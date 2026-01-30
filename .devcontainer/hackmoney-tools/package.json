@@ -1,0 +1,22 @@
+{
+    "name": "hackmoney-tools",
+    "private": true,
+    "description": "Scratchpad deps for hackathon prototyping (kept out of app deps).",
+    "dependencies": {
+      "@circle-fin/circle-sdk": "latest",
+      "@erc7824/nitrolite": "latest",
+      "@ensdomains/ensjs": "latest",
+      "@lifi/sdk": "latest",
+      "@mysten/sui": "latest",
+      "@tenderly/sdk": "latest",
+      "@uniswap/sdk-core": "latest",
+      "@uniswap/v4-sdk": "latest",
+      "@uniswap/v3-sdk": "latest",
+      "@types/node": "latest",
+      "dotenv": "latest",
+      "ethers": "latest",
+      "tsx": "latest",
+      "typescript": "latest",
+      "viem": "latest"
+    }
+  }
