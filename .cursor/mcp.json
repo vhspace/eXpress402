@@ -1,11 +1,14 @@
 {
   "mcpServers": {
     "github": {
-      "command": "docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server",
+      "command": "sh",
+      "args": [
+        "-c",
+        "docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_PERSONAL_ACCESS_TOKEN\" ghcr.io/github/github-mcp-server"
+      ],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "{$env:CURSOR_GITHUB_TOKEN}"
-      },
-      "args": []
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
     },
     "awslabs.terraform-mcp-server": {
       "command": "uvx awslabs.terraform-mcp-server@latest",

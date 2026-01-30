@@ -1,13 +1,13 @@
 {
     "name": "eXpress402 Development",
-  
+
     "build": {
       "dockerfile": "Dockerfile"
     },
-  
+
     "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
     "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-  
+
     "features": {
       "ghcr.io/devcontainers/features/common-utils:2": {
         "installZsh": true,
@@ -32,7 +32,7 @@
         "version": "latest"
       }
     },
-  
+
     // VS Code customizations
     "customizations": {
       "vscode": {
@@ -43,7 +43,7 @@
           "editor.rulers": [80, 120],
           "files.trimTrailingWhitespace": true,
           "files.insertFinalNewline": true,
-  
+
           // JavaScript/TypeScript
           "[javascript]": {
             "editor.defaultFormatter": "esbenp.prettier-vscode",
@@ -57,7 +57,7 @@
             "editor.defaultFormatter": "esbenp.prettier-vscode",
             "editor.formatOnSave": true
           },
-  
+
           // JSON
           "[json]": {
             "editor.defaultFormatter": "esbenp.prettier-vscode",
@@ -67,7 +67,7 @@
             "editor.defaultFormatter": "esbenp.prettier-vscode",
             "editor.formatOnSave": true
           },
-  
+
           // Solidity
           "[solidity]": {
             "editor.defaultFormatter": "NomicFoundation.hardhat-solidity",
@@ -75,39 +75,39 @@
           },
           "solidity.compileUsingRemoteVersion": "latest",
           "solidity.formatter": "forge",
-  
+
           // Shell scripts
           "[shellscript]": {
             "editor.defaultFormatter": "foxundermoon.shell-format",
             "files.eol": "\n"
           }
         },
-  
+
         "extensions": [
           // Solidity & Smart Contract Development
           "NomicFoundation.hardhat-solidity",
-  
+
           // Docker
           "ms-azuretools.vscode-docker",
-  
+
           // JavaScript/TypeScript
           "esbenp.prettier-vscode",
           "dbaeumer.vscode-eslint",
-  
+
           // Git
           "eamodio.gitlens",
           "github.vscode-pull-request-github",
           "Github.copilot",
           "Github.copilot-chat",
-  
+
           // Shell
           "foxundermoon.shell-format",
           "timonwong.shellcheck",
-  
+
           // Markdown
           "yzhang.markdown-all-in-one",
           "davidanson.vscode-markdownlint",
-  
+
           // Utilities
           "editorconfig.editorconfig",
           "christian-kohler.path-intellisense",
@@ -116,10 +116,11 @@
         ]
       }
     },
-  
+
     "remoteEnv": {
       "PATH": "${containerEnv:PATH}:/home/vscode/.foundry/bin:/home/vscode/go/bin:/home/vscode/.local/bin",
       "EDITOR": "code --wait",
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "${localEnv:CURSOR_GITHUB_TOKEN}",
       "TAVILY_API_KEY": "${localEnv:TAVILY_API_KEY}",
       "ALCHEMY_API_KEY": "${localEnv:ALCHEMY_API_KEY}",
       "ETHERSCAN_API_KEY": "${localEnv:ETHERSCAN_API_KEY}",
@@ -129,9 +130,9 @@
       "TENDERLY_ACCESS_TOKEN": "${localEnv:TENDERLY_ACCESS_TOKEN}",
       "ENS_PROVIDER_URL": "${localEnv:ENS_PROVIDER_URL}"
     },
-  
+
     "postCreateCommand": "bash -lc \"echo '[postCreate] installing hackmoney tool deps' && npm install --no-package-lock --prefix .devcontainer/hackmoney-tools\"",
-  
+
     "mounts": [
       {
         "source": "eXpress402-dev-home-data",
@@ -144,7 +145,7 @@
         "type": "volume"
       }
     ],
-  
+
     // Run arguments
     "runArgs": [
       "--privileged",
@@ -152,12 +153,12 @@
       "--name=eXpress402-dev",
       "--init"
     ],
-  
+
     "remoteUser": "vscode",
-  
+
     // Forward ports (for Next.js dev server and backend)
     "forwardPorts": [3000, 3001, 8545],
-  
+
     // Port attributes
     "portsAttributes": {
       "3000": {
@@ -174,4 +175,3 @@
       }
     }
   }
-  
