@@ -3,8 +3,10 @@ import { signPayload } from "./codec.js";
 import {
   createAuthRequestMessage,
   createAuthVerifyMessageFromChallenge,
+  createCloseAppSessionMessage,
   createECDSAMessageSigner,
   createEIP712AuthMessageSigner,
+  createGetAppSessionsMessageV2,
   createTransferMessage
 } from "@erc7824/nitrolite/dist/rpc/api.js";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
@@ -34,6 +36,23 @@ export type AuthOptions = {
   allowances?: Array<{ asset: string; amount: string }>;
   expiresInMs?: number;
   sessionPrivateKey?: `0x${string}`;
+};
+
+export type LedgerBalance = { asset: string; amount: string };
+export type AppSession = {
+  appSessionId: string;
+  application: string;
+  status: string;
+  participants: string[];
+  protocol: string;
+  challenge: number;
+  weights: number[];
+  quorum: number;
+  version: number;
+  nonce: number;
+  createdAt: string | number | Date;
+  updatedAt: string | number | Date;
+  sessionData?: string;
 };
 
 export class YellowRpcClient {
@@ -233,6 +252,38 @@ export class YellowRpcClient {
     const signingKey = this.sessionPrivateKey ?? (this.options.privateKey as `0x${string}`);
     const signer = createECDSAMessageSigner(signingKey);
     const message = await createTransferMessage(signer, params);
+    return await this.sendRaw(message);
+  }
+
+  async getLedgerBalances(accountId?: string): Promise<LedgerBalance[]> {
+    const response = await this.request<{ ledgerBalances: LedgerBalance[] }>("get_ledger_balances", {
+      ...(accountId ? { account_id: accountId } : {})
+    });
+    return response.ledgerBalances ?? [];
+  }
+
+  async getAppSessions(participant: string, status?: string): Promise<AppSession[]> {
+    const message = createGetAppSessionsMessageV2(participant, status);
+    const response = await this.sendRaw(message);
+    return (response?.appSessions ?? []) as AppSession[];
+  }
+
+  async closeAppSession(params: {
+    appSessionId: string;
+    allocations: Array<{ asset: string; amount: string; participant: string }>;
+    sessionData?: string;
+  }) {
+    if (!this.options.privateKey) {
+      throw new Error("Missing private key for close_app_session");
+    }
+    await this.authenticate();
+    const signingKey = this.sessionPrivateKey ?? (this.options.privateKey as `0x${string}`);
+    const signer = createECDSAMessageSigner(signingKey);
+    const message = await createCloseAppSessionMessage(signer, {
+      app_session_id: params.appSessionId as `0x${string}`,
+      allocations: params.allocations,
+      ...(params.sessionData ? { session_data: params.sessionData } : {})
+    });
     return await this.sendRaw(message);
   }
 

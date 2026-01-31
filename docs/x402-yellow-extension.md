@@ -62,9 +62,9 @@ Example:
 }
 ```
 
-## PaymentPayload
+## PaymentPayload (per-call fallback)
 
-Clients include a transfer receipt in the `payload` field and mirror the `yellow` extension.
+Clients include a transfer receipt in the `payload` field and mirror the `yellow` extension. This is the per-call fallback path.
 
 Example:
 
@@ -106,5 +106,9 @@ Example:
 ## Notes
 
 - This extension is intended for demos and experimentation.
-- Servers should verify the transfer using `get_ledger_transactions` on the clearnode.
+- Servers should verify per-call transfers using `get_ledger_transactions` on the clearnode.
+- For prepaid app sessions, clients pass `_meta["x402/yellow"]` with:
+  - `appSessionId` (required)
+  - `payer` (optional, used for close/refund)
+- Servers query `get_ledger_balances` for the session account and debit per call. If the balance is insufficient, they return 402 and may attempt `close_app_session` to refund remaining allocation.
 - Use the hosted sandbox clearnode for testing: `wss://clearnet-sandbox.yellow.com/ws`.
