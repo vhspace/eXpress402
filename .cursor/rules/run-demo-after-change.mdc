@@ -1,0 +1,12 @@
+---
+description: Run demo after changes
+alwaysApply: true
+---
+
+# Run Demo After Changes
+
+After making code changes, run the demo to test:
+
+```bash
+set -a && source .env && npm run demo
+```
