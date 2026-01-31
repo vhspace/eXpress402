@@ -120,7 +120,7 @@
     "remoteEnv": {
       "PATH": "${containerEnv:PATH}:/home/vscode/.foundry/bin:/home/vscode/go/bin:/home/vscode/.local/bin",
       "EDITOR": "code --wait",
-      "GITHUB_PERSONAL_ACCESS_TOKEN": "${localEnv:CURSOR_GITHUB_TOKEN}",
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "${localEnv:CURSOR_HACKATHON_TOKEN}",
       "TAVILY_API_KEY": "${localEnv:TAVILY_API_KEY}",
       "ALCHEMY_API_KEY": "${localEnv:ALCHEMY_API_KEY}",
       "ETHERSCAN_API_KEY": "${localEnv:ETHERSCAN_API_KEY}",

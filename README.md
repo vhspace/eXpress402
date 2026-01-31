@@ -1,6 +1,16 @@
-# x402 + Yellow MCP Demo
+# eXpress402
 
 Hackathon demo MCP server implementing x402 v2 payments with Yellow off-chain settlement (Nitro RPC). Exposes paid financial tools backed by real data sources (no mocks).
+
+## Architecture sketch
+
+![x402 v2 + Yellow offchain MCP architecture](docs/assets/x402-yellow-architecture.png)
+
+## Billing model (offchain default)
+
+- **Default**: prepaid app-session billing (faster for agents). The client passes `_meta["x402/yellow"]` with an `appSessionId` and optional `payer`. The server queries Yellow ledger balances for that session and decrements usage per call.
+- **Fallback**: per-call Yellow transfer receipts via `_meta["x402/payment"]` and ledger verification.
+- **Depletion**: if the session balance is below `YELLOW_PRICE_PER_CALL`, the server attempts to close/refund the session (requires `YELLOW_MERCHANT_PRIVATE_KEY`) and returns 402 with `errorReason: "insufficient_balance"`.
 
 ## What this provides
 

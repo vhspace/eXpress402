@@ -13,6 +13,7 @@ const PAYMENT_RESOURCE_BASE = "mcp://tool";
 const env = {
   clearnodeUrl: process.env.YELLOW_CLEARNODE_URL ?? "wss://clearnet-sandbox.yellow.com/ws",
   merchantAddress: process.env.YELLOW_MERCHANT_ADDRESS ?? "",
+  merchantPrivateKey: process.env.YELLOW_MERCHANT_PRIVATE_KEY ?? "",
   assetSymbol: process.env.YELLOW_ASSET_SYMBOL ?? "usdc",
   pricePerCall: process.env.YELLOW_PRICE_PER_CALL ?? "0.1",
   network: process.env.YELLOW_NETWORK ?? "yellow:sandbox",
@@ -25,6 +26,10 @@ if (!env.merchantAddress) {
 }
 
 const yellowClient = new YellowRpcClient({ url: env.clearnodeUrl });
+const yellowAuthClient = new YellowRpcClient({
+  url: env.clearnodeUrl,
+  privateKey: env.merchantPrivateKey || undefined
+});
 
 export async function startMcpServer() {
   const server = new McpServer({
@@ -83,6 +88,10 @@ async function requirePayment(extra: RequestHandlerExtra, toolName: string) {
   }
 
   const payment = extra._meta?.["x402/payment"] as unknown;
+  const yellowMeta = (extra._meta?.["x402/yellow"] ?? {}) as {
+    appSessionId?: string;
+    payer?: string;
+  };
   const resourceUrl = `${PAYMENT_RESOURCE_BASE}/${toolName}`;
   const paymentRequired = buildPaymentRequired(
     {
@@ -97,8 +106,29 @@ async function requirePayment(extra: RequestHandlerExtra, toolName: string) {
     `Paid tool: ${toolName}`
   );
 
-  if (!payment) {
+  if (!payment && !yellowMeta.appSessionId) {
     throw new McpError(402, "Payment required", paymentRequired);
+  }
+
+  if (yellowMeta.appSessionId) {
+    const payer = yellowMeta.payer ?? env.agentAddress ?? "";
+    const balance = await fetchSessionBalance(yellowMeta.appSessionId, env.assetSymbol);
+    if (balance < Number(env.pricePerCall)) {
+      await attemptCloseAppSession(yellowMeta.appSessionId, payer, balance);
+      const paymentResponse = buildSettlementResponse(
+        false,
+        env.network,
+        payer,
+        yellowMeta.appSessionId,
+        "insufficient_balance"
+      );
+      throw new McpError(402, "Offchain balance depleted", {
+        ...paymentRequired,
+        "x402/payment-response": paymentResponse
+      });
+    }
+
+    return buildSettlementResponse(true, env.network, payer, yellowMeta.appSessionId);
   }
 
   const validation = validateYellowPayment(payment, {
@@ -141,4 +171,36 @@ async function requirePayment(extra: RequestHandlerExtra, toolName: string) {
     validation.info.payer,
     String(validation.info.transferId)
   );
+}
+
+async function fetchSessionBalance(appSessionId: string, asset: string): Promise<number> {
+  const balances = await yellowClient.getLedgerBalances(appSessionId);
+  const match = balances.find((entry) => entry.asset === asset);
+  const amount = match ? Number(match.amount) : 0;
+  return Number.isNaN(amount) ? 0 : amount;
+}
+
+async function attemptCloseAppSession(appSessionId: string, payer: string, amount: number) {
+  if (!env.merchantPrivateKey || !payer) {
+    return;
+  }
+
+  try {
+    const sessions = await yellowClient.getAppSessions(payer);
+    const session = sessions.find((item) => item.appSessionId === appSessionId);
+    if (!session) {
+      return;
+    }
+    const allocations = session.participants.map((participant) => ({
+      participant,
+      asset: env.assetSymbol,
+      amount: participant.toLowerCase() === payer.toLowerCase() ? String(amount) : "0"
+    }));
+    await yellowAuthClient.closeAppSession({
+      appSessionId,
+      allocations
+    });
+  } catch (error) {
+    console.error("Failed to close app session:", error);
+  }
 }
