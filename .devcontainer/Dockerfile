@@ -27,6 +27,9 @@ RUN curl -fsSL https://dl.yarnpkg.com/debian/pubkey.gpg \
 RUN GOBIN=/usr/local/bin go install github.com/lifinance/lifi-mcp@latest
 RUN GOBIN=/usr/local/bin go install github.com/huahuayu/etherscan-mcp-server/cmd/etherscan-mcp-server@latest
 
+# Install uv for Python package management (used by some MCP servers)
+RUN pip3 install uv
+
 
 RUN install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://downloads.1password.com/linux/keys/1password.asc | gpg --dearmor -o /etc/apt/keyrings/1password-archive-keyring.gpg \
