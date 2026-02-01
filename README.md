@@ -51,6 +51,12 @@ Required:
 - `YELLOW_MERCHANT_ADDRESS` - Your payment recipient address
 - `TAVILY_API_KEY` - For market research (optional)
 
+Demo trade loop:
+- `YELLOW_TRADE_COUNT` - Number of trade iterations (default: 5)
+- `YELLOW_TRADE_SIZE` - Position size per trade (default: 1)
+- `YELLOW_TRADE_DELAY_MS` - Delay between trades in ms (default: 0)
+- `YELLOW_TRADE_SYMBOLS` - Comma-separated tickers to cycle
+
 Coinbase CDP AgentKit (demo):
 - `CDP_API_KEY_ID` - CDP API key ID
 - `CDP_API_KEY_SECRET` - CDP API key secret

@@ -117,6 +117,8 @@ Example:
 
 The demo script initializes a Coinbase CDP AgentKit wallet, lists MCP tools, verifies the `yellow` payment
 extension in the 402 response, and then creates a prepaid app session on the Yellow sandbox by default.
+It then runs a high speed trade loop that repeatedly calls `stock_price` and `market_rumors` to exercise
+the Yellow x402 session.
 
 Required environment variables:
 - `CDP_API_KEY_ID`
@@ -129,6 +131,12 @@ Optional environment variables:
 - `CDP_IDEMPOTENCY_KEY` (create or reuse a wallet deterministically)
 - `CDP_RPC_URL` (override the RPC endpoint for read-only calls)
 - `CDP_ONRAMP_PROJECT_ID` (required in production to generate the onramp URL)
+
+Trade loop configuration:
+- `YELLOW_TRADE_COUNT` (default: 5)
+- `YELLOW_TRADE_SIZE` (default: 1)
+- `YELLOW_TRADE_DELAY_MS` (default: 0)
+- `YELLOW_TRADE_SYMBOLS` (comma-separated tickers)
 
 ## Production deposit flow (overview)
 

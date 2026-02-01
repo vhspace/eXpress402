@@ -114,6 +114,174 @@ function truncateOutput(value: string, maxLength = 80) {
   return `${value.slice(0, maxLength - 3)}...`;
 }
 
+type StockQuote = {
+  symbol: string;
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  source: string;
+};
+
+type MarketRumors = {
+  symbol: string;
+  reddit: Array<{ title: string }>;
+  tavily: Array<{ title: string; content: string }>;
+};
+
+type TradeSettings = {
+  count: number;
+  size: number;
+  delayMs: number;
+  symbols: string[];
+};
+
+type TradeSummary = {
+  localSessionBalance: number;
+  spentTotal: number;
+  cash: number;
+  positions: Record<string, number>;
+  lastPrices: Record<string, number>;
+};
+
+const POSITIVE_RUMOR_KEYWORDS = [
+  "beat",
+  "upgrade",
+  "bull",
+  "record",
+  "surge",
+  "strong",
+  "profit",
+  "growth",
+  "rally"
+];
+
+const NEGATIVE_RUMOR_KEYWORDS = [
+  "miss",
+  "downgrade",
+  "bear",
+  "lawsuit",
+  "probe",
+  "weak",
+  "drop",
+  "decline",
+  "loss",
+  "slump"
+];
+
+function parseToolText(result: unknown, toolName: string): string {
+  const text = (result as { content?: Array<{ text?: string }> }).content?.[0]?.text;
+  if (!text) {
+    throw new Error(`Missing ${toolName} content: ${JSON.stringify(result)}`);
+  }
+  return text;
+}
+
+function parseToolJson<T>(result: unknown, toolName: string): T {
+  const text = parseToolText(result, toolName);
+  try {
+    return JSON.parse(text) as T;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Failed to parse ${toolName} JSON: ${message}. Raw: ${truncateOutput(text, 240)}`
+    );
+  }
+}
+
+function assertValidQuote(quote: StockQuote) {
+  if (!quote.symbol || !Number.isFinite(quote.close)) {
+    throw new Error(`Invalid stock quote payload: ${JSON.stringify(quote)}`);
+  }
+}
+
+function assertValidRumors(rumors: MarketRumors) {
+  if (!rumors.symbol || !Array.isArray(rumors.reddit) || !Array.isArray(rumors.tavily)) {
+    throw new Error(`Invalid rumor payload: ${JSON.stringify(rumors)}`);
+  }
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function scoreKeywords(text: string, keywords: string[]) {
+  let score = 0;
+  for (const keyword of keywords) {
+    if (!keyword) {
+      continue;
+    }
+    const matches = text.match(new RegExp(`\\b${escapeRegex(keyword)}\\b`, "g"));
+    score += matches ? matches.length : 0;
+  }
+  return score;
+}
+
+function scoreRumors(rumors: MarketRumors) {
+  const redditText = rumors.reddit.map((post) => post.title).join(" ");
+  const tavilyText = rumors.tavily.map((entry) => `${entry.title} ${entry.content}`).join(" ");
+  const combined = `${redditText} ${tavilyText}`.toLowerCase();
+  const positive = scoreKeywords(combined, POSITIVE_RUMOR_KEYWORDS);
+  const negative = scoreKeywords(combined, NEGATIVE_RUMOR_KEYWORDS);
+  return positive - negative;
+}
+
+function decideTradeSide(
+  quote: StockQuote,
+  rumorScore: number,
+  lastClose?: number
+): { side: "BUY" | "SELL"; reason: string } {
+  const momentum = lastClose === undefined ? 0 : quote.close - lastClose;
+  const momentumSignal = Math.sign(momentum);
+  const rumorSignal = Math.sign(rumorScore);
+  const combined = momentumSignal + rumorSignal;
+  if (combined > 0) {
+    return { side: "BUY", reason: `momentum=${momentum} rumorScore=${rumorScore}` };
+  }
+  if (combined < 0) {
+    return { side: "SELL", reason: `momentum=${momentum} rumorScore=${rumorScore}` };
+  }
+  return { side: "BUY", reason: `neutral signal, default buy. rumorScore=${rumorScore}` };
+}
+
+function getTradeSettings(): TradeSettings {
+  const countRaw = process.env.YELLOW_TRADE_COUNT ?? "5";
+  const sizeRaw = process.env.YELLOW_TRADE_SIZE ?? "1";
+  const delayRaw = process.env.YELLOW_TRADE_DELAY_MS ?? "0";
+  const count = Number(countRaw);
+  const size = Number(sizeRaw);
+  const delayMs = Number(delayRaw);
+  if (!Number.isFinite(count) || count <= 0) {
+    throw new Error(`Invalid YELLOW_TRADE_COUNT: ${countRaw}`);
+  }
+  if (!Number.isFinite(size) || size <= 0) {
+    throw new Error(`Invalid YELLOW_TRADE_SIZE: ${sizeRaw}`);
+  }
+  if (!Number.isFinite(delayMs) || delayMs < 0) {
+    throw new Error(`Invalid YELLOW_TRADE_DELAY_MS: ${delayRaw}`);
+  }
+  const symbolRaw = process.env.YELLOW_TRADE_SYMBOLS ?? "";
+  const symbols = symbolRaw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return {
+    count,
+    size,
+    delayMs,
+    symbols: symbols.length ? symbols : SAMPLE_SP500_TICKERS
+  };
+}
+
+async function sleep(delayMs: number) {
+  if (delayMs <= 0) {
+    return;
+  }
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
 async function createCdpAgentKit(config: CdpConfig) {
   logStage("Initializing Coinbase AgentKit");
   const walletProvider = await CdpEvmWalletProvider.configureWithWallet({
@@ -237,13 +405,6 @@ const SAMPLE_SP500_TICKERS = [
   "MRK"
 ];
 
-function pickRandomTicker(exclude?: string) {
-  const options = exclude
-    ? SAMPLE_SP500_TICKERS.filter((ticker) => ticker !== exclude)
-    : SAMPLE_SP500_TICKERS;
-  return options[Math.floor(Math.random() * options.length)];
-}
-
 function runProductionChannelFlow(cdpWalletAddress?: string) {
   logStage("Production channel flow (Yellow custody)");
   const required = {
@@ -323,6 +484,109 @@ async function createAppSession(
   return { appSessionId, allocations };
 }
 
+async function runTradeLoop(params: {
+  client: Client;
+  yellow: YellowRpcClient;
+  appSessionId: string;
+  agentAddress: string;
+  assetSymbol: string;
+  tradeSettings: TradeSettings;
+  startingBalance: number;
+}) {
+  const { client, yellow, appSessionId, agentAddress, assetSymbol, tradeSettings } = params;
+  const positions: Record<string, number> = {};
+  const lastPrices: Record<string, number> = {};
+  let cash = 0;
+  let localSessionBalance = params.startingBalance;
+  let spentTotal = 0;
+
+  console.log("trade symbols", tradeSettings.symbols.join(", "));
+  console.log("trade count", tradeSettings.count, "trade size", tradeSettings.size);
+
+  for (let index = 0; index < tradeSettings.count; index += 1) {
+    const symbol = tradeSettings.symbols[index % tradeSettings.symbols.length];
+    logStage(`Trade ${index + 1}/${tradeSettings.count}: ${symbol}`);
+
+    const stockResult = await client.callTool({
+      name: "stock_price",
+      arguments: { symbol },
+      _meta: { "x402/yellow": { appSessionId, payer: agentAddress } }
+    });
+    const quote = parseToolJson<StockQuote>(stockResult, "stock_price");
+    assertValidQuote(quote);
+    const stockPrice = getToolPrice("stock_price");
+    localSessionBalance -= stockPrice;
+    spentTotal += stockPrice;
+
+    const rumorsResult = await client.callTool({
+      name: "market_rumors",
+      arguments: { symbol },
+      _meta: { "x402/yellow": { appSessionId, payer: agentAddress } }
+    });
+    const rumors = parseToolJson<MarketRumors>(rumorsResult, "market_rumors");
+    assertValidRumors(rumors);
+    const rumorsPrice = getToolPrice("market_rumors");
+    localSessionBalance -= rumorsPrice;
+    spentTotal += rumorsPrice;
+
+    if (localSessionBalance < 0) {
+      throw new Error(`Session balance depleted mid-trade: ${localSessionBalance}`);
+    }
+
+    const rumorScore = scoreRumors(rumors);
+    const lastClose = lastPrices[symbol];
+    const { side, reason } = decideTradeSide(quote, rumorScore, lastClose);
+    lastPrices[symbol] = quote.close;
+
+    const currentPosition = positions[symbol] ?? 0;
+    const tradeSize = tradeSettings.size;
+    const tradeNotional = quote.close * tradeSize;
+    const nextPosition = side === "BUY" ? currentPosition + tradeSize : currentPosition - tradeSize;
+    positions[symbol] = nextPosition;
+    cash += side === "BUY" ? -tradeNotional : tradeNotional;
+
+    const portfolioValue = Object.entries(positions).reduce((total, [ticker, qty]) => {
+      const price = lastPrices[ticker];
+      if (!Number.isFinite(price)) {
+        return total;
+      }
+      return total + qty * price;
+    }, cash);
+
+    console.log(
+      "trade",
+      JSON.stringify(
+        {
+          symbol,
+          side,
+          price: quote.close,
+          rumorScore,
+          reason,
+          position: nextPosition,
+          cash,
+          portfolioValue
+        },
+        null,
+        2
+      )
+    );
+
+    logStage("Session balance after trade");
+    console.log("session", appSessionId, "balance", await safeBalance(yellow, appSessionId, assetSymbol));
+    console.log("session (local)", localSessionBalance);
+
+    await sleep(tradeSettings.delayMs);
+  }
+
+  return {
+    localSessionBalance,
+    spentTotal,
+    cash,
+    positions,
+    lastPrices
+  } satisfies TradeSummary;
+}
+
 async function main() {
   logStage("Booting demo");
   console.log(getFundingHint(env.mode));
@@ -393,9 +657,10 @@ async function main() {
       throw new Error(`MCP server missing tools: ${[...toolNames].join(", ")}`);
     }
 
-    const stockSymbol = pickRandomTicker();
+    const tradeSettings = getTradeSettings();
+    const probeSymbol = tradeSettings.symbols[0];
     logStage("Step 3: verify yellow protocol via payment required");
-    await detectYellowProtocol(client, "stock_price", stockSymbol);
+    await detectYellowProtocol(client, "stock_price", probeSymbol);
 
     logStage("Step 4: create prepaid session (allocation + TTL)");
     const { appSessionId, allocations } = await createAppSession(
@@ -414,66 +679,41 @@ async function main() {
     if (Number.isNaN(localSessionBalance)) {
       throw new Error(`Invalid session allocation for agent: ${agentAllocation}`);
     }
-    let spentTotal = 0;
-
-    logStage(`Step 5: call MCP (stock_price) using Yellow session (${stockSymbol})`);
-    try {
-      const stock = await client.callTool({
-        name: "stock_price",
-        arguments: { symbol: stockSymbol },
-        _meta: { "x402/yellow": { appSessionId, payer: agentAddress } }
-      });
-      const stockText = (stock as { content?: Array<{ text?: string }> }).content?.[0]?.text;
-      logStage("Step 6: MCP result (stock_price)");
-      console.log(truncateOutput(stockText ?? JSON.stringify(stock)));
-    } catch (error) {
-      logStage("Step 6: MCP result (stock_price) failed");
-      console.error(error);
-      throw error;
-    }
-    const stockPrice = getToolPrice("stock_price");
-    localSessionBalance -= stockPrice;
-    spentTotal += stockPrice;
-
-    logStage("Step 7: session balance after stock_price");
-    console.log(
-      "session",
+    logStage("Step 5: run high speed trade loop");
+    const tradeSummary = await runTradeLoop({
+      client,
+      yellow,
       appSessionId,
-      "balance",
-      await safeBalance(yellow, appSessionId, assetSymbol)
+      agentAddress,
+      assetSymbol,
+      tradeSettings,
+      startingBalance: localSessionBalance
+    });
+
+    const portfolioValue = Object.entries(tradeSummary.positions).reduce(
+      (total, [ticker, qty]) => {
+        const price = tradeSummary.lastPrices[ticker];
+        if (!Number.isFinite(price)) {
+          return total;
+        }
+        return total + qty * price;
+      },
+      tradeSummary.cash
     );
-    console.log("session (local)", localSessionBalance);
-
-    const rumorsSymbol = pickRandomTicker(stockSymbol);
-    logStage(`Step 8: call MCP (market_rumors) using Yellow session (${rumorsSymbol})`);
-    try {
-      const rumors = await client.callTool({
-        name: "market_rumors",
-        arguments: { symbol: rumorsSymbol },
-        _meta: { "x402/yellow": { appSessionId, payer: agentAddress } }
-      });
-      const rumorsText = (rumors as { content?: Array<{ text?: string }> }).content?.[0]?.text;
-      logStage("Step 9: MCP result (market_rumors)");
-      console.log(truncateOutput(rumorsText ?? JSON.stringify(rumors)));
-    } catch (error) {
-      logStage("Step 9: MCP result (market_rumors) failed");
-      console.error(error);
-      throw error;
-    }
-    const rumorsPrice = getToolPrice("market_rumors");
-    localSessionBalance -= rumorsPrice;
-    spentTotal += rumorsPrice;
-
-    logStage("Step 10: session balance after market_rumors");
     console.log(
-      "session",
-      appSessionId,
-      "balance",
-      await safeBalance(yellow, appSessionId, assetSymbol)
+      "trade summary",
+      JSON.stringify(
+        {
+          positions: tradeSummary.positions,
+          cash: tradeSummary.cash,
+          portfolioValue
+        },
+        null,
+        2
+      )
     );
-    console.log("session (local)", localSessionBalance);
 
-    logStage("Step 11: close out offchain wallet (close app session)");
+    logStage("Step 6: close out offchain wallet (close app session)");
     const sessionBalance = await safeBalance(yellow, appSessionId, assetSymbol);
     const merchantParticipant =
       sessionParticipants.find(
@@ -484,9 +724,9 @@ async function main() {
       asset: assetSymbol,
       amount:
         participant.toLowerCase() === agentAddress.toLowerCase()
-          ? localSessionBalance.toString()
+          ? tradeSummary.localSessionBalance.toString()
           : participant.toLowerCase() === merchantParticipant?.toLowerCase()
-            ? spentTotal.toString()
+            ? tradeSummary.spentTotal.toString()
             : "0"
     }));
     const closeSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
@@ -497,7 +737,7 @@ async function main() {
     await yellow.sendRawMessage(closeMessage);
     console.log("session", appSessionId, "balance", await safeBalance(yellow, appSessionId, assetSymbol));
 
-    logStage("Step 12: unified balance after close");
+    logStage("Step 7: unified balance after close");
     const finalAgentBalance = await safeBalance(yellow, agentAddress, assetSymbol);
     console.log("agent", agentAddress, "balance", finalAgentBalance);
     const initialValue = Number(initialAgentBalance);
