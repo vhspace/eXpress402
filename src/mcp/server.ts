@@ -223,8 +223,8 @@ async function fetchSessionBalance(appSessionId: string, asset: string): Promise
   const client = env.sessionPrivateKey
     ? (yellowSessionClient ?? yellowAuthClient)
     : env.merchantPrivateKey
-    ? yellowAuthClient
-    : yellowClient;
+      ? yellowAuthClient
+      : yellowClient;
 
   if (!client) throw new Error('No Yellow client available');
   if (env.sessionPrivateKey || env.merchantPrivateKey) {
