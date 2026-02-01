@@ -329,7 +329,16 @@ async function runPerCallFlow(
     Array.isArray(stock.content) ? stock.content[0]?.text : JSON.stringify(stock),
   );
 
-  console.log('market_rumors: skipped in per-call flow (covered in demo flow).');
+  const rumorsPayment = await createPaymentPayload({ env, yellow, assetSymbol, agentAddress });
+  const rumors = await client.callTool({
+    name: 'market_rumors',
+    arguments: { symbol: 'AAPL' },
+    _meta: { 'x402/payment': rumorsPayment },
+  });
+  console.log(
+    'market_rumors:',
+    Array.isArray(rumors.content) ? rumors.content[0]?.text : JSON.stringify(rumors),
+  );
 }
 
 async function runAppSessionFlow(
@@ -387,24 +396,19 @@ async function runAppSessionFlow(
   localSessionBalance -= stockPrice;
   spentTotal += stockPrice;
 
-  const shouldRunRumors = process.env.SKIP_TAVILY_TESTS !== 'true';
-  if (shouldRunRumors) {
-    const rumorsSymbol = 'AAPL';
-    logStage(`Demo: call MCP (market_rumors) using Yellow session (${rumorsSymbol})`);
-    const rumors = await client.callTool({
-      name: 'market_rumors',
-      arguments: { symbol: rumorsSymbol },
-      _meta: { 'x402/yellow': { appSessionId, payer: agentAddress } },
-    });
-    const rumorsText = (rumors as { content?: Array<{ text?: string }> }).content?.[0]?.text;
-    console.log(truncateOutput(rumorsText ?? JSON.stringify(rumors)));
+  const rumorsSymbol = 'AAPL';
+  logStage(`Demo: call MCP (market_rumors) using Yellow session (${rumorsSymbol})`);
+  const rumors = await client.callTool({
+    name: 'market_rumors',
+    arguments: { symbol: rumorsSymbol },
+    _meta: { 'x402/yellow': { appSessionId, payer: agentAddress } },
+  });
+  const rumorsText = (rumors as { content?: Array<{ text?: string }> }).content?.[0]?.text;
+  console.log(truncateOutput(rumorsText ?? JSON.stringify(rumors)));
 
-    const rumorsPrice = getToolPrice(env, 'market_rumors');
-    localSessionBalance -= rumorsPrice;
-    spentTotal += rumorsPrice;
-  } else {
-    console.log('market_rumors: SKIPPED (TAVILY tests disabled)');
-  }
+  const rumorsPrice = getToolPrice(env, 'market_rumors');
+  localSessionBalance -= rumorsPrice;
+  spentTotal += rumorsPrice;
 
   logStage('Demo: close app session');
   const merchantParticipant =
@@ -435,6 +439,11 @@ async function main() {
 
   if (!env.agentPrivateKey || !env.merchantAddress) {
     console.error('YELLOW_AGENT_PRIVATE_KEY and YELLOW_MERCHANT_ADDRESS are required.');
+    process.exit(1);
+  }
+
+  if (!process.env.TAVILY_API_KEY) {
+    console.error('TAVILY_API_KEY is required to run market_rumors in e2e.');
     process.exit(1);
   }
 
