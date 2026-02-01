@@ -61,7 +61,7 @@ Run the complete paid workflow:
 npm run demo
 ```
 
-This demonstrates the full payment flow from funding to tool usage with balance tracking.
+This demonstrates the full payment flow from funding to tool usage with balance tracking. It also includes an offline MCP scenario that closes the app session and reclaims unused allocation to show offchain wallet safety.
 
 ## Documentation
 

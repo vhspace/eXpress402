@@ -44,12 +44,22 @@ async function getBalance(client: YellowRpcClient, accountId: string, asset: str
   return match?.amount ?? "0";
 }
 
+function logError(context: string, error: unknown) {
+  if (error instanceof Error) {
+    console.error(`${context}: ${error.message}`);
+    if (error.stack) {
+      console.error(error.stack);
+    }
+    return;
+  }
+  console.error(`${context}: ${String(error)}`);
+}
+
 async function safeBalance(client: YellowRpcClient, accountId: string, asset: string) {
   try {
     return await getBalance(client, accountId, asset);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.log(`balance unavailable (${accountId}): ${message}`);
+    logError(`balance unavailable (${accountId})`, error);
     return "unavailable";
   }
 }
@@ -172,6 +182,43 @@ async function createAppSession(
   return { appSessionId, allocations };
 }
 
+async function closeOutSession(
+  yellow: YellowRpcClient,
+  appSessionId: string,
+  participants: `0x${string}`[],
+  assetSymbol: string,
+  agentAddress: string,
+  agentRemaining: number,
+  merchantSpent: number
+) {
+  const sessionBalance = await safeBalance(yellow, appSessionId, assetSymbol);
+  if (sessionBalance === "unavailable") {
+    console.log("close skipped: session balance unavailable");
+    return;
+  }
+
+  const merchantParticipant =
+    participants.find((participant) => participant.toLowerCase() !== agentAddress.toLowerCase()) ??
+    env.merchantAddress;
+  const closeAllocations = participants.map((participant) => ({
+    participant: participant as `0x${string}`,
+    asset: assetSymbol,
+    amount:
+      participant.toLowerCase() === agentAddress.toLowerCase()
+        ? agentRemaining.toString()
+        : participant.toLowerCase() === merchantParticipant?.toLowerCase()
+          ? merchantSpent.toString()
+          : "0"
+  }));
+  const closeSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
+  const closeMessage = await createCloseAppSessionMessage(closeSigner, {
+    app_session_id: appSessionId as `0x${string}`,
+    allocations: closeAllocations
+  });
+  await yellow.sendRawMessage(closeMessage);
+  console.log("session", appSessionId, "balance", await safeBalance(yellow, appSessionId, assetSymbol));
+}
+
 async function main() {
   logStage("Booting demo");
   console.log(getFundingHint(env.mode));
@@ -235,6 +282,14 @@ async function main() {
   });
   const client = new Client({ name: "demo-e2e", version: "0.0.1" });
   await client.connect(transport);
+  let clientClosed = false;
+  const closeClient = async () => {
+    if (clientClosed) {
+      return;
+    }
+    clientClosed = true;
+    await client.close();
+  };
 
   const stockSymbol = pickRandomTicker();
   logStage(`Step 2: call MCP (stock_price) using Yellow session (${stockSymbol})`);
@@ -251,7 +306,7 @@ async function main() {
     stockPaid = true;
   } catch (error) {
     logStage("Step 3: MCP result (stock_price) failed");
-    console.log(error);
+    logError("stock_price call failed", error);
   }
   if (stockPaid) {
     const price = getToolPrice("stock_price");
@@ -277,7 +332,7 @@ async function main() {
     rumorsPaid = true;
   } catch (error) {
     logStage("Step 3: MCP result (market_rumors) failed");
-    console.log(error);
+    logError("market_rumors call failed", error);
   }
   if (rumorsPaid) {
     const price = getToolPrice("market_rumors");
@@ -289,44 +344,87 @@ async function main() {
   console.log("session (local)", localSessionBalance);
 
   logStage("Step 5: close out offchain wallet (close app session)");
-  const sessionBalance = await safeBalance(yellow, appSessionId, assetSymbol);
-  if (sessionBalance !== "unavailable") {
-    const merchantParticipant =
-      sessionParticipants.find(
-        (participant) => participant.toLowerCase() !== agentAddress.toLowerCase()
-      ) ?? env.merchantAddress;
-    const closeAllocations = sessionParticipants.map((participant) => ({
-      participant: participant as `0x${string}`,
-      asset: assetSymbol,
-      amount:
-        participant.toLowerCase() === agentAddress.toLowerCase()
-          ? localSessionBalance.toString()
-          : participant.toLowerCase() === merchantParticipant?.toLowerCase()
-            ? spentTotal.toString()
-            : "0"
-    }));
-    const closeSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
-    const closeMessage = await createCloseAppSessionMessage(closeSigner, {
-      app_session_id: appSessionId as `0x${string}`,
-      allocations: closeAllocations
-    });
-    await yellow.sendRawMessage(closeMessage);
-    console.log("session", appSessionId, "balance", await safeBalance(yellow, appSessionId, assetSymbol));
-  } else {
-    console.log("close skipped: session balance unavailable");
-  }
+  await closeOutSession(
+    yellow,
+    appSessionId,
+    sessionParticipants,
+    assetSymbol,
+    agentAddress,
+    localSessionBalance,
+    spentTotal
+  );
 
   logStage("Step 6: unified balance after close");
-  const finalAgentBalance = await safeBalance(yellow, agentAddress, assetSymbol);
-  console.log("agent", agentAddress, "balance", finalAgentBalance);
+  const balanceAfterPaidCalls = await safeBalance(yellow, agentAddress, assetSymbol);
+  console.log("agent", agentAddress, "balance", balanceAfterPaidCalls);
   const initialValue = Number(initialAgentBalance);
-  const finalValue = Number(finalAgentBalance);
-  if (!Number.isNaN(initialValue) && !Number.isNaN(finalValue)) {
-    const delta = finalValue - initialValue;
+  const postPaidValue = Number(balanceAfterPaidCalls);
+  if (!Number.isNaN(initialValue) && !Number.isNaN(postPaidValue)) {
+    const delta = postPaidValue - initialValue;
     console.log("agent delta", delta.toFixed(4));
   }
 
-  await client.close();
+  logStage("Fraud prevention: MCP offline after session start");
+  const { appSessionId: offlineSessionId, allocations: offlineAllocations } = await createAppSession(
+    yellow,
+    sessionParticipants,
+    assetSymbol,
+    sessionTtlSeconds
+  );
+  console.log("appSessionId", offlineSessionId);
+  console.log("ttlSeconds", sessionTtlSeconds);
+  console.log("allocations", offlineAllocations);
+  const offlineAgentAllocation =
+    offlineAllocations.find(
+      (entry) => entry.participant.toLowerCase() === agentAddress.toLowerCase()
+    )?.amount ?? "0";
+  const offlineLocalBalance = Number(offlineAgentAllocation);
+
+  logStage("Step 7: MCP goes offline before use");
+  await closeClient();
+  const offlineSymbol = pickRandomTicker();
+  logStage(`Step 7: call MCP (stock_price) after offline (${offlineSymbol})`);
+  try {
+    await client.callTool({
+      name: "stock_price",
+      arguments: { symbol: offlineSymbol },
+      _meta: { "x402/yellow": { appSessionId: offlineSessionId, payer: agentAddress } }
+    });
+  } catch (error) {
+    logStage("Step 7: MCP offline call failed as expected");
+    logError("offline stock_price call failed", error);
+  }
+
+  logStage("Step 8: session balance after offline attempt");
+  console.log(
+    "session",
+    offlineSessionId,
+    "balance",
+    await safeBalance(yellow, offlineSessionId, assetSymbol)
+  );
+  console.log("session (local)", offlineLocalBalance);
+
+  logStage("Step 9: close offline session to reclaim funds");
+  await closeOutSession(
+    yellow,
+    offlineSessionId,
+    sessionParticipants,
+    assetSymbol,
+    agentAddress,
+    offlineLocalBalance,
+    0
+  );
+
+  logStage("Step 10: unified balance after offline close");
+  const balanceAfterOfflineClose = await safeBalance(yellow, agentAddress, assetSymbol);
+  console.log("agent", agentAddress, "balance", balanceAfterOfflineClose);
+  const finalValue = Number(balanceAfterOfflineClose);
+  if (!Number.isNaN(postPaidValue) && !Number.isNaN(finalValue)) {
+    const delta = finalValue - postPaidValue;
+    console.log("agent delta after offline close", delta.toFixed(4));
+  }
+
+  await closeClient();
 }
 
 main().catch((error) => {
