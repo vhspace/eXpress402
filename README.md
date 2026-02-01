@@ -63,6 +63,11 @@ npm run demo
 
 This demonstrates the full payment flow from funding to tool usage with balance tracking.
 
+## Demo Website
+
+A static demo website is included at the repository root for Vercel deployment.
+See [docs/demo-site.md](docs/demo-site.md) for deployment and preview details.
+
 ## Documentation
 
 - [x402 Yellow Extension](docs/x402-yellow-extension.md) - Payment protocol details

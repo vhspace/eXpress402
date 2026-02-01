@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>eXpress402 - Paid MCP Market Data</title>
+    <meta
+      name="description"
+      content="eXpress402 is a paid MCP server for high-volume market data access using x402 and Yellow Network off-chain payment channels."
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #0b0f17;
+        --panel: #121826;
+        --accent: #f3b63f;
+        --accent-2: #3b82f6;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --border: #1f2937;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .container {
+        width: min(1100px, 92vw);
+        margin: 0 auto;
+      }
+
+      .hero {
+        padding: 80px 0 40px;
+        border-bottom: 1px solid var(--border);
+        background: radial-gradient(
+            circle at 10% 20%,
+            rgba(59, 130, 246, 0.25),
+            transparent 45%
+          ),
+          radial-gradient(
+            circle at 90% 0%,
+            rgba(243, 182, 63, 0.2),
+            transparent 40%
+          );
+      }
+
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-bottom: 12px;
+      }
+
+      h1 {
+        font-size: clamp(2.5rem, 6vw, 3.75rem);
+        margin: 0 0 16px;
+      }
+
+      h2 {
+        font-size: clamp(1.5rem, 3vw, 2.1rem);
+        margin: 0 0 16px;
+      }
+
+      p {
+        margin: 0 0 16px;
+        color: var(--text);
+      }
+
+      .lead {
+        font-size: 1.1rem;
+        color: var(--muted);
+        max-width: 780px;
+      }
+
+      .cta {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-top: 24px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 18px;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #111827;
+        font-weight: 600;
+      }
+
+      .button.secondary {
+        background: transparent;
+        border: 1px solid var(--accent-2);
+        color: var(--text);
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 28px;
+      }
+
+      .pill {
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.85rem;
+        background: rgba(18, 24, 38, 0.8);
+      }
+
+      main {
+        padding: 50px 0 80px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 30px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 20px;
+      }
+
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 1.1rem;
+      }
+
+      .steps {
+        display: grid;
+        gap: 12px;
+        margin: 20px 0 0;
+        padding-left: 18px;
+      }
+
+      .code {
+        background: #0f172a;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        padding: 16px;
+        font-family: "JetBrains Mono", "Fira Code", monospace;
+        font-size: 0.9rem;
+        color: #d1d5db;
+        overflow-x: auto;
+      }
+
+      .section {
+        margin-top: 46px;
+      }
+
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 24px 0 48px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      footer a {
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="container">
+        <div class="eyebrow">Paid MCP server for market data</div>
+        <h1>eXpress402</h1>
+        <p class="lead">
+          eXpress402 combines the x402 payment protocol with Yellow Network
+          off-chain channels to let AI agents access real market data at scale.
+          Fund a prepaid session once, then execute thousands of tool calls
+          without per-call blockchain fees.
+        </p>
+        <div class="cta">
+          <a class="button" href="https://github.com/vhspace/eXpress402">
+            View source
+          </a>
+          <a class="button secondary" href="#demo">Run the demo</a>
+        </div>
+        <div class="pill-row">
+          <div class="pill">x402 payment sessions</div>
+          <div class="pill">Yellow Network channels</div>
+          <div class="pill">Model Context Protocol</div>
+          <div class="pill">Real-time market data</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="section">
+        <h2>Why it exists</h2>
+        <p>
+          Web3 agents need high-volume data access, but per-call blockchain
+          transactions add cost, latency, and operational overhead. eXpress402
+          removes the per-query transaction burden by using a prepaid payment
+          session that settles through Yellow Network off-chain channels.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>How it works</h2>
+        <ol class="steps">
+          <li>Fund a prepaid session using x402.</li>
+          <li>Authorize an MCP client to spend from that balance.</li>
+          <li>
+            Query real-time market data tools without per-call blockchain fees.
+          </li>
+          <li>Settle usage off-chain with Yellow Network.</li>
+        </ol>
+      </section>
+
+      <section class="section">
+        <h2>What you get</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Prepaid payment sessions</h3>
+            <p>
+              Fund once and execute many calls while tracking usage and balance.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Real market data</h3>
+            <p>
+              Live stock prices, market sentiment, and financial news from
+              production APIs.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Agent-first tooling</h3>
+            <p>
+              Built for MCP-compatible AI agents that need reliable data access.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Off-chain settlement</h3>
+            <p>
+              Yellow Network channels remove per-call blockchain transaction
+              fees.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="demo">
+        <h2>Run the paid workflow demo</h2>
+        <p>
+          The demo script shows the full payment flow from session funding to
+          tool usage with balance tracking.
+        </p>
+        <div class="code">
+          <div>npm install</div>
+          <div>npm run demo</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Deployment</h2>
+        <p>
+          This site is a static HTML page deployed to Vercel using
+          <code>vercel.json</code>. No build step is required for the demo site.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Learn more</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Documentation</h3>
+            <p>
+              Start with the setup guide and payment protocol details in the
+              docs folder.
+            </p>
+            <p>
+              <a href="/docs/x402-yellow-extension.md">x402 Yellow Extension</a>
+            </p>
+          </div>
+          <div class="card">
+            <h3>Project links</h3>
+            <p><a href="https://yellow.org">Yellow Network</a></p>
+            <p><a href="https://x402.org">x402 Specification</a></p>
+            <p><a href="https://modelcontextprotocol.io">Model Context Protocol</a></p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="container">
+        <p>
+          eXpress402 is a paid MCP server for high-volume market data access.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>
