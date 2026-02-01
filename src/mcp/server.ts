@@ -16,27 +16,38 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 
 const PAYMENT_RESOURCE_BASE = 'mcp://tool';
 
-const env = getYellowConfig();
-
-if (!env.merchantAddress) {
-  console.error('Missing YELLOW_MERCHANT_ADDRESS; required for payments.');
-}
-if (!env.merchantPrivateKey) {
-  console.error('Missing YELLOW_MERCHANT_PRIVATE_KEY; required for offchain billing.');
-}
-
-const yellowClient = new YellowRpcClient({ url: env.clearnodeUrl });
-const yellowAuthClient = new YellowRpcClient({
-  url: env.clearnodeUrl,
-  privateKey: env.merchantPrivateKey || undefined,
-});
-const yellowSessionClient = env.sessionPrivateKey
-  ? new YellowRpcClient({ url: env.clearnodeUrl, privateKey: env.sessionPrivateKey })
-  : undefined;
-
-const sessionBalanceCache = new Map<string, number>();
+let env: ReturnType<typeof getYellowConfig> | undefined;
+let yellowClient: YellowRpcClient | undefined;
+let yellowAuthClient: YellowRpcClient | undefined;
+let yellowSessionClient: YellowRpcClient | undefined;
+let sessionBalanceCache: Map<string, number> | undefined;
 
 export async function startMcpServer() {
+  // Initialize environment and clients at runtime (not module load time)
+  // This ensures environment variables set in CI are available
+  if (!env) {
+    env = getYellowConfig();
+
+    if (!env.merchantAddress) {
+      console.error('Missing YELLOW_MERCHANT_ADDRESS; required for payments.');
+      throw new Error('Missing YELLOW_MERCHANT_ADDRESS');
+    }
+    if (!env.merchantPrivateKey) {
+      console.error('Missing YELLOW_MERCHANT_PRIVATE_KEY; required for offchain billing.');
+      throw new Error('Missing YELLOW_MERCHANT_PRIVATE_KEY');
+    }
+
+    yellowClient = new YellowRpcClient({ url: env.clearnodeUrl });
+    yellowAuthClient = new YellowRpcClient({
+      url: env.clearnodeUrl,
+      privateKey: env.merchantPrivateKey || undefined,
+    });
+    yellowSessionClient = env.sessionPrivateKey
+      ? new YellowRpcClient({ url: env.clearnodeUrl, privateKey: env.sessionPrivateKey })
+      : undefined;
+
+    sessionBalanceCache = new Map<string, number>();
+  }
   const server = new McpServer({
     name: 'eXpress402-mcp',
     version: '0.1.0',
@@ -88,12 +99,22 @@ export async function startMcpServer() {
 }
 
 function getPriceForTool(toolName: string) {
+  if (!env) {
+    throw new Error('Server not initialized');
+  }
   const toolPrice = env.toolPrices?.[toolName];
   return toolPrice ?? env.pricePerCall;
 }
 
 async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: string) {
-  if (!env.merchantAddress) {
+  if (!env) {
+    throw new Error('Server not initialized - call startMcpServer() first');
+  }
+
+  // After the check above, env is guaranteed to be defined
+  const config = env;
+
+  if (!config.merchantAddress) {
     throw new McpError(402, 'Payment unavailable: missing merchant address');
   }
 
@@ -106,12 +127,12 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
   const pricePerCall = getPriceForTool(toolName);
   const paymentRequired = buildPaymentRequired(
     {
-      clearnodeUrl: env.clearnodeUrl,
-      merchantAddress: env.merchantAddress,
-      assetSymbol: env.assetSymbol,
+      clearnodeUrl: config.clearnodeUrl,
+      merchantAddress: config.merchantAddress,
+      assetSymbol: config.assetSymbol,
       pricePerCall,
-      network: env.network,
-      maxTimeoutSeconds: env.maxTimeoutSeconds,
+      network: config.network,
+      maxTimeoutSeconds: config.maxTimeoutSeconds,
     },
     resourceUrl,
     `Paid tool: ${toolName}`,
@@ -122,13 +143,13 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
   }
 
   if (yellowMeta.appSessionId) {
-    const payer = yellowMeta.payer ?? env.agentAddress ?? '';
-    const remaining = await fetchSessionBalance(yellowMeta.appSessionId, env.assetSymbol);
+    const payer = yellowMeta.payer ?? config.agentAddress ?? '';
+    const remaining = await fetchSessionBalance(yellowMeta.appSessionId, config.assetSymbol);
     if (remaining < Number(pricePerCall)) {
       await attemptCloseAppSession(yellowMeta.appSessionId, payer, remaining);
       const paymentResponse = buildSettlementResponse(
         false,
-        env.network,
+        config.network,
         payer,
         yellowMeta.appSessionId,
         'insufficient_balance',
@@ -139,35 +160,41 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
       });
     }
 
-    sessionBalanceCache.set(yellowMeta.appSessionId, Number(remaining) - Number(pricePerCall));
+    if (sessionBalanceCache) {
+      sessionBalanceCache.set(yellowMeta.appSessionId, Number(remaining) - Number(pricePerCall));
+    }
 
-    return buildSettlementResponse(true, env.network, payer, yellowMeta.appSessionId);
+    return buildSettlementResponse(true, config.network, payer, yellowMeta.appSessionId);
   }
 
   const validation = validateYellowPayment(payment, {
-    clearnodeUrl: env.clearnodeUrl,
-    merchantAddress: env.merchantAddress,
-    assetSymbol: env.assetSymbol,
+    clearnodeUrl: config.clearnodeUrl,
+    merchantAddress: config.merchantAddress,
+    assetSymbol: config.assetSymbol,
     pricePerCall,
-    network: env.network,
-    maxTimeoutSeconds: env.maxTimeoutSeconds,
+    network: config.network,
+    maxTimeoutSeconds: config.maxTimeoutSeconds,
   });
 
   if (!validation.ok) {
     throw new McpError(402, `Payment invalid: ${validation.reason}`, paymentRequired);
   }
 
+  if (!yellowClient) {
+    throw new Error('Yellow client not initialized');
+  }
+
   const verified = await verifyYellowTransfer(
     yellowClient,
     validation.info,
-    env.merchantAddress,
-    env.assetSymbol,
+    config.merchantAddress,
+    config.assetSymbol,
   );
 
   if (!verified) {
     const paymentResponse = buildSettlementResponse(
       false,
-      env.network,
+      config.network,
       validation.info.payer,
       undefined,
       'verification_failed',
@@ -187,6 +214,8 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
 }
 
 async function fetchSessionBalance(appSessionId: string, asset: string): Promise<number> {
+  if (!sessionBalanceCache || !env) throw new Error('Server not initialized');
+
   const cached = sessionBalanceCache.get(appSessionId);
   if (cached !== undefined) {
     return cached;
@@ -194,8 +223,10 @@ async function fetchSessionBalance(appSessionId: string, asset: string): Promise
   const client = env.sessionPrivateKey
     ? (yellowSessionClient ?? yellowAuthClient)
     : env.merchantPrivateKey
-      ? yellowAuthClient
-      : yellowClient;
+    ? yellowAuthClient
+    : yellowClient;
+
+  if (!client) throw new Error('No Yellow client available');
   if (env.sessionPrivateKey || env.merchantPrivateKey) {
     await client.authenticate({
       allowances: [{ asset, amount: '1000000' }],
@@ -211,7 +242,11 @@ async function fetchSessionBalance(appSessionId: string, asset: string): Promise
 }
 
 async function attemptCloseAppSession(appSessionId: string, payer: string, amount: number) {
-  if (!env.merchantPrivateKey || !payer) {
+  if (!env || !yellowClient || !yellowAuthClient || !sessionBalanceCache) {
+    throw new Error('Server not initialized');
+  }
+
+  if (!env?.merchantPrivateKey || !payer) {
     return;
   }
 
@@ -223,7 +258,7 @@ async function attemptCloseAppSession(appSessionId: string, payer: string, amoun
     }
     const allocations = session.participants.map(participant => ({
       participant: participant as `0x${string}`,
-      asset: env.assetSymbol,
+      asset: env?.assetSymbol ?? '',
       amount: participant.toLowerCase() === payer.toLowerCase() ? String(amount) : '0',
     }));
     await yellowAuthClient.closeAppSession({
