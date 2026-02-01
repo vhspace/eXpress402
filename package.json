@@ -20,6 +20,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@coinbase/agentkit": "0.10.4",
     "@erc7824/nitrolite": "^0.5.3",
     "@modelcontextprotocol/sdk": "^1.9.0",
     "@noble/hashes": "^2.0.1",

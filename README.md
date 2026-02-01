@@ -51,6 +51,22 @@ Required:
 - `YELLOW_MERCHANT_ADDRESS` - Your payment recipient address
 - `TAVILY_API_KEY` - For market research (optional)
 
+Demo trade loop:
+- `YELLOW_TRADE_COUNT` - Number of trade iterations (default: 5)
+- `YELLOW_TRADE_SIZE` - Position size per trade (default: 1)
+- `YELLOW_TRADE_DELAY_MS` - Delay between trades in ms (default: 0)
+- `YELLOW_TRADE_SYMBOLS` - Comma-separated tickers to cycle
+
+Coinbase CDP AgentKit (demo):
+- `CDP_API_KEY_ID` - CDP API key ID
+- `CDP_API_KEY_SECRET` - CDP API key secret
+- `CDP_WALLET_SECRET` - CDP wallet secret
+- `CDP_NETWORK_ID` - Optional (defaults to base-sepolia in sandbox, base-mainnet in production)
+- `CDP_WALLET_ADDRESS` - Optional existing wallet address
+- `CDP_IDEMPOTENCY_KEY` - Optional wallet idempotency key
+- `CDP_RPC_URL` - Optional RPC URL override
+- `CDP_ONRAMP_PROJECT_ID` - Required for production onramp flow
+
 See [docs/](docs/) for complete setup and configuration details.
 
 ## Demo
@@ -61,7 +77,8 @@ Run the complete paid workflow:
 npm run demo
 ```
 
-This demonstrates the full payment flow from funding to tool usage with balance tracking.
+This demonstrates the full payment flow from funding to tool usage with balance tracking,
+including Coinbase CDP AgentKit wallet initialization and Yellow session settlement.
 
 ## Documentation
 
