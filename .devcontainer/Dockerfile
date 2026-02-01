@@ -28,7 +28,8 @@ RUN GOBIN=/usr/local/bin go install github.com/lifinance/lifi-mcp@latest
 RUN GOBIN=/usr/local/bin go install github.com/huahuayu/etherscan-mcp-server/cmd/etherscan-mcp-server@latest
 
 # Install uv for Python package management (used by some MCP servers)
-RUN pip3 install uv
+# Use --break-system-packages for Ubuntu 24.04 PEP 668 compliance
+RUN pip3 install --break-system-packages uv
 
 
 RUN install -m 0755 -d /etc/apt/keyrings \
