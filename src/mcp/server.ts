@@ -4,6 +4,7 @@ import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { getMarketRumors, getStockPrice } from "../finance/index.js";
 import { buildPaymentRequired, buildSettlementResponse, validateYellowPayment } from "../x402/payment.js";
+import type { PaymentPayload } from "../x402/types.js";
 import { getYellowConfig } from "../yellow/config.js";
 import { YellowRpcClient } from "../yellow/rpc.js";
 import { verifyYellowTransfer } from "../yellow/verify.js";
@@ -87,12 +88,12 @@ function getPriceForTool(toolName: string) {
   return toolPrice ?? env.pricePerCall;
 }
 
-async function requirePayment(extra: RequestHandlerExtra, toolName: string) {
+async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: string) {
   if (!env.merchantAddress) {
     throw new McpError(402, "Payment unavailable: missing merchant address");
   }
 
-  const payment = extra._meta?.["x402/payment"] as unknown;
+  const payment = extra._meta?.["x402/payment"] as PaymentPayload;
   const yellowMeta = (extra._meta?.["x402/yellow"] ?? {}) as {
     appSessionId?: string;
     payer?: string;
@@ -215,18 +216,18 @@ async function attemptCloseAppSession(appSessionId: string, payer: string, amoun
   }
 
   try {
-    const sessions = await yellowClient.getAppSessions(payer);
+    const sessions = await yellowClient.getAppSessions(payer as `0x${string}`);
     const session = sessions.find((item) => item.appSessionId === appSessionId);
     if (!session) {
       return;
     }
     const allocations = session.participants.map((participant) => ({
-      participant,
+      participant: participant as `0x${string}`,
       asset: env.assetSymbol,
       amount: participant.toLowerCase() === payer.toLowerCase() ? String(amount) : "0"
     }));
     await yellowAuthClient.closeAppSession({
-      appSessionId,
+      appSessionId: appSessionId as `0x${string}`,
       allocations
     });
     sessionBalanceCache.delete(appSessionId);

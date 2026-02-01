@@ -164,7 +164,7 @@ export class YellowRpcClient {
 
     for (const domainName of candidateDomains) {
       const authRequestMessage = await createAuthRequestMessage(authParams);
-      const authResponse = await this.sendRaw(authRequestMessage);
+      const authResponse = await this.sendRaw(authRequestMessage) as Record<string, unknown>;
       const challengeMessage =
         authResponse.challengeMessage ??
         authResponse.challenge_message ??
@@ -185,9 +185,9 @@ export class YellowRpcClient {
         { name: domainName }
       );
 
-      const authVerifyMessage = await createAuthVerifyMessageFromChallenge(signer, challengeMessage);
+      const authVerifyMessage = await createAuthVerifyMessageFromChallenge(signer, challengeMessage as string);
       try {
-        const verifyResponse = await this.sendRaw(authVerifyMessage);
+        const verifyResponse = await this.sendRaw(authVerifyMessage) as Record<string, unknown>;
         if (verifyResponse?.success === true) {
           this.sessionPrivateKey = sessionPrivateKey;
           this.authenticated = true;
@@ -201,9 +201,9 @@ export class YellowRpcClient {
       }
 
       const ecdsaSigner = createECDSAMessageSigner(this.options.privateKey as `0x${string}`);
-      const authVerifyEcdsa = await createAuthVerifyMessageFromChallenge(ecdsaSigner, challengeMessage);
+      const authVerifyEcdsa = await createAuthVerifyMessageFromChallenge(ecdsaSigner, challengeMessage as string);
       try {
-        const verifyResponse = await this.sendRaw(authVerifyEcdsa);
+        const verifyResponse = await this.sendRaw(authVerifyEcdsa) as Record<string, unknown>;
         if (verifyResponse?.success === true) {
           this.sessionPrivateKey = sessionPrivateKey;
           this.authenticated = true;
@@ -222,7 +222,7 @@ export class YellowRpcClient {
       session_key: account.address
     };
     const authRequestMessage = await createAuthRequestMessage(selfAuthParams);
-    const authResponse = await this.sendRaw(authRequestMessage);
+    const authResponse = await this.sendRaw(authRequestMessage) as Record<string, unknown>;
     const challengeMessage =
       authResponse.challengeMessage ??
       authResponse.challenge_message ??
@@ -232,8 +232,8 @@ export class YellowRpcClient {
     }
 
     const ecdsaSigner = createECDSAMessageSigner(this.options.privateKey as `0x${string}`);
-    const authVerifyEcdsa = await createAuthVerifyMessageFromChallenge(ecdsaSigner, challengeMessage);
-    const verifyResponse = await this.sendRaw(authVerifyEcdsa);
+    const authVerifyEcdsa = await createAuthVerifyMessageFromChallenge(ecdsaSigner, challengeMessage as string);
+    const verifyResponse = await this.sendRaw(authVerifyEcdsa) as Record<string, unknown>;
     if (verifyResponse?.success === true) {
       this.sessionPrivateKey = undefined;
       this.authenticated = true;
@@ -243,7 +243,7 @@ export class YellowRpcClient {
     throw new Error("Authentication failed");
   }
 
-  async transfer(params: { destination: string; allocations: Array<{ asset: string; amount: string }> }) {
+  async transfer(params: { destination: `0x${string}`; allocations: Array<{ asset: string; amount: string }> }) {
     if (!this.options.privateKey) {
       throw new Error("Missing private key for transfer");
     }
@@ -265,15 +265,15 @@ export class YellowRpcClient {
     return response.ledgerBalances ?? response.ledger_balances ?? [];
   }
 
-  async getAppSessions(participant: string, status?: string): Promise<AppSession[]> {
-    const message = createGetAppSessionsMessageV2(participant, status);
-    const response = await this.sendRaw(message);
+  async getAppSessions(participant: `0x${string}`, status?: string): Promise<AppSession[]> {
+    const message = createGetAppSessionsMessageV2(participant, status as any);
+    const response = await this.sendRaw(message) as Record<string, unknown>;
     return (response?.appSessions ?? []) as AppSession[];
   }
 
   async closeAppSession(params: {
-    appSessionId: string;
-    allocations: Array<{ asset: string; amount: string; participant: string }>;
+    appSessionId: `0x${string}`;
+    allocations: Array<{ asset: string; amount: string; participant: `0x${string}` }>;
     sessionData?: string;
   }) {
     if (!this.options.privateKey) {

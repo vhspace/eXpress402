@@ -22,7 +22,7 @@ const agentAddress =
 const sessionParticipants = (process.env.YELLOW_APP_SESSION_PARTICIPANTS ?? "")
   .split(",")
   .map((entry) => entry.trim())
-  .filter(Boolean);
+  .filter(Boolean) as `0x${string}`[];
 const sessionAllocationsRaw = process.env.YELLOW_APP_SESSION_ALLOCATIONS ?? "";
 const sessionTtlSeconds = Number(process.env.YELLOW_APP_SESSION_TTL_SECONDS ?? "");
 
@@ -95,11 +95,34 @@ function pickRandomTicker(exclude?: string) {
   return options[Math.floor(Math.random() * options.length)];
 }
 
+function runProductionChannelFlow() {
+  logStage("Production channel flow (on-ramp/off-ramp)");
+  const required = {
+    YELLOW_CHAIN_ID: process.env.YELLOW_CHAIN_ID,
+    YELLOW_RPC_URL: process.env.YELLOW_RPC_URL,
+    YELLOW_CUSTODY_ADDRESS: process.env.YELLOW_CUSTODY_ADDRESS,
+    YELLOW_ADJUDICATOR_ADDRESS: process.env.YELLOW_ADJUDICATOR_ADDRESS,
+    YELLOW_TOKEN_ADDRESS: process.env.YELLOW_TOKEN_ADDRESS
+  };
+  const missing = Object.entries(required)
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
+  if (missing.length) {
+    console.log("Channel flow skipped; set:", missing.join(", "));
+    return;
+  }
+
+  console.log("1) Deposit on-chain to custody");
+  console.log("2) Open channel (wallet ↔ broker)");
+  console.log("3) Resize channel (wallet signature + on-chain confirmation)");
+  console.log("4) Close/withdraw to on-chain wallet");
+}
+
 function parseAllocations(
-  participants: string[],
+  participants: `0x${string}`[],
   allocationsRaw: string,
   assetSymbol: string
-): Array<{ participant: string; asset: string; amount: string }> {
+): Array<{ participant: `0x${string}`; asset: string; amount: string }> {
   const allocationMap = JSON.parse(allocationsRaw) as Record<string, string>;
   return participants.map((participant) => ({
     participant,
@@ -115,7 +138,7 @@ function getToolPrice(toolName: string) {
 
 async function createAppSession(
   yellow: YellowRpcClient,
-  participants: string[],
+  participants: `0x${string}`[],
   assetSymbol: string,
   ttlSeconds: number
 ) {
@@ -133,7 +156,7 @@ async function createAppSession(
       nonce: Date.now()
     },
     allocations,
-    sessionData: JSON.stringify({ ttlSeconds })
+    session_data: JSON.stringify({ ttlSeconds })
   });
 
   const response = (await yellow.sendRawMessage(message)) as Record<string, unknown>;
@@ -152,6 +175,10 @@ async function createAppSession(
 async function main() {
   logStage("Booting demo");
   console.log(getFundingHint(env.mode));
+
+  if (env.mode === "production") {
+    runProductionChannelFlow();
+  }
 
   const yellow = new YellowRpcClient({
     url: env.clearnodeUrl,
@@ -178,7 +205,8 @@ async function main() {
   });
 
   logStage("Step 1: wallet balances before calls");
-  console.log("agent", agentAddress, "balance", await safeBalance(yellow, agentAddress, assetSymbol));
+  const initialAgentBalance = await safeBalance(yellow, agentAddress, assetSymbol);
+  console.log("agent", agentAddress, "balance", initialAgentBalance);
   console.log("merchant", env.merchantAddress, "balance", await safeBalance(yellow, env.merchantAddress, assetSymbol));
 
   logStage("Step 2: create prepaid session (allocation + TTL)");
@@ -195,11 +223,14 @@ async function main() {
     allocations.find((entry) => entry.participant.toLowerCase() === agentAddress.toLowerCase())
       ?.amount ?? "0";
   let localSessionBalance = Number(agentAllocation);
+  let spentTotal = 0;
 
   const transport = new StdioClientTransport({
     command: "bash",
     args: ["-lc", "cd /workspaces/eXpress402 && npm run dev"],
-    env: process.env,
+    env: Object.fromEntries(
+      Object.entries(process.env).filter(([_, value]) => value !== undefined)
+    ) as Record<string, string>,
     stderr: "pipe"
   });
   const client = new Client({ name: "demo-e2e", version: "0.0.1" });
@@ -207,6 +238,7 @@ async function main() {
 
   const stockSymbol = pickRandomTicker();
   logStage(`Step 2: call MCP (stock_price) using Yellow session (${stockSymbol})`);
+  let stockPaid = false;
   try {
     const stock = await client.callTool({
       name: "stock_price",
@@ -216,17 +248,23 @@ async function main() {
     const stockText = (stock as { content?: Array<{ text?: string }> }).content?.[0]?.text;
     logStage("Step 3: MCP result (stock_price)");
     console.log(truncateOutput(stockText ?? JSON.stringify(stock)));
+    stockPaid = true;
   } catch (error) {
     logStage("Step 3: MCP result (stock_price) failed");
     console.log(error);
   }
-  localSessionBalance -= getToolPrice("stock_price");
+  if (stockPaid) {
+    const price = getToolPrice("stock_price");
+    localSessionBalance -= price;
+    spentTotal += price;
+  }
   logStage("Step 4: session balance after stock_price");
   console.log("session", appSessionId, "balance", await safeBalance(yellow, appSessionId, assetSymbol));
   console.log("session (local)", localSessionBalance);
 
   const rumorsSymbol = pickRandomTicker(stockSymbol);
   logStage(`Step 2: call MCP (market_rumors) using Yellow session (${rumorsSymbol})`);
+  let rumorsPaid = false;
   try {
     const rumors = await client.callTool({
       name: "market_rumors",
@@ -236,11 +274,16 @@ async function main() {
     const rumorsText = (rumors as { content?: Array<{ text?: string }> }).content?.[0]?.text;
     logStage("Step 3: MCP result (market_rumors)");
     console.log(truncateOutput(rumorsText ?? JSON.stringify(rumors)));
+    rumorsPaid = true;
   } catch (error) {
     logStage("Step 3: MCP result (market_rumors) failed");
     console.log(error);
   }
-  localSessionBalance -= getToolPrice("market_rumors");
+  if (rumorsPaid) {
+    const price = getToolPrice("market_rumors");
+    localSessionBalance -= price;
+    spentTotal += price;
+  }
   logStage("Step 4: session balance after market_rumors");
   console.log("session", appSessionId, "balance", await safeBalance(yellow, appSessionId, assetSymbol));
   console.log("session (local)", localSessionBalance);
@@ -248,10 +291,19 @@ async function main() {
   logStage("Step 5: close out offchain wallet (close app session)");
   const sessionBalance = await safeBalance(yellow, appSessionId, assetSymbol);
   if (sessionBalance !== "unavailable") {
+    const merchantParticipant =
+      sessionParticipants.find(
+        (participant) => participant.toLowerCase() !== agentAddress.toLowerCase()
+      ) ?? env.merchantAddress;
     const closeAllocations = sessionParticipants.map((participant) => ({
-      participant,
+      participant: participant as `0x${string}`,
       asset: assetSymbol,
-      amount: participant.toLowerCase() === agentAddress.toLowerCase() ? sessionBalance : "0"
+      amount:
+        participant.toLowerCase() === agentAddress.toLowerCase()
+          ? localSessionBalance.toString()
+          : participant.toLowerCase() === merchantParticipant?.toLowerCase()
+            ? spentTotal.toString()
+            : "0"
     }));
     const closeSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
     const closeMessage = await createCloseAppSessionMessage(closeSigner, {
@@ -262,6 +314,16 @@ async function main() {
     console.log("session", appSessionId, "balance", await safeBalance(yellow, appSessionId, assetSymbol));
   } else {
     console.log("close skipped: session balance unavailable");
+  }
+
+  logStage("Step 6: unified balance after close");
+  const finalAgentBalance = await safeBalance(yellow, agentAddress, assetSymbol);
+  console.log("agent", agentAddress, "balance", finalAgentBalance);
+  const initialValue = Number(initialAgentBalance);
+  const finalValue = Number(finalAgentBalance);
+  if (!Number.isNaN(initialValue) && !Number.isNaN(finalValue)) {
+    const delta = finalValue - initialValue;
+    console.log("agent delta", delta.toFixed(4));
   }
 
   await client.close();
