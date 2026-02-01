@@ -113,6 +113,23 @@ Example:
 - Servers query `get_ledger_balances` for the session account and debit per call. If the balance is insufficient, they return 402 and may attempt `close_app_session` to refund remaining allocation.
 - Use the hosted sandbox clearnode for testing: `wss://clearnet-sandbox.yellow.com/ws`.
 
+## Coinbase CDP AgentKit demo
+
+The demo script initializes a Coinbase CDP AgentKit wallet, lists MCP tools, verifies the `yellow` payment
+extension in the 402 response, and then creates a prepaid app session on the Yellow sandbox by default.
+
+Required environment variables:
+- `CDP_API_KEY_ID`
+- `CDP_API_KEY_SECRET`
+- `CDP_WALLET_SECRET`
+
+Optional environment variables:
+- `CDP_NETWORK_ID` (defaults to `base-sepolia` in sandbox and `base-mainnet` in production)
+- `CDP_WALLET_ADDRESS` (use an existing wallet)
+- `CDP_IDEMPOTENCY_KEY` (create or reuse a wallet deterministically)
+- `CDP_RPC_URL` (override the RPC endpoint for read-only calls)
+- `CDP_ONRAMP_PROJECT_ID` (required in production to generate the onramp URL)
+
 ## Production deposit flow (overview)
 
 In production, funds must be deposited on-chain into Yellow’s custody contract before they can be used for off-chain transfers.
@@ -123,6 +140,15 @@ In production, funds must be deposited on-chain into Yellow’s custody contract
 4. Perform off-chain transfers and include the receipt in `_meta["x402/payment"]`.
 
 If you are using the sandbox faucet instead, fund the Unified Balance and use `allocate_amount` when resizing.
+
+## Production onramp/offramp with CDP wallet
+
+When `YELLOW_ENV=production`, the demo enforces a mainnet CDP network and will generate an onramp
+URL for the CDP wallet using `CDP_ONRAMP_PROJECT_ID`. Use the onramp flow to fund the wallet,
+then deposit to the Yellow custody contract, open/resize channels, and create app sessions.
+
+Offramp is achieved by closing the Yellow app session, withdrawing on-chain, and then transferring
+funds out of the CDP wallet using your preferred Coinbase off-ramp workflow.
 
 ## Channel & app session flow (broker model)
 
