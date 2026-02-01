@@ -146,7 +146,7 @@ export class YellowRpcClient {
     const authParams = {
       address: account.address,
       session_key: sessionAccount.address,
-      application: options.application ?? "x402-yellow-mcp",
+      application: options.application ?? "eXpress402-mcp",
       allowances: options.allowances ?? [],
       // Yellow expects seconds since epoch (not ms).
       expires_at: BigInt(Math.floor(Date.now() / 1000) + Math.floor((options.expiresInMs ?? 1000 * 60 * 60) / 1000)),
@@ -256,10 +256,13 @@ export class YellowRpcClient {
   }
 
   async getLedgerBalances(accountId?: string): Promise<LedgerBalance[]> {
-    const response = await this.request<{ ledgerBalances: LedgerBalance[] }>("get_ledger_balances", {
+    const response = await this.request<{
+      ledgerBalances?: LedgerBalance[];
+      ledger_balances?: LedgerBalance[];
+    }>("get_ledger_balances", {
       ...(accountId ? { account_id: accountId } : {})
     });
-    return response.ledgerBalances ?? [];
+    return response.ledgerBalances ?? response.ledger_balances ?? [];
   }
 
   async getAppSessions(participant: string, status?: string): Promise<AppSession[]> {

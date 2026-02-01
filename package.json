@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node build/index.js",
     "demo": "tsx src/client-demo.ts",
+    "e2e:paid-tools": "tsx src/e2e-paid-tools.ts",
     "merchant-spend": "tsx src/merchant-spend.ts",
     "app-session-init": "tsx src/app-session-init.ts",
     "test": "vitest run"

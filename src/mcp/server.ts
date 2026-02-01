@@ -4,25 +4,20 @@ import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { getMarketRumors, getStockPrice } from "../finance/index.js";
 import { buildPaymentRequired, buildSettlementResponse, validateYellowPayment } from "../x402/payment.js";
+import { getYellowConfig } from "../yellow/config.js";
 import { YellowRpcClient } from "../yellow/rpc.js";
 import { verifyYellowTransfer } from "../yellow/verify.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
 const PAYMENT_RESOURCE_BASE = "mcp://tool";
 
-const env = {
-  clearnodeUrl: process.env.YELLOW_CLEARNODE_URL ?? "wss://clearnet-sandbox.yellow.com/ws",
-  merchantAddress: process.env.YELLOW_MERCHANT_ADDRESS ?? "",
-  merchantPrivateKey: process.env.YELLOW_MERCHANT_PRIVATE_KEY ?? "",
-  assetSymbol: process.env.YELLOW_ASSET_SYMBOL ?? "usdc",
-  pricePerCall: process.env.YELLOW_PRICE_PER_CALL ?? "0.1",
-  network: process.env.YELLOW_NETWORK ?? "yellow:sandbox",
-  maxTimeoutSeconds: Number(process.env.YELLOW_MAX_TIMEOUT_SECONDS ?? "60"),
-  agentAddress: process.env.YELLOW_AGENT_ADDRESS
-};
+const env = getYellowConfig();
 
 if (!env.merchantAddress) {
   console.error("Missing YELLOW_MERCHANT_ADDRESS; required for payments.");
+}
+if (!env.merchantPrivateKey) {
+  console.error("Missing YELLOW_MERCHANT_PRIVATE_KEY; required for offchain billing.");
 }
 
 const yellowClient = new YellowRpcClient({ url: env.clearnodeUrl });
@@ -30,10 +25,15 @@ const yellowAuthClient = new YellowRpcClient({
   url: env.clearnodeUrl,
   privateKey: env.merchantPrivateKey || undefined
 });
+const yellowSessionClient = env.sessionPrivateKey
+  ? new YellowRpcClient({ url: env.clearnodeUrl, privateKey: env.sessionPrivateKey })
+  : undefined;
+
+const sessionBalanceCache = new Map<string, number>();
 
 export async function startMcpServer() {
   const server = new McpServer({
-    name: "x402-yellow-mcp",
+    name: "eXpress402-mcp",
     version: "0.1.0"
   });
 
@@ -82,6 +82,11 @@ export async function startMcpServer() {
   console.error("x402 Yellow MCP server started.");
 }
 
+function getPriceForTool(toolName: string) {
+  const toolPrice = env.toolPrices?.[toolName];
+  return toolPrice ?? env.pricePerCall;
+}
+
 async function requirePayment(extra: RequestHandlerExtra, toolName: string) {
   if (!env.merchantAddress) {
     throw new McpError(402, "Payment unavailable: missing merchant address");
@@ -93,12 +98,13 @@ async function requirePayment(extra: RequestHandlerExtra, toolName: string) {
     payer?: string;
   };
   const resourceUrl = `${PAYMENT_RESOURCE_BASE}/${toolName}`;
+  const pricePerCall = getPriceForTool(toolName);
   const paymentRequired = buildPaymentRequired(
     {
       clearnodeUrl: env.clearnodeUrl,
       merchantAddress: env.merchantAddress,
       assetSymbol: env.assetSymbol,
-      pricePerCall: env.pricePerCall,
+      pricePerCall,
       network: env.network,
       maxTimeoutSeconds: env.maxTimeoutSeconds
     },
@@ -112,9 +118,9 @@ async function requirePayment(extra: RequestHandlerExtra, toolName: string) {
 
   if (yellowMeta.appSessionId) {
     const payer = yellowMeta.payer ?? env.agentAddress ?? "";
-    const balance = await fetchSessionBalance(yellowMeta.appSessionId, env.assetSymbol);
-    if (balance < Number(env.pricePerCall)) {
-      await attemptCloseAppSession(yellowMeta.appSessionId, payer, balance);
+    const remaining = await fetchSessionBalance(yellowMeta.appSessionId, env.assetSymbol);
+    if (remaining < Number(pricePerCall)) {
+      await attemptCloseAppSession(yellowMeta.appSessionId, payer, remaining);
       const paymentResponse = buildSettlementResponse(
         false,
         env.network,
@@ -128,6 +134,11 @@ async function requirePayment(extra: RequestHandlerExtra, toolName: string) {
       });
     }
 
+    sessionBalanceCache.set(
+      yellowMeta.appSessionId,
+      Number(remaining) - Number(pricePerCall)
+    );
+
     return buildSettlementResponse(true, env.network, payer, yellowMeta.appSessionId);
   }
 
@@ -135,7 +146,7 @@ async function requirePayment(extra: RequestHandlerExtra, toolName: string) {
     clearnodeUrl: env.clearnodeUrl,
     merchantAddress: env.merchantAddress,
     assetSymbol: env.assetSymbol,
-    pricePerCall: env.pricePerCall,
+    pricePerCall,
     network: env.network,
     maxTimeoutSeconds: env.maxTimeoutSeconds
   });
@@ -174,10 +185,28 @@ async function requirePayment(extra: RequestHandlerExtra, toolName: string) {
 }
 
 async function fetchSessionBalance(appSessionId: string, asset: string): Promise<number> {
-  const balances = await yellowClient.getLedgerBalances(appSessionId);
+  const cached = sessionBalanceCache.get(appSessionId);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const client =
+    env.sessionPrivateKey
+      ? yellowSessionClient ?? yellowAuthClient
+      : env.merchantPrivateKey
+        ? yellowAuthClient
+        : yellowClient;
+  if (env.sessionPrivateKey || env.merchantPrivateKey) {
+    await client.authenticate({
+      allowances: [{ asset, amount: "1000000" }],
+      scope: "transfer"
+    });
+  }
+  const balances = await client.getLedgerBalances(appSessionId);
   const match = balances.find((entry) => entry.asset === asset);
   const amount = match ? Number(match.amount) : 0;
-  return Number.isNaN(amount) ? 0 : amount;
+  const normalized = Number.isNaN(amount) ? 0 : amount;
+  sessionBalanceCache.set(appSessionId, normalized);
+  return normalized;
 }
 
 async function attemptCloseAppSession(appSessionId: string, payer: string, amount: number) {
@@ -200,6 +229,7 @@ async function attemptCloseAppSession(appSessionId: string, payer: string, amoun
       appSessionId,
       allocations
     });
+    sessionBalanceCache.delete(appSessionId);
   } catch (error) {
     console.error("Failed to close app session:", error);
   }

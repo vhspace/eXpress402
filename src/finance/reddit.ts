@@ -18,7 +18,7 @@ export async function fetchRedditRumors(query: string, limit = 5): Promise<Reddi
 
   const response = await fetch(url.toString(), {
     headers: {
-      "User-Agent": process.env.REDDIT_USER_AGENT ?? "x402-yellow-mcp/0.1"
+      "User-Agent": process.env.REDDIT_USER_AGENT ?? "eXpress402-mcp/0.1"
     }
   });
 
