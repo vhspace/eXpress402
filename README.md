@@ -4,7 +4,7 @@
 
   <img src="docs/assets/express402-logo.png" alt="eXpress402 Logo" width="600">
   
-  <h3>⚡ Lightning-Fast Payments for AI Agents ⚡</h3>
+  <h3>⚡ Extreme DeFi Payments for AI Agents ⚡</h3>
   
   [![ETHGlobal HackMoney](https://img.shields.io/badge/ETHGlobal-HackMoney-7B3FE4?logo=ethereum&logoColor=white)](https://hackmoney.ethglobal.com/)
   [![Yellow](https://img.shields.io/badge/Yellow-Network-FFD700?logo=ethereum&logoColor=black)](https://yellow.org)
@@ -17,11 +17,11 @@
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
-A paid MCP server implementing x402 v2 payments with Yellow off-chain settlement. Provides financial data tools with real cryptocurrency payments - no mocks.
+A paid MCP server for web3 agents to access real-time market data at scale. Set up once with x402 on Yellow Network's off-chain payment channels, then make unlimited queries without per-transaction blockchain fees. Built for high-volume agent workflows requiring bulk financial data.
 
 ## Overview
 
-This project demonstrates monetized AI tools using the Model Context Protocol (MCP) with integrated blockchain payments. Users pay for API calls using Yellow's off-chain payment network, enabling true pay-per-use AI services.
+Web3 agents need market data, but traditional per-call blockchain transactions create bottlenecks and excessive fees. eXpress402 solves this by combining x402 payment protocol with Yellow Network's off-chain channels - agents fund a prepaid session once, then make thousands of market data queries without individual blockchain transactions. Perfect for AI agents running high-frequency trading strategies, portfolio analysis, or market research.
 
 ## Architecture
 
@@ -29,10 +29,10 @@ This project demonstrates monetized AI tools using the Model Context Protocol (M
 
 ## Features
 
-- **Paid MCP Tools**: Stock prices and market analysis with real payments
-- **x402 Payment Protocol**: JSON-RPC payment integration
-- **Yellow Settlement**: Off-chain cryptocurrency transfers
-- **Real Data Sources**: Live financial APIs (Stooq, Reddit, Tavily)
+- **Prepaid Payment Sessions**: Fund once via x402, query thousands of times without additional transactions
+- **Off-Chain Settlement**: Yellow Network channels eliminate per-call blockchain fees
+- **Real Market Data**: Live stock prices, market sentiment, and financial news from production APIs
+- **Agent-Optimized**: Built for MCP-compatible AI agents requiring high-volume data access
 
 ## Quick Start
 
