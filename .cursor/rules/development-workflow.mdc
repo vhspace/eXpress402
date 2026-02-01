@@ -33,7 +33,7 @@ After writing any code changes:
 1. Lint: Run npm run lint to check code style and quality
 2. Type Check: Run npm run type-check for TypeScript validation
 3. Unit Tests: Run npm test to ensure unit tests pass
-4. E2E Tests: Run npm run e2e:paid-tools for end-to-end validation (CI skips expensive TAVILY tests)
+4. E2E Tests: Run npm run e2e:paid-tools for end-to-end validation (currently disabled in CI)
 5. Build: Run npm run build to ensure clean compilation
 
 ### Testing Philosophy
@@ -83,7 +83,7 @@ Before creating a PR, verify:
 - [ ] Documentation is updated
 - [ ] Breaking changes are clearly documented
 - [ ] Commit messages are descriptive and follow conventional commits
-- [ ] CI pipeline passes (lint, test, e2e with sandbox using ephemeral keys, skips expensive APIs)
+- [ ] CI pipeline passes (lint, test, e2e temporarily disabled)
 
 ## Examples
 
