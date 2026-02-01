@@ -33,11 +33,6 @@ function parseNumber(value: string, label: string) {
   return parsed;
 }
 
-function isInsufficientFunds(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.toLowerCase().includes('insufficient funds');
-}
-
 async function requestSandboxFunds(address: string) {
   const faucetUrl = process.env.YELLOW_FAUCET_URL ?? SANDBOX_FAUCET_URL;
   console.error(`Requesting sandbox funds from ${faucetUrl} for ${address}`);
@@ -230,117 +225,6 @@ async function createAppSession(
   return appSessionId;
 }
 
-async function createPaymentPayload(options: {
-  env: ReturnType<typeof getYellowConfig>;
-  yellow: YellowRpcClient;
-  assetSymbol: string;
-  agentAddress: string;
-}) {
-  const { env, yellow, assetSymbol, agentAddress } = options;
-
-  await yellow.authenticate({
-    allowances: [{ asset: assetSymbol, amount: '1000' }],
-    scope: 'transfer',
-  });
-
-  const pricePerCall = parseNumber(env.pricePerCall, 'YELLOW_PRICE_PER_CALL');
-  await ensureSandboxBalance(
-    yellow,
-    env,
-    agentAddress,
-    assetSymbol,
-    pricePerCall,
-    'Per-call payment funding',
-  );
-
-  const transferRequest = {
-    destination: env.merchantAddress as `0x${string}`,
-    allocations: [
-      {
-        asset: assetSymbol,
-        amount: env.pricePerCall,
-      },
-    ],
-  };
-
-  const autoFaucet = env.mode === 'development' && process.env.YELLOW_AUTO_FAUCET !== 'false';
-  let transferResponse: { transactions?: Array<Record<string, unknown>> };
-
-  try {
-    transferResponse = (await yellow.transfer(transferRequest)) as {
-      transactions?: Array<Record<string, unknown>>;
-    };
-  } catch (error) {
-    if (!autoFaucet || !isInsufficientFunds(error)) {
-      throw error;
-    }
-    console.error('Insufficient funds detected; requesting sandbox faucet funding.');
-    await requestSandboxFunds(agentAddress);
-    await waitForFunding(yellow, agentAddress, assetSymbol, pricePerCall);
-    transferResponse = (await yellow.transfer(transferRequest)) as {
-      transactions?: Array<Record<string, unknown>>;
-    };
-  }
-
-  const transfer = transferResponse.transactions?.[0] ?? {};
-  const transferId = String(transfer.id ?? transfer.transaction_id ?? '');
-  const payer = String(transfer.from_account ?? transfer.sender ?? '');
-
-  return {
-    x402Version: 2,
-    accepted: {
-      scheme: 'yellow-offchain',
-      network: env.network,
-      amount: env.pricePerCall,
-      asset: assetSymbol,
-      payTo: env.merchantAddress,
-      maxTimeoutSeconds: 60,
-      extra: {
-        settlement: 'yellow',
-      },
-    },
-    payload: {
-      transferId,
-      payer,
-      amount: env.pricePerCall,
-      asset: assetSymbol,
-      to: env.merchantAddress,
-    },
-  };
-}
-
-async function runPerCallFlow(
-  client: Client,
-  env: ReturnType<typeof getYellowConfig>,
-  yellow: YellowRpcClient,
-  assetSymbol: string,
-  agentAddress: string,
-) {
-  logStage('Per-call payment flow');
-
-  const stockPayment = await createPaymentPayload({ env, yellow, assetSymbol, agentAddress });
-  const stock = await client.callTool({
-    name: 'stock_price',
-    arguments: { symbol: 'AAPL' },
-    _meta: { 'x402/payment': stockPayment },
-  });
-  console.log(
-    'stock_price:',
-    Array.isArray(stock.content) ? stock.content[0]?.text : JSON.stringify(stock),
-  );
-
-  const rumorsPayment = await createPaymentPayload({ env, yellow, assetSymbol, agentAddress });
-  const rumors = await client.callTool({
-    name: 'market_rumors',
-    arguments: { symbol: 'AAPL' },
-    _meta: { 'x402/payment': rumorsPayment },
-  });
-  console.log(
-    'market_rumors:',
-    Array.isArray(rumors.content) ? rumors.content[0]?.text : JSON.stringify(rumors),
-  );
-}
-
 async function runAppSessionFlow(
   client: Client,
   env: ReturnType<typeof getYellowConfig>,
@@ -484,7 +368,6 @@ async function main() {
   await client.connect(transport);
 
   try {
-    await runPerCallFlow(client, env, yellow, assetSymbol, agentAddress);
     await runAppSessionFlow(client, env, yellow, agentAddress, assetSymbol);
   } finally {
     await client.close();
