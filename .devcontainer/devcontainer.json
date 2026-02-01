@@ -9,42 +9,45 @@
     "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
 
     "features": {
-      "ghcr.io/devcontainers/features/common-utils:2": {
+      "ghcr.io/devcontainers/features/common-utils:2.5.0": {
         "installZsh": true,
         "installOhMyZsh": true,
         "configureZshAsDefaultShell": true,
         "upgradePackages": true
       },
-      "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "ghcr.io/devcontainers/features/docker-in-docker:2.11.0": {
         "version": "latest",
         "moby": true,
         "dockerDashComposeVersion": "v2"
       },
-      "ghcr.io/devcontainers/features/node:1": {
+      "ghcr.io/devcontainers/features/node:1.9.0": {
         "version": "lts",
         "nodeGypDependencies": true,
         "installYarnUsingApt": true
       },
-      "ghcr.io/devcontainers/features/go:1": {
+      "ghcr.io/devcontainers/features/go:1.6.0": {
         "version": "latest"
       },
-      "ghcr.io/devcontainers/features/github-cli:1": {
+      "ghcr.io/devcontainers/features/github-cli:1.0.13": {
         "version": "latest"
+      },
+      "ghcr.io/devcontainers/features/python:1.8.0": {
+        "version": "3.11",
+        "installTools": true
+      },
+      "ghcr.io/rocker-org/devcontainer-features/apt-packages:1.1.0": {
+        "packages": "jq,unzip,python3-dev,python3-venv"
       }
     },
 
-    // VS Code customizations
     "customizations": {
       "vscode": {
         "settings": {
-          // General
           "terminal.integrated.defaultProfile.linux": "zsh",
           "editor.formatOnSave": true,
           "editor.rulers": [80, 120],
           "files.trimTrailingWhitespace": true,
           "files.insertFinalNewline": true,
-
-          // JavaScript/TypeScript
           "[javascript]": {
             "editor.defaultFormatter": "esbenp.prettier-vscode",
             "editor.formatOnSave": true
@@ -57,8 +60,6 @@
             "editor.defaultFormatter": "esbenp.prettier-vscode",
             "editor.formatOnSave": true
           },
-
-          // JSON
           "[json]": {
             "editor.defaultFormatter": "esbenp.prettier-vscode",
             "editor.formatOnSave": true
@@ -67,16 +68,20 @@
             "editor.defaultFormatter": "esbenp.prettier-vscode",
             "editor.formatOnSave": true
           },
-
-          // Solidity
+          "[json]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.formatOnSave": true
+          },
+          "[jsonc]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.formatOnSave": true
+          },
           "[solidity]": {
             "editor.defaultFormatter": "NomicFoundation.hardhat-solidity",
             "editor.formatOnSave": true
           },
           "solidity.compileUsingRemoteVersion": "latest",
           "solidity.formatter": "forge",
-
-          // Shell scripts
           "[shellscript]": {
             "editor.defaultFormatter": "foxundermoon.shell-format",
             "files.eol": "\n"
@@ -84,35 +89,28 @@
         },
 
         "extensions": [
-          // Solidity & Smart Contract Development
           "NomicFoundation.hardhat-solidity",
-
-          // Docker
           "ms-azuretools.vscode-docker",
-
-          // JavaScript/TypeScript
           "esbenp.prettier-vscode",
           "dbaeumer.vscode-eslint",
-
-          // Git
           "eamodio.gitlens",
           "github.vscode-pull-request-github",
           "Github.copilot",
           "Github.copilot-chat",
-
-          // Shell
           "foxundermoon.shell-format",
           "timonwong.shellcheck",
-
-          // Markdown
           "yzhang.markdown-all-in-one",
           "davidanson.vscode-markdownlint",
-
-          // Utilities
           "editorconfig.editorconfig",
           "christian-kohler.path-intellisense",
           "visualstudioexptteam.vscodeintellicode",
-          "gruntfuggly.todo-tree"
+          "gruntfuggly.todo-tree",
+          "ms-vscode.vscode-json",
+          "ms-vscode.vscode-typescript-next",
+          "formulahendry.auto-rename-tag",
+          "bradlc.vscode-tailwindcss",
+          "ms-vscode.vscode-eslint",
+          "ms-windows-ai-studio.windows-ai-studio"
         ]
       }
     },
@@ -128,10 +126,19 @@
       "TENDERLY_ACCOUNT_SLUG": "${localEnv:TENDERLY_ACCOUNT_SLUG}",
       "TENDERLY_PROJECT_ID": "${localEnv:TENDERLY_PROJECT_ID}",
       "TENDERLY_ACCESS_TOKEN": "${localEnv:TENDERLY_ACCESS_TOKEN}",
-      "ENS_PROVIDER_URL": "${localEnv:ENS_PROVIDER_URL}"
+      "ENS_PROVIDER_URL": "${localEnv:ENS_PROVIDER_URL}",
+      "VERCEL_ACCESS_TOKEN": "${localEnv:VERCEL_ACCESS_TOKEN}",
+      "YELLOW_MERCHANT_ADDRESS": "${localEnv:YELLOW_MERCHANT_ADDRESS}",
+      "YELLOW_MERCHANT_PRIVATE_KEY": "${localEnv:YELLOW_MERCHANT_PRIVATE_KEY}",
+      "YELLOW_CLEARNODE_URL": "${localEnv:YELLOW_CLEARNODE_URL}",
+      "YELLOW_AGENT_PRIVATE_KEY": "${localEnv:YELLOW_AGENT_PRIVATE_KEY}",
+      "YELLOW_AGENT_ADDRESS": "${localEnv:YELLOW_AGENT_ADDRESS}",
+      "YELLOW_SESSION_PRIVATE_KEY": "${localEnv:YELLOW_SESSION_PRIVATE_KEY}",
+      "YELLOW_AUTH_DOMAIN": "${localEnv:YELLOW_AUTH_DOMAIN}",
+      "YELLOW_DEBUG": "${localEnv:YELLOW_DEBUG}"
     },
 
-    "postCreateCommand": "bash -lc \"echo '[postCreate] installing hackmoney tool deps' && npm install --no-package-lock --prefix .devcontainer/hackmoney-tools\"",
+    "postCreateCommand": "bash -lc \"echo '[postCreate] installing project dependencies' && npm install && echo '[postCreate] installing hackmoney tool deps' && npm install --no-package-lock --prefix .devcontainer/hackmoney-tools\"",
 
     "mounts": [
       {
@@ -146,7 +153,6 @@
       }
     ],
 
-    // Run arguments
     "runArgs": [
       "--privileged",
       "--hostname=eXpress402-dev",
@@ -156,10 +162,8 @@
 
     "remoteUser": "vscode",
 
-    // Forward ports (for Next.js dev server and backend)
-    "forwardPorts": [3000, 3001, 8545],
+    "forwardPorts": [3000, 3001, 8545, 3002],
 
-    // Port attributes
     "portsAttributes": {
       "3000": {
         "label": "Next.js Frontend",
@@ -172,6 +176,10 @@
       "8545": {
         "label": "Local Blockchain",
         "onAutoForward": "silent"
+      },
+      "3002": {
+        "label": "MCP Server",
+        "onAutoForward": "notify"
       }
     }
   }

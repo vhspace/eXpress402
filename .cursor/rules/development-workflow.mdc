@@ -1,0 +1,127 @@
+---
+description: Core development workflow and quality standards
+alwaysApply: true
+---
+
+# Development Workflow Standards
+
+## Code Quality & Professionalism
+
+### No Emojis in Code or PRs
+- Never use emojis in code comments, commit messages, or PR descriptions
+- Never use emojis in variable names, function names, or documentation
+- Write professional, clear, and concise communication
+
+### Professional PR Writing
+- Write clear, descriptive PR titles that explain the "what" and "why"
+- Include comprehensive descriptions with context, implementation details, and testing notes
+- Use proper markdown formatting and structure
+- Reference related issues or previous PRs when applicable
+## Git Workflow
+
+### Branch Strategy
+- Never commit directly to main branch
+- Create feature branches for all changes
+- Use descriptive branch names (e.g., feat/add-user-auth, fix/payment-validation)
+- Create PRs for all changes, even small fixes
+
+## Quality Assurance Process
+
+### Post-Code Quality Checks
+After writing any code changes:
+
+1. Lint: Run npm run lint to check code style and quality
+2. Type Check: Run npm run type-check for TypeScript validation
+3. Unit Tests: Run npm test to ensure unit tests pass
+4. E2E Tests: Run npm run e2e:paid-tools for end-to-end validation (currently disabled in CI)
+5. Build: Run npm run build to ensure clean compilation
+
+### Testing Philosophy
+- Never mock external dependencies or APIs
+- Never use fallback implementations
+- Test with real data and actual integrations
+- Ensure all tests use production-like conditions
+
+## Library Management
+
+### Version Management
+- Use recent, actively maintained libraries
+- Pin all library versions in package.json to prevent unexpected updates
+- Regularly audit dependencies for security vulnerabilities
+- Update libraries proactively but test thoroughly
+
+### Library Selection
+- Research and evaluate libraries before adding
+- Prefer libraries with good TypeScript support
+- Check maintenance status and community activity
+- Consider bundle size and performance impact
+
+## Documentation & Research
+
+### MCP Tools Usage
+- Use Context7 MCP for library and API documentation
+- Use Tavily MCP for web search and finding documentation
+- Consult official documentation before implementation
+- Keep research notes for complex decisions
+
+### Documentation Updates
+- Update docs/ directory after any code changes
+- Keep README.md current with setup and usage instructions
+- Document breaking changes and migration guides
+- Update API documentation for public interfaces
+
+## Code Review Checklist
+
+Before creating a PR, verify:
+
+- [ ] All linting passes without errors or warnings
+- [ ] All unit tests pass locally
+- [ ] All e2e tests pass locally (npm run e2e:paid-tools with sandbox)
+- [ ] TypeScript compilation is clean
+- [ ] No console.log statements in production code
+- [ ] Error handling is appropriate and tested
+- [ ] Documentation is updated
+- [ ] Breaking changes are clearly documented
+- [ ] Commit messages are descriptive and follow conventional commits
+- [ ] CI pipeline passes (lint, test, e2e temporarily disabled)
+
+## Examples
+
+### Good PR Description
+```
+feat: implement user authentication with JWT tokens
+
+## Context
+Users need secure authentication for accessing protected resources.
+This implements JWT-based auth following OAuth 2.0 standards.
+
+## Implementation
+- Added JWT token generation and validation
+- Implemented password hashing with bcrypt
+- Added middleware for route protection
+- Created user registration and login endpoints
+
+## Testing
+- Unit tests for token validation logic
+- E2E tests for complete auth flow
+- Integration tests with real database
+
+## Breaking Changes
+- Authentication is now required for all API endpoints
+- Migration guide: [link to migration docs]
+```
+
+### Good Commit Messages
+```
+feat: add user authentication middleware
+fix: resolve payment validation race condition
+docs: update API documentation for v2 endpoints
+refactor: extract common database utilities
+```
+
+### Bad Examples
+```
+Added cool auth stuff
+fix bug
+updated docs
+```

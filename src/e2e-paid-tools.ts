@@ -3,14 +3,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { getFundingHint, getYellowConfig } from "./yellow/config.js";
 import { YellowRpcClient } from "./yellow/rpc.js";
 
-const env = getYellowConfig();
-
-if (!env.agentPrivateKey || !env.merchantAddress) {
-  console.error("YELLOW_AGENT_PRIVATE_KEY and YELLOW_MERCHANT_ADDRESS are required.");
-  process.exit(1);
-}
-
-async function createPaymentPayload() {
+async function createPaymentPayload(env: ReturnType<typeof getYellowConfig>) {
   const yellow = new YellowRpcClient({
     url: env.clearnodeUrl,
     privateKey: env.agentPrivateKey,
@@ -70,6 +63,15 @@ async function createPaymentPayload() {
 }
 
 async function main() {
+  // Load environment at runtime (not module load time)
+  // This ensures CI-generated environment variables are available
+  const env = getYellowConfig();
+
+  if (!env.agentPrivateKey || !env.merchantAddress) {
+    console.error("YELLOW_AGENT_PRIVATE_KEY and YELLOW_MERCHANT_ADDRESS are required.");
+    process.exit(1);
+  }
+
   console.error(getFundingHint(env.mode));
 
   const transport = new StdioClientTransport({
@@ -84,7 +86,7 @@ async function main() {
   const client = new Client({ name: "paid-tool-e2e", version: "0.0.1" });
   await client.connect(transport);
 
-  const stockPayment = await createPaymentPayload();
+  const stockPayment = await createPaymentPayload(env);
   const stock = await client.callTool({
     name: "stock_price",
     arguments: { symbol: "AAPL" },
@@ -92,13 +94,18 @@ async function main() {
   });
   console.log("stock_price:", Array.isArray(stock.content) ? stock.content[0]?.text : JSON.stringify(stock));
 
-  const rumorsPayment = await createPaymentPayload();
-  const rumors = await client.callTool({
-    name: "market_rumors",
-    arguments: { symbol: "AAPL" },
-    _meta: { "x402/payment": rumorsPayment }
-  });
-  console.log("market_rumors:", Array.isArray(rumors.content) ? rumors.content[0]?.text : JSON.stringify(rumors));
+  // Skip TAVILY-dependent tests in CI to avoid API costs
+  if (process.env.SKIP_TAVILY_TESTS !== 'true') {
+    const rumorsPayment = await createPaymentPayload(env);
+    const rumors = await client.callTool({
+      name: "market_rumors",
+      arguments: { symbol: "AAPL" },
+      _meta: { "x402/payment": rumorsPayment }
+    });
+    console.log("market_rumors:", Array.isArray(rumors.content) ? rumors.content[0]?.text : JSON.stringify(rumors));
+  } else {
+    console.log("market_rumors: SKIPPED (TAVILY tests disabled in CI)");
+  }
 
   await client.close();
 }

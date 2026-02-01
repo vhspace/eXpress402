@@ -1,5 +1,22 @@
 {
   "mcpServers": {
+    "eXpress402-mcp": {
+      "command": "npm",
+      "args": ["run", "dev"],
+      "env": {
+        "YELLOW_MERCHANT_ADDRESS": "${env:YELLOW_MERCHANT_ADDRESS}",
+        "YELLOW_MERCHANT_PRIVATE_KEY": "${env:YELLOW_MERCHANT_PRIVATE_KEY}",
+        "YELLOW_CLEARNODE_URL": "${env:YELLOW_CLEARNODE_URL}",
+        "YELLOW_ASSET_SYMBOL": "${env:YELLOW_ASSET_SYMBOL}",
+        "YELLOW_PRICE_PER_CALL": "${env:YELLOW_PRICE_PER_CALL}",
+        "YELLOW_NETWORK": "${env:YELLOW_NETWORK}",
+        "YELLOW_MAX_TIMEOUT_SECONDS": "${env:YELLOW_MAX_TIMEOUT_SECONDS}",
+        "YELLOW_AGENT_ADDRESS": "${env:YELLOW_AGENT_ADDRESS}",
+        "TAVILY_API_KEY": "${env:TAVILY_API_KEY}",
+        "REDDIT_USER_AGENT": "${env:REDDIT_USER_AGENT}",
+        "YELLOW_DEBUG": "${env:YELLOW_DEBUG}"
+      }
+    },
     "github": {
       "command": "sh",
       "args": [
@@ -66,6 +83,27 @@
       "-y",
       "sui-mcp@latest"
     ]
+  },
+  "vercel": {
+    "url": "https://mcp.vercel.com",
+    "transport": "http",
+    "headers": {}
+  },
+  "blockscout": {
+    "url": "https://mcp.blockscout.com/mcp",
+    "transport": "http",
+    "headers": {}
+  },
+  "playwright": {
+    "command": "npx",
+    "args": [
+      "@playwright/mcp@latest"
+    ]
+  },
+  "coinbase-developer": {
+    "url": "https://docs.cdp.coinbase.com/mcp",
+    "transport": "http",
+    "headers": {}
   },
   "lifi": {
     "command": "lifi-mcp",
