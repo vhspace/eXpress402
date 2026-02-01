@@ -3,7 +3,8 @@ import {
   CdpEvmWalletProvider,
   onrampActionProvider,
   walletActionProvider,
-  type Action
+  type Action,
+  type ActionProvider
 } from "@coinbase/agentkit";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -124,7 +125,7 @@ async function createCdpAgentKit(config: CdpConfig) {
     ...(config.idempotencyKey ? { idempotencyKey: config.idempotencyKey } : {}),
     ...(config.rpcUrl ? { rpcUrl: config.rpcUrl } : {})
   });
-  const actionProviders = [walletActionProvider()];
+  const actionProviders: ActionProvider[] = [walletActionProvider()];
   if (config.onrampProjectId) {
     actionProviders.push(onrampActionProvider({ projectId: config.onrampProjectId }));
   }
