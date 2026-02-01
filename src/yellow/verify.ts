@@ -6,6 +6,8 @@ type LedgerTransaction = {
   transaction_id?: number;
   sender?: string;
   receiver?: string;
+  from_account?: string;
+  to_account?: string;
   asset?: string;
   amount?: string;
   type?: string;
@@ -26,14 +28,17 @@ export async function verifyYellowTransfer(
 
   const list = Array.isArray(transactions)
     ? transactions
-    : (transactions as { ledgerTransactions?: LedgerTransaction[] }).ledgerTransactions ?? [];
+    : (transactions as { ledgerTransactions?: LedgerTransaction[]; ledger_transactions?: LedgerTransaction[] })
+        .ledgerTransactions ??
+      (transactions as { ledger_transactions?: LedgerTransaction[] }).ledger_transactions ??
+      [];
 
   const transferId = Number(receipt.transferId);
   const receiptAmount = Number(receipt.amount);
   return list.some((tx) => {
     const txId = Number(tx.id ?? tx.transaction_id ?? -1);
-    const sender = String(tx.sender ?? "");
-    const receiver = String(tx.receiver ?? "");
+    const sender = String(tx.sender ?? tx.from_account ?? "");
+    const receiver = String(tx.receiver ?? tx.to_account ?? "");
     const amount = Number(tx.amount ?? 0);
     return (
       txId === transferId &&

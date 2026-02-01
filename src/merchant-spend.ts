@@ -1,11 +1,7 @@
+import { getYellowConfig } from "./yellow/config.js";
 import { YellowRpcClient } from "./yellow/rpc.js";
 
-const env = {
-  clearnodeUrl: process.env.YELLOW_CLEARNODE_URL ?? "wss://clearnet-sandbox.yellow.com/ws",
-  merchantPrivateKey: process.env.YELLOW_MERCHANT_PRIVATE_KEY ?? "",
-  assetSymbol: process.env.YELLOW_ASSET_SYMBOL ?? "usdc",
-  authDomain: process.env.YELLOW_AUTH_DOMAIN
-};
+const env = getYellowConfig();
 
 const destination = process.argv[2];
 const amount = process.argv[3];
@@ -25,7 +21,7 @@ async function main() {
     url: env.clearnodeUrl,
     privateKey: env.merchantPrivateKey,
     authDomain: env.authDomain,
-    debug: process.env.YELLOW_DEBUG === "true"
+    debug: env.debug
   });
 
   const transferResponse = (await yellow.transfer({
