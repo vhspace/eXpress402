@@ -26,84 +26,84 @@ export async function startMcpServer() {
   try {
     // Initialize environment and clients at runtime (not module load time)
     // This ensures environment variables set in CI are available
-    console.error("Initializing MCP server environment...");
+    console.error('Initializing MCP server environment...');
     if (!env) {
-    env = getYellowConfig();
+      env = getYellowConfig();
 
-    if (!env.merchantAddress) {
-      console.error('Missing YELLOW_MERCHANT_ADDRESS; required for payments.');
-      throw new Error('Missing YELLOW_MERCHANT_ADDRESS');
-    }
-    if (!env.merchantPrivateKey) {
-      console.error('Missing YELLOW_MERCHANT_PRIVATE_KEY; required for offchain billing.');
-      throw new Error('Missing YELLOW_MERCHANT_PRIVATE_KEY');
+      if (!env.merchantAddress) {
+        console.error('Missing YELLOW_MERCHANT_ADDRESS; required for payments.');
+        throw new Error('Missing YELLOW_MERCHANT_ADDRESS');
+      }
+      if (!env.merchantPrivateKey) {
+        console.error('Missing YELLOW_MERCHANT_PRIVATE_KEY; required for offchain billing.');
+        throw new Error('Missing YELLOW_MERCHANT_PRIVATE_KEY');
+      }
+
+      yellowClient = new YellowRpcClient({ url: env.clearnodeUrl });
+      yellowAuthClient = new YellowRpcClient({
+        url: env.clearnodeUrl,
+        privateKey: env.merchantPrivateKey || undefined,
+      });
+      yellowSessionClient = env.sessionPrivateKey
+        ? new YellowRpcClient({ url: env.clearnodeUrl, privateKey: env.sessionPrivateKey })
+        : undefined;
+
+      sessionBalanceCache = new Map<string, number>();
     }
 
-    yellowClient = new YellowRpcClient({ url: env.clearnodeUrl });
-    yellowAuthClient = new YellowRpcClient({
-      url: env.clearnodeUrl,
-      privateKey: env.merchantPrivateKey || undefined,
+    console.error('Creating MCP server...');
+    const server = new McpServer({
+      name: 'eXpress402-mcp',
+      version: '0.1.0',
     });
-    yellowSessionClient = env.sessionPrivateKey
-      ? new YellowRpcClient({ url: env.clearnodeUrl, privateKey: env.sessionPrivateKey })
-      : undefined;
 
-    sessionBalanceCache = new Map<string, number>();
-  }
-
-  console.error("Creating MCP server...");
-  const server = new McpServer({
-    name: 'eXpress402-mcp',
-    version: '0.1.0',
-  });
-
-  server.registerTool(
-    'stock_price',
-    {
-      description: 'Get latest OHLCV price data for a stock symbol.',
-      inputSchema: {
-        symbol: z.string().min(1).describe('Stock ticker symbol, e.g. AAPL or TSLA'),
-      },
-    },
-    async ({ symbol }, extra) => {
-      const settlement = await requirePayment(extra, 'stock_price');
-      const data = await getStockPrice(symbol);
-      return {
-        content: [{ type: 'text', text: JSON.stringify(data) }],
-        _meta: {
-          'x402/payment-response': settlement,
+    server.registerTool(
+      'stock_price',
+      {
+        description: 'Get latest OHLCV price data for a stock symbol.',
+        inputSchema: {
+          symbol: z.string().min(1).describe('Stock ticker symbol, e.g. AAPL or TSLA'),
         },
-      };
-    },
-  );
-
-  server.registerTool(
-    'market_rumors',
-    {
-      description: 'Fetch recent market rumors for a stock symbol from Reddit and Tavily.',
-      inputSchema: {
-        symbol: z.string().min(1).describe('Stock ticker symbol, e.g. AAPL or TSLA'),
       },
-    },
-    async ({ symbol }, extra) => {
-      const settlement = await requirePayment(extra, 'market_rumors');
-      const data = await getMarketRumors(symbol);
-      return {
-        content: [{ type: 'text', text: JSON.stringify(data) }],
-        _meta: {
-          'x402/payment-response': settlement,
+      async ({ symbol }, extra) => {
+        const settlement = await requirePayment(extra, 'stock_price');
+        const data = await getStockPrice(symbol);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(data) }],
+          _meta: {
+            'x402/payment-response': settlement,
+          },
+        };
+      },
+    );
+
+    server.registerTool(
+      'market_rumors',
+      {
+        description: 'Fetch recent market rumors for a stock symbol from Reddit and Tavily.',
+        inputSchema: {
+          symbol: z.string().min(1).describe('Stock ticker symbol, e.g. AAPL or TSLA'),
         },
-      };
-    },
-  );
+      },
+      async ({ symbol }, extra) => {
+        const settlement = await requirePayment(extra, 'market_rumors');
+        const data = await getMarketRumors(symbol);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(data) }],
+          _meta: {
+            'x402/payment-response': settlement,
+          },
+        };
+      },
+    );
 
-  console.error("Setting up stdio transport...");
-  const transport = new StdioServerTransport();
+    console.error('Setting up stdio transport...');
+    const transport = new StdioServerTransport();
 
-  console.error("Connecting server to transport...");
-  await server.connect(transport);
+    console.error('Connecting server to transport...');
+    await server.connect(transport);
 
-  console.error('x402 Yellow MCP server started successfully.');
+    console.error('x402 Yellow MCP server started successfully.');
   } catch (error) {
     console.error('Error in startMcpServer:', error);
     throw error;
