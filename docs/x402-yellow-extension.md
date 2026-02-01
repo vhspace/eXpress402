@@ -112,3 +112,56 @@ Example:
   - `payer` (optional, used for close/refund)
 - Servers query `get_ledger_balances` for the session account and debit per call. If the balance is insufficient, they return 402 and may attempt `close_app_session` to refund remaining allocation.
 - Use the hosted sandbox clearnode for testing: `wss://clearnet-sandbox.yellow.com/ws`.
+
+## Production deposit flow (overview)
+
+In production, funds must be deposited on-chain into Yellow’s custody contract before they can be used for off-chain transfers.
+
+1. Deposit supported tokens (e.g., USDC) into the **custody contract** for your chain.
+2. Open or reuse a channel for that chain + asset.
+3. Fund the channel using `resize_amount` (custody-funded).
+4. Perform off-chain transfers and include the receipt in `_meta["x402/payment"]`.
+
+If you are using the sandbox faucet instead, fund the Unified Balance and use `allocate_amount` when resizing.
+
+## Cursor MCP config
+
+```json
+"eXpress402-mcp": {
+  "command": "npm",
+  "args": ["run", "dev"],
+  "env": {
+    "YELLOW_MERCHANT_ADDRESS": "${env:YELLOW_MERCHANT_ADDRESS}",
+    "YELLOW_MERCHANT_PRIVATE_KEY": "${env:YELLOW_MERCHANT_PRIVATE_KEY}",
+    "YELLOW_CLEARNODE_URL": "${env:YELLOW_CLEARNODE_URL}",
+    "YELLOW_ASSET_SYMBOL": "${env:YELLOW_ASSET_SYMBOL}",
+    "YELLOW_PRICE_PER_CALL": "${env:YELLOW_PRICE_PER_CALL}",
+    "YELLOW_NETWORK": "${env:YELLOW_NETWORK}",
+    "YELLOW_MAX_TIMEOUT_SECONDS": "${env:YELLOW_MAX_TIMEOUT_SECONDS}",
+    "YELLOW_AGENT_ADDRESS": "${env:YELLOW_AGENT_ADDRESS}",
+    "TAVILY_API_KEY": "${env:TAVILY_API_KEY}",
+    "REDDIT_USER_AGENT": "${env:REDDIT_USER_AGENT}",
+    "YELLOW_DEBUG": "${env:YELLOW_DEBUG}"
+  }
+}
+```
+
+[![Add eXpress402-mcp to Cursor](https://cursor.com/deeplink/mcp-install-dark.png)](cursor://anysphere.cursor-deeplink/mcp/install?name=eXpress402-mcp&config=eyJjb21tYW5kIjoibnBtIiwiYXJncyI6WyJydW4iLCJkZXYiXSwiZW52Ijp7IllFTExPV19NRVJDSEFOVF9BRERSRVNTIjoiJHtlbnY6WUVMTE9XX01FUkNIQU5UX0FERFJFU1N9IiwiWUVMTE9XX01FUkNIQU5UX1BSSVZBVEVfS0VZIjoiJHtlbnY6WUVMTE9XX01FUkNIQU5UX1BSSVZBVEVfS0VZfSIsIllFTExPV19DTEVBUk5PREVfVVJMIjoiJHtlbnY6WUVMTE9XX0NMRUFSTk9ERV9VUkx9IiwiWUVMTE9XX0FTU0VUX1NZTUJPTCI6IiR7ZW52OllFTExPV19BU1NFVF9TWU1CT0x9IiwiWUVMTE9XX1BSSUNFX1BFUl9DQUxMIjoiJHtlbnY6WUVMTE9XX1BSSUNFX1BFUl9DQUxMfSIsIllFTExPV19ORVRXT1JLIjoiJHtlbnY6WUVMTE9XX05FVFdPUkt9IiwiWUVMTE9XX01BWF9USU1FT1VUX1NFQ09ORFMiOiIke2VudjpZRUxMT1dfTUFYX1RJTUVPVVRfU0VDT05EU30iLCJZRUxMT1dfQUdFTlRfQUREUkVTUyI6IiR7ZW52OllFTExPV19BR0VOVF9BRERSRVNTfSIsIlRBVklMWV9BUElfS0VZIjoiJHtlbnY6VEFWSUxZX0FQSV9LRVl9IiwiUkVERElUX1VTRVJfQUdFTlQiOiIke2VudjpSRURESVRfVVNFUl9BR0VOVH0iLCJZRUxMT1dfREVCVUciOiIke2VudjpZRUxMT1dfREVCVUd9In19)
+
+## Claude MCP config (API)
+
+Claude’s MCP support expects **URL-based** servers in the API request (`mcp_servers`), not stdio. To use this server with Claude, you’d need to host it behind an HTTP/SSE MCP endpoint.
+
+```json
+{
+  "mcp_servers": [
+    {
+      "name": "eXpress402-mcp",
+      "type": "url",
+      "url": "https://your-hosted-mcp.example.com/mcp"
+    }
+  ]
+}
+```
+
+No official “Add to Claude” button/deeplink is documented yet. Claude MCP servers are configured per API request. See Anthropic docs for `mcp_servers`: [https://platform.claude.com/docs/en/api/beta](https://platform.claude.com/docs/en/api/beta)

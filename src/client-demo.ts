@@ -1,29 +1,167 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import {
+  createAppSessionMessage,
+  createCloseAppSessionMessage,
+  createECDSAMessageSigner
+} from "@erc7824/nitrolite/dist/rpc/api.js";
+import { RPCProtocolVersion } from "@erc7824/nitrolite/dist/rpc/types/index.js";
+import { privateKeyToAccount } from "viem/accounts";
+import { getFundingHint, getYellowConfig } from "./yellow/config.js";
 import { YellowRpcClient } from "./yellow/rpc.js";
-import { buildPaymentRequired } from "./x402/payment.js";
 
-const env = {
-  clearnodeUrl: process.env.YELLOW_CLEARNODE_URL ?? "wss://clearnet-sandbox.yellow.com/ws",
-  merchantAddress: process.env.YELLOW_MERCHANT_ADDRESS ?? "",
-  assetSymbol: process.env.YELLOW_ASSET_SYMBOL ?? "usdc",
-  pricePerCall: process.env.YELLOW_PRICE_PER_CALL ?? "0.1",
-  network: process.env.YELLOW_NETWORK ?? "yellow:sandbox",
-  privateKey: process.env.YELLOW_AGENT_PRIVATE_KEY ?? "",
-  authDomain: process.env.YELLOW_AUTH_DOMAIN
-};
+const env = getYellowConfig();
 
-if (!env.privateKey || !env.merchantAddress) {
+if (!env.agentPrivateKey || !env.merchantAddress) {
   console.error("YELLOW_AGENT_PRIVATE_KEY and YELLOW_MERCHANT_ADDRESS are required.");
   process.exit(1);
 }
 
-async function main() {
-  const yellow = new YellowRpcClient({
-    url: env.clearnodeUrl,
-    privateKey: env.privateKey,
-    authDomain: env.authDomain,
-    debug: process.env.YELLOW_DEBUG === "true"
+const agentAddress =
+  env.agentAddress ?? privateKeyToAccount(env.agentPrivateKey as `0x${string}`).address;
+const sessionParticipants = (process.env.YELLOW_APP_SESSION_PARTICIPANTS ?? "")
+  .split(",")
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+const sessionAllocationsRaw = process.env.YELLOW_APP_SESSION_ALLOCATIONS ?? "";
+const sessionTtlSeconds = Number(process.env.YELLOW_APP_SESSION_TTL_SECONDS ?? "");
+
+if (sessionParticipants.length < 2 || !sessionAllocationsRaw || Number.isNaN(sessionTtlSeconds)) {
+  console.error(
+    "YELLOW_APP_SESSION_PARTICIPANTS (at least 2), YELLOW_APP_SESSION_ALLOCATIONS, and YELLOW_APP_SESSION_TTL_SECONDS are required."
+  );
+  process.exit(1);
+}
+
+if (!sessionParticipants.some((participant) => participant.toLowerCase() === agentAddress.toLowerCase())) {
+  console.error("YELLOW_APP_SESSION_PARTICIPANTS must include the agent address.");
+  process.exit(1);
+}
+
+async function getBalance(client: YellowRpcClient, accountId: string, asset: string) {
+  const balances = await client.getLedgerBalances(accountId);
+  const match = balances.find((entry) => entry.asset === asset);
+  return match?.amount ?? "0";
+}
+
+async function safeBalance(client: YellowRpcClient, accountId: string, asset: string) {
+  try {
+    return await getBalance(client, accountId, asset);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`balance unavailable (${accountId}): ${message}`);
+    return "unavailable";
+  }
+}
+
+function logStage(label: string) {
+  console.log(label);
+}
+
+function truncateOutput(value: string, maxLength = 80) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 3)}...`;
+}
+
+const SAMPLE_SP500_TICKERS = [
+  "AAPL",
+  "MSFT",
+  "AMZN",
+  "GOOGL",
+  "META",
+  "NVDA",
+  "TSLA",
+  "JPM",
+  "V",
+  "UNH",
+  "HD",
+  "PG",
+  "MA",
+  "XOM",
+  "LLY",
+  "AVGO",
+  "COST",
+  "PEP",
+  "KO",
+  "MRK"
+];
+
+function pickRandomTicker(exclude?: string) {
+  const options = exclude
+    ? SAMPLE_SP500_TICKERS.filter((ticker) => ticker !== exclude)
+    : SAMPLE_SP500_TICKERS;
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+function parseAllocations(
+  participants: string[],
+  allocationsRaw: string,
+  assetSymbol: string
+): Array<{ participant: string; asset: string; amount: string }> {
+  const allocationMap = JSON.parse(allocationsRaw) as Record<string, string>;
+  return participants.map((participant) => ({
+    participant,
+    asset: assetSymbol,
+    amount: allocationMap[participant] ?? "0"
+  }));
+}
+
+function getToolPrice(toolName: string) {
+  const toolPrice = env.toolPrices?.[toolName];
+  return Number(toolPrice ?? env.pricePerCall);
+}
+
+async function createAppSession(
+  yellow: YellowRpcClient,
+  participants: string[],
+  assetSymbol: string,
+  ttlSeconds: number
+) {
+  const signer = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
+  const allocations = parseAllocations(participants, sessionAllocationsRaw, assetSymbol);
+  const weights = participants.map(() => 1);
+  const message = await createAppSessionMessage(signer, {
+    definition: {
+      application: "eXpress402-mcp",
+      protocol: RPCProtocolVersion.NitroRPC_0_4,
+      participants,
+      weights,
+      quorum: 1,
+      challenge: 0,
+      nonce: Date.now()
+    },
+    allocations,
+    sessionData: JSON.stringify({ ttlSeconds })
   });
 
+  const response = (await yellow.sendRawMessage(message)) as Record<string, unknown>;
+  const appSessionId =
+    (response.appSessionId as string | undefined) ??
+    (response.app_session_id as string | undefined) ??
+    (response.appSession as { appSessionId?: string } | undefined)?.appSessionId;
+
+  if (!appSessionId) {
+    throw new Error(`App session creation failed: ${JSON.stringify(response)}`);
+  }
+
+  return { appSessionId, allocations };
+}
+
+async function main() {
+  logStage("Booting demo");
+  console.log(getFundingHint(env.mode));
+
+  const yellow = new YellowRpcClient({
+    url: env.clearnodeUrl,
+    privateKey: env.agentPrivateKey,
+    authDomain: env.authDomain,
+    debug: env.debug
+  });
+
+  logStage("Connecting to Yellow clearnode");
+  await yellow.connect();
   const assetsResponse = (await yellow.request("get_assets", {})) as {
     assets?: Array<{ symbol: string }>;
   };
@@ -33,75 +171,100 @@ async function main() {
     assets[0];
   const assetSymbol = selectedAsset?.symbol ?? env.assetSymbol;
 
+  logStage("Authorizing session key");
   await yellow.authenticate({
     allowances: [{ asset: assetSymbol, amount: "1000" }],
     scope: "transfer"
   });
 
-  const transferResponse = (await yellow.transfer({
-    destination: env.merchantAddress,
-    allocations: [
-      {
-        asset: assetSymbol,
-        amount: env.pricePerCall
-      }
-    ]
-  })) as { transactions?: Array<Record<string, unknown>> };
+  logStage("Step 1: wallet balances before calls");
+  console.log("agent", agentAddress, "balance", await safeBalance(yellow, agentAddress, assetSymbol));
+  console.log("merchant", env.merchantAddress, "balance", await safeBalance(yellow, env.merchantAddress, assetSymbol));
 
-  const transfer = transferResponse.transactions?.[0] ?? {};
-  const transferId = String(transfer.id ?? transfer.transaction_id ?? "");
-  const payer = String(transfer.sender ?? "");
+  logStage("Step 2: create prepaid session (allocation + TTL)");
+  const { appSessionId, allocations } = await createAppSession(
+    yellow,
+    sessionParticipants,
+    assetSymbol,
+    sessionTtlSeconds
+  );
+  console.log("appSessionId", appSessionId);
+  console.log("ttlSeconds", sessionTtlSeconds);
+  console.log("allocations", allocations);
+  const agentAllocation =
+    allocations.find((entry) => entry.participant.toLowerCase() === agentAddress.toLowerCase())
+      ?.amount ?? "0";
+  let localSessionBalance = Number(agentAllocation);
 
-  const receipt = {
-    transferId,
-    payer,
-    amount: env.pricePerCall,
-    asset: assetSymbol,
-    to: env.merchantAddress
-  };
+  const transport = new StdioClientTransport({
+    command: "bash",
+    args: ["-lc", "cd /workspaces/eXpress402 && npm run dev"],
+    env: process.env,
+    stderr: "pipe"
+  });
+  const client = new Client({ name: "demo-e2e", version: "0.0.1" });
+  await client.connect(transport);
 
-  const paymentPayload = {
-    x402Version: 2,
-    accepted: {
-      scheme: "yellow-offchain",
-      network: env.network,
-      amount: env.pricePerCall,
+  const stockSymbol = pickRandomTicker();
+  logStage(`Step 2: call MCP (stock_price) using Yellow session (${stockSymbol})`);
+  try {
+    const stock = await client.callTool({
+      name: "stock_price",
+      arguments: { symbol: stockSymbol },
+      _meta: { "x402/yellow": { appSessionId, payer: agentAddress } }
+    });
+    const stockText = (stock as { content?: Array<{ text?: string }> }).content?.[0]?.text;
+    logStage("Step 3: MCP result (stock_price)");
+    console.log(truncateOutput(stockText ?? JSON.stringify(stock)));
+  } catch (error) {
+    logStage("Step 3: MCP result (stock_price) failed");
+    console.log(error);
+  }
+  localSessionBalance -= getToolPrice("stock_price");
+  logStage("Step 4: session balance after stock_price");
+  console.log("session", appSessionId, "balance", await safeBalance(yellow, appSessionId, assetSymbol));
+  console.log("session (local)", localSessionBalance);
+
+  const rumorsSymbol = pickRandomTicker(stockSymbol);
+  logStage(`Step 2: call MCP (market_rumors) using Yellow session (${rumorsSymbol})`);
+  try {
+    const rumors = await client.callTool({
+      name: "market_rumors",
+      arguments: { symbol: rumorsSymbol },
+      _meta: { "x402/yellow": { appSessionId, payer: agentAddress } }
+    });
+    const rumorsText = (rumors as { content?: Array<{ text?: string }> }).content?.[0]?.text;
+    logStage("Step 3: MCP result (market_rumors)");
+    console.log(truncateOutput(rumorsText ?? JSON.stringify(rumors)));
+  } catch (error) {
+    logStage("Step 3: MCP result (market_rumors) failed");
+    console.log(error);
+  }
+  localSessionBalance -= getToolPrice("market_rumors");
+  logStage("Step 4: session balance after market_rumors");
+  console.log("session", appSessionId, "balance", await safeBalance(yellow, appSessionId, assetSymbol));
+  console.log("session (local)", localSessionBalance);
+
+  logStage("Step 5: close out offchain wallet (close app session)");
+  const sessionBalance = await safeBalance(yellow, appSessionId, assetSymbol);
+  if (sessionBalance !== "unavailable") {
+    const closeAllocations = sessionParticipants.map((participant) => ({
+      participant,
       asset: assetSymbol,
-      payTo: env.merchantAddress,
-      maxTimeoutSeconds: 60,
-      extra: {
-        settlement: "yellow"
-      }
-    },
-    payload: receipt,
-    extensions: {
-      yellow: {
-        info: {
-          clearnodeUrl: env.clearnodeUrl,
-          protocolVersion: "NitroRPC/0.4",
-          asset: assetSymbol,
-          pricePerCall: env.pricePerCall,
-          transferId: receipt.transferId,
-          payer: receipt.payer
-        },
-        schema: buildPaymentRequired(
-          {
-            clearnodeUrl: env.clearnodeUrl,
-            merchantAddress: env.merchantAddress,
-            assetSymbol: assetSymbol,
-            pricePerCall: env.pricePerCall,
-            network: env.network,
-            maxTimeoutSeconds: 60
-          },
-          "mcp://tool/stock_price",
-          "Paid tool"
-        ).extensions?.yellow?.schema
-      }
-    }
-  };
+      amount: participant.toLowerCase() === agentAddress.toLowerCase() ? sessionBalance : "0"
+    }));
+    const closeSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
+    const closeMessage = await createCloseAppSessionMessage(closeSigner, {
+      app_session_id: appSessionId as `0x${string}`,
+      allocations: closeAllocations
+    });
+    await yellow.sendRawMessage(closeMessage);
+    console.log("session", appSessionId, "balance", await safeBalance(yellow, appSessionId, assetSymbol));
+  } else {
+    console.log("close skipped: session balance unavailable");
+  }
 
-  console.error("Payment payload to include in _meta[x402/payment]:");
-  console.error(JSON.stringify(paymentPayload, null, 2));
+  await client.close();
 }
 
 main().catch((error) => {
