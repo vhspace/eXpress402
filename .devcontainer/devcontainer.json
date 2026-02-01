@@ -9,33 +9,33 @@
     "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
 
     "features": {
-      "ghcr.io/devcontainers/features/common-utils:2.5.0": {
+      "ghcr.io/devcontainers/features/common-utils:2": {
         "installZsh": true,
         "installOhMyZsh": true,
         "configureZshAsDefaultShell": true,
         "upgradePackages": true
       },
-      "ghcr.io/devcontainers/features/docker-in-docker:2.11.0": {
+      "ghcr.io/devcontainers/features/docker-in-docker:2": {
         "version": "latest",
         "moby": true,
         "dockerDashComposeVersion": "v2"
       },
-      "ghcr.io/devcontainers/features/node:1.9.0": {
+      "ghcr.io/devcontainers/features/node:1": {
         "version": "lts",
         "nodeGypDependencies": true,
         "installYarnUsingApt": true
       },
-      "ghcr.io/devcontainers/features/go:1.6.0": {
+      "ghcr.io/devcontainers/features/go:1": {
         "version": "latest"
       },
-      "ghcr.io/devcontainers/features/github-cli:1.0.13": {
+      "ghcr.io/devcontainers/features/github-cli:1": {
         "version": "latest"
       },
-      "ghcr.io/devcontainers/features/python:1.8.0": {
+      "ghcr.io/devcontainers/features/python:1": {
         "version": "3.11",
         "installTools": true
       },
-      "ghcr.io/rocker-org/devcontainer-features/apt-packages:1.1.0": {
+      "ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
         "packages": "jq,unzip,python3-dev,python3-venv"
       }
     },
