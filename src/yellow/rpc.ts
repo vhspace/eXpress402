@@ -7,6 +7,7 @@ import {
   createECDSAMessageSigner,
   createEIP712AuthMessageSigner,
   createGetAppSessionsMessageV2,
+  createGetLedgerBalancesMessage,
   createTransferMessage,
 } from '@erc7824/nitrolite/dist/rpc/api.js';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
@@ -271,12 +272,24 @@ export class YellowRpcClient {
   }
 
   async getLedgerBalances(accountId?: string): Promise<LedgerBalance[]> {
-    const response = await this.request<{
+    if (!this.options.privateKey) {
+      const response = await this.request<{
+        ledgerBalances?: LedgerBalance[];
+        ledger_balances?: LedgerBalance[];
+      }>('get_ledger_balances', {
+        ...(accountId ? { account_id: accountId } : {}),
+      });
+      return response.ledgerBalances ?? response.ledger_balances ?? [];
+    }
+
+    await this.authenticate();
+    const signingKey = this.sessionPrivateKey ?? (this.options.privateKey as `0x${string}`);
+    const signer = createECDSAMessageSigner(signingKey);
+    const message = await createGetLedgerBalancesMessage(signer, accountId);
+    const response = (await this.sendRaw(message)) as {
       ledgerBalances?: LedgerBalance[];
       ledger_balances?: LedgerBalance[];
-    }>('get_ledger_balances', {
-      ...(accountId ? { account_id: accountId } : {}),
-    });
+    };
     return response.ledgerBalances ?? response.ledger_balances ?? [];
   }
 
