@@ -54,6 +54,14 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    env:
+      YELLOW_AGENT_PRIVATE_KEY: ${{ secrets.YELLOW_AGENT_PRIVATE_KEY }}
+      YELLOW_MERCHANT_PRIVATE_KEY: ${{ secrets.YELLOW_MERCHANT_PRIVATE_KEY }}
+      YELLOW_MERCHANT_ADDRESS: ${{ secrets.YELLOW_MERCHANT_ADDRESS }}
+      YELLOW_CLEARNODE_URL: "wss://clearnet-sandbox.yellow.com/ws"
+      YELLOW_AUTO_FAUCET: "true"
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      REDDIT_USER_AGENT: "eXpress402-ci/0.1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -66,11 +74,24 @@ jobs:
         run: npm install
       - name: Build
         run: npm run build
-      - name: E2E Tests with Sandbox (Skip TAVILY)
+      - name: Prepare demo session env
+        run: |
+          node --input-type=module - <<'NODE' >> $GITHUB_ENV
+          import { privateKeyToAccount } from 'viem/accounts';
+          const agentKey = process.env.YELLOW_AGENT_PRIVATE_KEY;
+          const merchantAddress = process.env.YELLOW_MERCHANT_ADDRESS;
+          if (!agentKey || !merchantAddress) {
+            throw new Error('Missing YELLOW_AGENT_PRIVATE_KEY or YELLOW_MERCHANT_ADDRESS');
+          }
+          const agentAddress = privateKeyToAccount(agentKey).address;
+          const allocations = {
+            [agentAddress]: '1',
+            [merchantAddress]: '0',
+          };
+          console.log(`YELLOW_AGENT_ADDRESS=${agentAddress}`);
+          console.log(`YELLOW_APP_SESSION_PARTICIPANTS=${agentAddress},${merchantAddress}`);
+          console.log(`YELLOW_APP_SESSION_ALLOCATIONS=${JSON.stringify(allocations)}`);
+          console.log('YELLOW_APP_SESSION_TTL_SECONDS=600');
+          NODE
+      - name: E2E Tests with Sandbox
         run: npm run e2e:paid-tools:ci
-        env:
-          YELLOW_AGENT_PRIVATE_KEY: ${{ secrets.YELLOW_AGENT_PRIVATE_KEY }}
-          YELLOW_MERCHANT_PRIVATE_KEY: ${{ secrets.YELLOW_MERCHANT_PRIVATE_KEY }}
-          YELLOW_MERCHANT_ADDRESS: ${{ secrets.YELLOW_MERCHANT_ADDRESS }}
-          YELLOW_CLEARNODE_URL: "wss://clearnet-sandbox.yellow.com/ws"
-          YELLOW_AUTO_FAUCET: "true"

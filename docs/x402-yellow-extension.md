@@ -114,6 +114,7 @@ Example:
 - Run `npm run demo` or `npm run e2e:paid-tools` from the repository root so the scripts can spawn `npm run dev` for the MCP server.
 - The e2e script can request sandbox funds automatically when `YELLOW_AUTO_FAUCET` is not `false` (use `YELLOW_FAUCET_URL` to override).
 - CI e2e runs expect `YELLOW_AGENT_PRIVATE_KEY`, `YELLOW_MERCHANT_PRIVATE_KEY`, and `YELLOW_MERCHANT_ADDRESS` to be set as secrets or environment variables.
+- The demo/e2e app-session flow requires `YELLOW_APP_SESSION_PARTICIPANTS`, `YELLOW_APP_SESSION_ALLOCATIONS`, and `YELLOW_APP_SESSION_TTL_SECONDS` to be set explicitly.
 - Use the hosted sandbox clearnode for testing: `wss://clearnet-sandbox.yellow.com/ws`.
 
 ## Production deposit flow (overview)
