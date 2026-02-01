@@ -4,7 +4,7 @@
 
   <img src="docs/assets/express402-logo.png" alt="eXpress402 Logo" width="600">
   
-  <h3>⚡ Prepaid Market Data Channels - Pay Once, Query Unlimited ⚡</h3>
+  <h3>⚡ Extreme DeFi Payments for AI Agents ⚡</h3>
   
   [![ETHGlobal HackMoney](https://img.shields.io/badge/ETHGlobal-HackMoney-7B3FE4?logo=ethereum&logoColor=white)](https://hackmoney.ethglobal.com/)
   [![Yellow](https://img.shields.io/badge/Yellow-Network-FFD700?logo=ethereum&logoColor=black)](https://yellow.org)
