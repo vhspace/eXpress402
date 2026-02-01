@@ -23,9 +23,11 @@ let yellowSessionClient: YellowRpcClient | undefined;
 let sessionBalanceCache: Map<string, number> | undefined;
 
 export async function startMcpServer() {
-  // Initialize environment and clients at runtime (not module load time)
-  // This ensures environment variables set in CI are available
-  if (!env) {
+  try {
+    // Initialize environment and clients at runtime (not module load time)
+    // This ensures environment variables set in CI are available
+    console.error("Initializing MCP server environment...");
+    if (!env) {
     env = getYellowConfig();
 
     if (!env.merchantAddress) {
@@ -48,6 +50,8 @@ export async function startMcpServer() {
 
     sessionBalanceCache = new Map<string, number>();
   }
+
+  console.error("Creating MCP server...");
   const server = new McpServer({
     name: 'eXpress402-mcp',
     version: '0.1.0',
@@ -93,9 +97,17 @@ export async function startMcpServer() {
     },
   );
 
+  console.error("Setting up stdio transport...");
   const transport = new StdioServerTransport();
+
+  console.error("Connecting server to transport...");
   await server.connect(transport);
-  console.error('x402 Yellow MCP server started.');
+
+  console.error('x402 Yellow MCP server started successfully.');
+  } catch (error) {
+    console.error('Error in startMcpServer:', error);
+    throw error;
+  }
 }
 
 function getPriceForTool(toolName: string) {
