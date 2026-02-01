@@ -111,6 +111,7 @@ Example:
   - `appSessionId` (required)
   - `payer` (optional, used for close/refund)
 - Servers query `get_ledger_balances` for the session account and debit per call. If the balance is insufficient, they return 402 and may attempt `close_app_session` to refund remaining allocation.
+- Run `npm run demo` or `npm run e2e:paid-tools` from the repository root so the scripts can spawn `npm run dev` for the MCP server.
 - Use the hosted sandbox clearnode for testing: `wss://clearnet-sandbox.yellow.com/ws`.
 
 ## Production deposit flow (overview)
