@@ -113,6 +113,10 @@ Example:
 - Servers query `get_ledger_balances` for the session account and debit per call. If the balance is insufficient, they return 402 and may attempt `close_app_session` to refund remaining allocation.
 - Use the hosted sandbox clearnode for testing: `wss://clearnet-sandbox.yellow.com/ws`.
 
+## Fraud and abuse prevention demo
+
+The demo script includes an offline MCP scenario. After creating a prepaid app session, the MCP server is stopped to simulate going offline. The client then closes the app session directly to reclaim the unused allocation. This demonstrates that unspent funds remain under the payer's control even when the MCP is unavailable.
+
 ## Production deposit flow (overview)
 
 In production, funds must be deposited on-chain into Yellow’s custody contract before they can be used for off-chain transfers.
