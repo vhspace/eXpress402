@@ -24,11 +24,11 @@ if (!env.allocations) {
   process.exit(1);
 }
 
-const participants = env.participants.split(",").map((p) => p.trim());
+const participants = env.participants.split(",").map((p) => p.trim()) as `0x${string}`[];
 const allocationMap = JSON.parse(env.allocations) as Record<string, string>;
 
 const allocations = participants.map((participant) => ({
-  participant,
+  participant: participant as `0x${string}`,
   asset: env.assetSymbol,
   amount: allocationMap[participant] ?? "0"
 }));

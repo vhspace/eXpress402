@@ -25,7 +25,7 @@ async function main() {
   });
 
   const transferResponse = (await yellow.transfer({
-    destination,
+    destination: destination as `0x${string}`,
     allocations: [
       {
         asset: env.assetSymbol,

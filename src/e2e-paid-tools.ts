@@ -33,7 +33,7 @@ async function createPaymentPayload() {
   });
 
   const transferResponse = (await yellow.transfer({
-    destination: env.merchantAddress,
+    destination: env.merchantAddress as `0x${string}`,
     allocations: [
       {
         asset: assetSymbol,
@@ -75,7 +75,9 @@ async function main() {
   const transport = new StdioClientTransport({
     command: "bash",
     args: ["-lc", "cd /workspaces/eXpress402 && npm run dev"],
-    env: process.env,
+    env: Object.fromEntries(
+      Object.entries(process.env).filter(([_, value]) => value !== undefined)
+    ) as Record<string, string>,
     stderr: "pipe"
   });
 
@@ -88,7 +90,7 @@ async function main() {
     arguments: { symbol: "AAPL" },
     _meta: { "x402/payment": stockPayment }
   });
-  console.log("stock_price:", stock.content?.[0]?.text ?? JSON.stringify(stock));
+  console.log("stock_price:", Array.isArray(stock.content) ? stock.content[0]?.text : JSON.stringify(stock));
 
   const rumorsPayment = await createPaymentPayload();
   const rumors = await client.callTool({
@@ -96,7 +98,7 @@ async function main() {
     arguments: { symbol: "AAPL" },
     _meta: { "x402/payment": rumorsPayment }
   });
-  console.log("market_rumors:", rumors.content?.[0]?.text ?? JSON.stringify(rumors));
+  console.log("market_rumors:", Array.isArray(rumors.content) ? rumors.content[0]?.text : JSON.stringify(rumors));
 
   await client.close();
 }
