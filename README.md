@@ -183,6 +183,24 @@ Notes:
 - Custody contract addresses and supported token addresses are environment-specific.
 - If you only have a Unified Balance (sandbox faucet), use `allocate_amount` instead of `resize_amount`.
 
+## Channel & app session flow (broker model)
+
+Channels are always **wallet ↔ broker** (not wallet ↔ wallet). Think of a channel as the on‑ramp/off‑ramp for a wallet.
+
+![Yellow broker channel flow](docs/assets/yellow-broker-flow.png)
+
+Sender flow:
+1. Deposit on‑chain to custody.
+2. Open channel (sender ↔ broker).
+3. Resize (signed by sender, confirmed on‑chain).
+4. Create app session (participants + quorum) and allocate funds.
+5. Make off‑chain transfers (including to recipient).
+
+Recipient flow:
+1. Optionally open channel (recipient ↔ broker) if withdrawing on‑chain.
+2. Resize to move off‑chain funds into the channel.
+3. Close/withdraw to on‑chain wallet.
+
 ## Merchant spend (optional)
 
 Send funds from the merchant wallet to another address:
