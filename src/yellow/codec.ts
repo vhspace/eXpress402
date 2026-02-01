@@ -1,14 +1,12 @@
-import stableStringify from "json-stable-stringify";
-import { keccak_256 } from "@noble/hashes/sha3";
-import { hexToBytes, bytesToHex, concatBytes } from "@noble/hashes/utils";
-import { getPublicKey, sign, Signature, etc } from "@noble/secp256k1";
-import { hmac } from "@noble/hashes/hmac";
-import { sha256 } from "@noble/hashes/sha256";
+import stableStringify from 'json-stable-stringify';
+import { keccak_256 } from '@noble/hashes/sha3';
+import { hexToBytes, bytesToHex, concatBytes } from '@noble/hashes/utils';
+import { getPublicKey, sign, Signature, etc } from '@noble/secp256k1';
+import { hmac } from '@noble/hashes/hmac';
+import { sha256 } from '@noble/hashes/sha256';
 
 const encoder = new TextEncoder();
-if (!etc.hmacSha256Sync) {
-  etc.hmacSha256Sync = (key, ...msgs) => hmac(sha256, key, concatBytes(...msgs));
-}
+etc.hmacSha256Sync ??= (key, ...msgs) => hmac(sha256, key, concatBytes(...msgs));
 
 export function encodeCanonicalJson(value: unknown): Uint8Array {
   const json = stableStringify(value);
@@ -40,7 +38,7 @@ function findRecovery(signature: Signature, hash: Uint8Array, privateKey: Uint8A
       return recovery;
     }
   }
-  throw new Error("Failed to derive recovery bit for signature");
+  throw new Error('Failed to derive recovery bit for signature');
 }
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -56,6 +54,6 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 export function normalizeHex(value: string): Uint8Array {
-  const trimmed = value.startsWith("0x") ? value.slice(2) : value;
+  const trimmed = value.startsWith('0x') ? value.slice(2) : value;
   return hexToBytes(trimmed);
 }

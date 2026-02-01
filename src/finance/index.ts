@@ -1,6 +1,6 @@
-import { fetchLatestStooqPrice } from "./stooq.js";
-import { fetchRedditRumors } from "./reddit.js";
-import { fetchTavilyRumors } from "./tavily.js";
+import { fetchLatestStooqPrice } from './stooq.js';
+import { fetchRedditRumors } from './reddit.js';
+import { fetchTavilyRumors } from './tavily.js';
 
 export async function getStockPrice(symbol: string) {
   const row = await fetchLatestStooqPrice(symbol);
@@ -12,20 +12,17 @@ export async function getStockPrice(symbol: string) {
     low: row.low,
     close: row.close,
     volume: row.volume,
-    source: "stooq"
+    source: 'stooq',
   };
 }
 
 export async function getMarketRumors(symbol: string) {
   const query = `${symbol} stock rumor`;
-  const [reddit, tavily] = await Promise.all([
-    fetchRedditRumors(symbol),
-    fetchTavilyRumors(query)
-  ]);
+  const [reddit, tavily] = await Promise.all([fetchRedditRumors(symbol), fetchTavilyRumors(query)]);
 
   return {
     symbol,
     reddit,
-    tavily
+    tavily,
   };
 }
