@@ -92,13 +92,18 @@ async function main() {
   });
   console.log("stock_price:", Array.isArray(stock.content) ? stock.content[0]?.text : JSON.stringify(stock));
 
-  const rumorsPayment = await createPaymentPayload();
-  const rumors = await client.callTool({
-    name: "market_rumors",
-    arguments: { symbol: "AAPL" },
-    _meta: { "x402/payment": rumorsPayment }
-  });
-  console.log("market_rumors:", Array.isArray(rumors.content) ? rumors.content[0]?.text : JSON.stringify(rumors));
+  // Skip TAVILY-dependent tests in CI to avoid API costs
+  if (process.env.SKIP_TAVILY_TESTS !== 'true') {
+    const rumorsPayment = await createPaymentPayload();
+    const rumors = await client.callTool({
+      name: "market_rumors",
+      arguments: { symbol: "AAPL" },
+      _meta: { "x402/payment": rumorsPayment }
+    });
+    console.log("market_rumors:", Array.isArray(rumors.content) ? rumors.content[0]?.text : JSON.stringify(rumors));
+  } else {
+    console.log("market_rumors: SKIPPED (TAVILY tests disabled in CI)");
+  }
 
   await client.close();
 }

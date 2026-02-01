@@ -1,9 +1,9 @@
 import stableStringify from 'json-stable-stringify';
-import { keccak_256 } from '@noble/hashes/sha3';
-import { hexToBytes, bytesToHex, concatBytes } from '@noble/hashes/utils';
+import { keccak_256 } from '@noble/hashes/sha3.js';
+import { hexToBytes, bytesToHex, concatBytes } from '@noble/hashes/utils.js';
 import { getPublicKey, sign, Signature, etc } from '@noble/secp256k1';
-import { hmac } from '@noble/hashes/hmac';
-import { sha256 } from '@noble/hashes/sha256';
+import { hmac } from '@noble/hashes/hmac.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 
 const encoder = new TextEncoder();
 etc.hmacSha256Sync ??= (key, ...msgs) => hmac(sha256, key, concatBytes(...msgs));

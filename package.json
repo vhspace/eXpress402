@@ -9,11 +9,12 @@
     "start": "node build/index.js",
     "demo": "tsx src/client-demo.ts",
     "e2e:paid-tools": "tsx src/e2e-paid-tools.ts",
+    "e2e:paid-tools:ci": "SKIP_TAVILY_TESTS=true tsx src/e2e-paid-tools.ts",
     "merchant-spend": "tsx src/merchant-spend.ts",
     "app-session-init": "tsx src/app-session-init.ts",
     "test": "vitest run",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix",
+    "lint": "eslint src/**/*.ts tests/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts tests/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts tests/**/*.ts",
     "format:check": "prettier --check src/**/*.ts tests/**/*.ts",
     "type-check": "tsc --noEmit"
@@ -21,11 +22,11 @@
   "dependencies": {
     "@erc7824/nitrolite": "^0.5.3",
     "@modelcontextprotocol/sdk": "^1.9.0",
-    "@noble/hashes": "^1.8.0",
-    "@noble/secp256k1": "^2.2.3",
+    "@noble/hashes": "^2.0.1",
+    "@noble/secp256k1": "^2.3.0",
     "json-stable-stringify": "^1.1.1",
     "ws": "^8.18.0",
-    "zod": "^3.24.2"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^25.1.0",
@@ -38,6 +39,6 @@
     "prettier": "^3.8.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.18"
   }
 }
