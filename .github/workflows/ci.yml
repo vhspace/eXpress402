@@ -73,15 +73,7 @@ jobs:
       - name: Generate Ephemeral Test Keys
         run: |
           # Generate ephemeral test keys for Yellow sandbox
-          npm install -g @noble/secp256k1
-          node -e "
-          const { generatePrivateKey } = require('viem/accounts');
-          const { privateKeyToAccount } = require('viem/accounts');
-          const privKey = generatePrivateKey();
-          const account = privateKeyToAccount(privKey);
-          console.log('YELLOW_AGENT_PRIVATE_KEY=' + privKey);
-          console.log('YELLOW_MERCHANT_ADDRESS=' + account.address);
-          " >> $GITHUB_ENV
+          node scripts/generate-test-keys.js >> $GITHUB_ENV
 
       - name: E2E Tests with Sandbox (Skip TAVILY)
         run: npm run e2e:paid-tools:ci
