@@ -113,6 +113,7 @@ Example:
 - Servers query `get_ledger_balances` for the session account and debit per call. If the balance is insufficient, they return 402 and may attempt `close_app_session` to refund remaining allocation.
 - Run `npm run demo` or `npm run e2e:paid-tools` from the repository root so the scripts can spawn `npm run dev` for the MCP server.
 - The e2e script can request sandbox funds automatically when `YELLOW_AUTO_FAUCET` is not `false` (use `YELLOW_FAUCET_URL` to override).
+- CI e2e runs expect `YELLOW_AGENT_PRIVATE_KEY`, `YELLOW_MERCHANT_PRIVATE_KEY`, and `YELLOW_MERCHANT_ADDRESS` to be set as secrets or environment variables.
 - Use the hosted sandbox clearnode for testing: `wss://clearnet-sandbox.yellow.com/ws`.
 
 ## Production deposit flow (overview)
