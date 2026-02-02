@@ -1,4 +1,5 @@
 import WebSocket from 'ws';
+import { EventEmitter } from 'events';
 import { signPayload } from './codec.js';
 import {
   createAuthRequestMessage,
@@ -40,6 +41,52 @@ export type AuthOptions = {
 };
 
 export type LedgerBalance = { asset: string; amount: string };
+
+// Notification types
+export type BalanceUpdateNotification = {
+  balance_updates: LedgerBalance[];
+};
+
+export type ChannelUpdateNotification = {
+  // Full Channel object - defined in Yellow docs
+  channel_id: string;
+  participant: string;
+  status: string;
+  token: string;
+  wallet: string;
+  amount: string;
+  chain_id: number;
+  adjudicator: string;
+  challenge: number;
+  nonce: number;
+  version: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TransferNotification = {
+  transactions: Array<{
+    id: number;
+    tx_type: string;
+    from_account: string;
+    from_account_tag?: string;
+    to_account: string;
+    to_account_tag?: string;
+    asset: string;
+    amount: string;
+    created_at: string;
+  }>;
+};
+
+export type AppSessionUpdateNotification = {
+  app_session: AppSession;
+  participant_allocations: Array<{
+    participant: string;
+    asset: string;
+    amount: string;
+  }>;
+};
+
 export type AppSession = {
   appSessionId: string;
   application: string;
@@ -56,7 +103,16 @@ export type AppSession = {
   sessionData?: string;
 };
 
-export class YellowRpcClient {
+export type AppDefinition = {
+  protocol: string;
+  participants: string[];
+  weights: number[];
+  quorum: number;
+  challenge: number;
+  nonce: number;
+};
+
+export class YellowRpcClient extends EventEmitter {
   private ws?: WebSocket;
   private requestId = 1;
   private pending = new Map<
@@ -66,7 +122,9 @@ export class YellowRpcClient {
   private authenticated = false;
   private sessionPrivateKey?: `0x${string}`;
 
-  constructor(private options: NitroRpcOptions) {}
+  constructor(private options: NitroRpcOptions) {
+    super();
+  }
 
   async connect(): Promise<void> {
     if (this.ws?.readyState === WebSocket.OPEN) {
@@ -126,6 +184,28 @@ export class YellowRpcClient {
     }
     this.ws?.send(message);
     return response;
+  }
+
+  private async requestWithSigners<T>(
+    method: string,
+    params: Record<string, unknown>,
+    signingKeys: string[],
+  ): Promise<T> {
+    await this.connect();
+    if (signingKeys.length === 0) {
+      throw new Error(`Missing signing keys for ${method}`);
+    }
+
+    const id = this.requestId++;
+    const req: NitroRpcRequest['req'] = [id, method, params, Date.now()];
+    const sig = await Promise.all(signingKeys.map(key => signPayload(req, key)));
+    const payload: NitroRpcRequest = { req, sig };
+    const message = JSON.stringify(payload);
+
+    if (this.options.debug) {
+      console.error('[yellow-rpc] send', message);
+    }
+    return (await this.sendRaw(message)) as T;
   }
 
   async authenticate(options: AuthOptions = {}): Promise<void> {
@@ -299,8 +379,20 @@ export class YellowRpcClient {
     return (response?.appSessions ?? []) as AppSession[];
   }
 
+  async getAppDefinition(appSessionId: string): Promise<AppDefinition> {
+    const response = await this.request<{
+      appDefinition?: AppDefinition;
+      app_definition?: AppDefinition;
+    }>('get_app_definition', { app_session_id: appSessionId });
+    const definition = response.appDefinition ?? response.app_definition;
+    if (!definition) {
+      throw new Error(`get_app_definition returned no definition for ${appSessionId}`);
+    }
+    return definition;
+  }
+
   async closeAppSession(params: {
-    appSessionId: `0x${string}`;
+    appSessionId: string;
     allocations: Array<{ asset: string; amount: string; participant: `0x${string}` }>;
     sessionData?: string;
   }) {
@@ -311,11 +403,34 @@ export class YellowRpcClient {
     const signingKey = this.sessionPrivateKey ?? (this.options.privateKey as `0x${string}`);
     const signer = createECDSAMessageSigner(signingKey);
     const message = await createCloseAppSessionMessage(signer, {
-      app_session_id: params.appSessionId,
+      app_session_id: params.appSessionId as `0x${string}`,
       allocations: params.allocations,
       ...(params.sessionData ? { session_data: params.sessionData } : {}),
     });
     return await this.sendRaw(message);
+  }
+
+  async closeAppSessionWithSigners(
+    params: {
+      appSessionId: string;
+      allocations: Array<{ asset: string; amount: string; participant: `0x${string}` }>;
+      sessionData?: string;
+    },
+    signingKeys: string[],
+  ) {
+    if (!this.options.privateKey) {
+      throw new Error('Missing private key for close_app_session');
+    }
+    await this.authenticate();
+    return await this.requestWithSigners(
+      'close_app_session',
+      {
+        app_session_id: params.appSessionId,
+        allocations: params.allocations,
+        ...(params.sessionData ? { session_data: params.sessionData } : {}),
+      },
+      signingKeys,
+    );
   }
 
   private handleMessage(raw: string) {
@@ -337,20 +452,44 @@ export class YellowRpcClient {
 
     const [requestId, method, result] = parsed.res;
     const pending = this.pending.get(requestId);
-    if (!pending) {
-      return;
-    }
 
-    if (method === 'error') {
-      const message =
-        typeof result === 'object' && result !== null && 'error' in result
-          ? String((result as { error: string }).error)
-          : 'Unknown Yellow RPC error';
-      pending.reject(new Error(message));
+    if (pending) {
+      // This is a response to a request
+      if (method === 'error') {
+        const message =
+          typeof result === 'object' && result !== null && 'error' in result
+            ? String((result as { error: string }).error)
+            : 'Unknown Yellow RPC error';
+        pending.reject(new Error(message));
+      } else {
+        pending.resolve(result);
+      }
+      this.pending.delete(requestId);
     } else {
-      pending.resolve(result);
+      // This might be a notification (unsolicited message)
+      this.handleNotification(method, result);
     }
-    this.pending.delete(requestId);
+  }
+
+  private handleNotification(method: string, data: unknown) {
+    switch (method) {
+      case 'bu':
+        this.emit('balanceUpdate', data as BalanceUpdateNotification);
+        break;
+      case 'cu':
+        this.emit('channelUpdate', data as ChannelUpdateNotification);
+        break;
+      case 'tr':
+        this.emit('transfer', data as TransferNotification);
+        break;
+      case 'asu':
+        this.emit('appSessionUpdate', data as AppSessionUpdateNotification);
+        break;
+      default:
+        if (this.options.debug) {
+          console.log('[yellow-rpc] Unknown notification method:', method, data);
+        }
+    }
   }
 
   private async sendRaw(message: string) {
