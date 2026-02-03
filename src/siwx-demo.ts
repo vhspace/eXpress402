@@ -74,28 +74,36 @@ async function main() {
   try {
     console.log('--- First Request: Authentication + Payment ---\n');
 
-    // First call without authentication - expect 402 error with payment data
-    const firstResult = await mcpClient.callTool({
-      name: 'stock_price',
-      arguments: { symbol: 'AAPL' },
-    });
-
-    // Check if we got a 402 response (isError with payment data)
-    if (!firstResult.isError) {
-      console.error('Unexpected: Tool succeeded without payment');
+    // First call without authentication - MCP SDK will throw on 402
+    let paymentRequired: any;
+    
+    try {
+      const firstResult = await mcpClient.callTool({
+        name: 'stock_price',
+        arguments: { symbol: 'AAPL' },
+      });
+      
+      // If we get here, no 402 was thrown (unexpected)
+      console.log('Tool succeeded without payment (unexpected)');
       console.log(firstResult.content);
-      console.log('\n=== Demo Complete (No payment required) ===\n');
+      console.log('\n=== Demo Complete ===\n');
       return;
-    }
-
-    // Extract payment required data from MCP error
-    // The MCP SDK includes it in the result even when isError=true
-    const paymentRequired = (firstResult as any)._meta?.['x402/payment-required'] ?? 
-                           (firstResult as any).data;
-
-    if (!paymentRequired) {
-      console.error('No payment data in 402 response');
-      throw new Error('Invalid 402 response format');
+    } catch (error: any) {
+      // MCP SDK throws McpError on 402
+      // Payment data is in error.data (third argument of McpError constructor)
+      console.log('Received MCP error (expected 402)');
+      
+      if (error.code === 402 || error.message?.includes('Payment required')) {
+        paymentRequired = error.data;
+        
+        if (!paymentRequired) {
+          console.error('Error details:', error);
+          throw new Error('402 error missing payment data');
+        }
+      } else {
+        // Some other error
+        throw error;
+      }
     }
 
     console.log('Received 402 Payment Required');
