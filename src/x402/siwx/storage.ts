@@ -25,9 +25,7 @@ function createKVClient(): Redis | null {
     process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN ?? 'local-dev-token';
 
   if (!url) {
-    console.error(
-      '[SIWx Storage] No KV URL configured. Using in-memory fallback (dev mode).',
-    );
+    console.error('[SIWx Storage] No KV URL configured. Using in-memory fallback (dev mode).');
     return null;
   }
 
@@ -104,10 +102,10 @@ export class SIWxSessionStorage {
     // Lookup session by wallet only (not per-resource)
     // One Yellow session works for all resources
     const key = `session:${wallet.toLowerCase()}`;
-    
+
     const client = getKV();
     let data: SessionMapping | null = null;
-    
+
     if (client) {
       data = await client.get<SessionMapping>(key);
     } else {
@@ -131,12 +129,12 @@ export class SIWxSessionStorage {
    */
   async markNonceUsed(nonce: string): Promise<boolean> {
     const key = `nonce:${nonce}`;
-    
+
     const client = getKV();
     let exists = false;
-    
+
     if (client) {
-      exists = await client.exists(key) > 0;
+      exists = (await client.exists(key)) > 0;
     } else {
       // In-memory fallback
       exists = inMemoryNonces.has(nonce);
@@ -156,7 +154,7 @@ export class SIWxSessionStorage {
       // Auto-expire after 5 minutes
       setTimeout(() => inMemoryNonces.delete(nonce), 300000);
     }
-    
+
     console.error(`[SIWx] Nonce marked used: ${nonce} (expires in 5min)`);
     return true;
   }
@@ -170,14 +168,14 @@ export class SIWxSessionStorage {
   async deleteSession(wallet: string, resource: string): Promise<void> {
     // Delete session by wallet only
     const key = `session:${wallet.toLowerCase()}`;
-    
+
     const client = getKV();
     if (client) {
       await client.del(key);
     } else {
       inMemorySessions.delete(key);
     }
-    
+
     console.error(`[SIWx] Session deleted: ${wallet}`);
   }
 
@@ -193,7 +191,7 @@ export class SIWxSessionStorage {
       console.error('[SIWx] Using in-memory storage (no Upstash configured)');
       return true;
     }
-    
+
     try {
       const response = await client.ping();
       console.error('[SIWx] Storage connection verified');
