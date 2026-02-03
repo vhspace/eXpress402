@@ -88,14 +88,16 @@ See `QUORUM-2-SOLVED.md` for the technical breakthrough!
 ### For Local Development
 
 ```bash
-npm run setup    # One command - generates wallet, installs deps
-
-# Fund your agent wallet (address shown in setup output)
-# Visit: https://faucet.yellow.org/
-# Asset: ytest.usd (sandbox test token)
+npm run setup     # One command - everything automated!
+                  # - Generates agent wallet
+                  # - Generates merchant wallet
+                  # - Auto-funds from Yellow faucet
+                  # - Installs dependencies
 
 npm run demo:siwx # Test SIWx integration
 ```
+
+**Fully automated** - No manual steps required for sandbox testing!
 
 ### Manual Setup
 
@@ -177,22 +179,15 @@ npm run minimal-session
 
 Demonstrates quorum 2 governance with agent + merchant signatures. See `QUORUM-2-SOLVED.md` for technical details.
 
-## Funding Your Wallet
+## Funding (Automated in Development)
 
-Your AI agent wallet needs Yellow Network test tokens (ytest.usd):
+**Sandbox Mode (automatic):**
+`npm run setup` automatically requests Yellow Network test tokens (ytest.usd) from the faucet if balance is below 10.
 
-**Yellow Faucet:**
-- Visit: https://faucet.yellow.org/
-- Paste your agent address
-- Select: ytest.usd
-- Request tokens
-
-**Or via API:**
-```bash
-curl -X POST https://clearnet-sandbox.yellow.com/faucet/requestTokens \
-  -H "Content-Type: application/json" \
-  -d '{"userAddress":"YOUR_AGENT_ADDRESS"}'
-```
+**Manual Funding (if needed):**
+- Yellow Faucet: https://faucet.yellow.org/
+- Asset: ytest.usd (sandbox test token)
+- Or API: `curl -X POST https://clearnet-sandbox.yellow.com/faucet/requestTokens -H "Content-Type: application/json" -d '{"userAddress":"YOUR_ADDRESS"}'`
 
 ## Verify Installation
 
