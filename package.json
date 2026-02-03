@@ -12,6 +12,7 @@
     "e2e:paid-tools:ci": "tsx src/e2e-paid-tools.ts",
     "merchant-spend": "tsx src/merchant-spend.ts",
     "app-session-init": "tsx src/app-session-init.ts",
+    "minimal-session": "tsx src/minimal-session-demo.ts",
     "test": "vitest run",
     "lint": "eslint src/**/*.ts tests/**/*.ts",
     "lint:fix": "eslint src/**/*.ts tests/**/*.ts --fix",
