@@ -47,15 +47,24 @@ async function main() {
 
   console.log('Setup Complete!\n');
   console.log('Next steps:');
+  console.log('===========\n');
 
   // Extract agent address
   const updatedEnvContent = readFileSync('.env', 'utf-8');
   const agentAddress = updatedEnvContent.match(/YELLOW_AGENT_ADDRESS=(0x[a-fA-F0-9]+)/)?.[1];
+
   if (agentAddress) {
-    console.log(`  1. Fund your agent wallet: ${agentAddress}`);
+    console.log('1. Fund your agent wallet with Yellow Network test tokens:');
+    console.log(`   Wallet: ${agentAddress}`);
+    console.log('');
+    console.log('   Yellow Faucet: https://faucet.yellow.org/');
+    console.log(`   Or via API: curl -X POST https://clearnet-sandbox.yellow.com/faucet/requestTokens \\`);
+    console.log(`     -H "Content-Type: application/json" \\`);
+    console.log(`     -d '{"userAddress":"${agentAddress}"}'`);
+    console.log('');
   }
-  console.log('  2. Run demo: npm run demo');
-  console.log('  3. Start MCP server: npm run dev\n');
+  console.log('2. Run demo: npm run demo:siwx');
+  console.log('3. Start MCP server: npm run dev\n');
 }
 
 main().catch(error => {

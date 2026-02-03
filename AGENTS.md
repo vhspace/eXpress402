@@ -16,7 +16,22 @@ This creates `YELLOW_AGENT_PRIVATE_KEY` and `YELLOW_AGENT_ADDRESS` in `.env`.
 
 ### 2. Fund Your Wallet
 
-Get test tokens for your agent address (shown after wallet generation).
+Get Yellow Network test tokens for your agent address:
+
+**Option 1 - Yellow Faucet Web UI:**
+- Visit: https://faucet.yellow.org/
+- Paste your agent address (shown after wallet generation)
+- Select asset: ytest.usd (sandbox test token)
+- Request tokens
+
+**Option 2 - API Request:**
+```bash
+curl -X POST https://clearnet-sandbox.yellow.com/faucet/requestTokens \
+  -H "Content-Type: application/json" \
+  -d '{"userAddress":"YOUR_AGENT_ADDRESS"}'
+```
+
+Wait ~30 seconds for faucet to process, then verify balance in your wallet.
 
 ### 3. Use the MCP Server
 

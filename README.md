@@ -89,6 +89,11 @@ See `QUORUM-2-SOLVED.md` for the technical breakthrough!
 
 ```bash
 npm run setup    # One command - generates wallet, installs deps
+
+# Fund your agent wallet (address shown in setup output)
+# Visit: https://faucet.yellow.org/
+# Asset: ytest.usd (sandbox test token)
+
 npm run demo:siwx # Test SIWx integration
 ```
 
@@ -172,17 +177,31 @@ npm run minimal-session
 
 Demonstrates quorum 2 governance with agent + merchant signatures. See `QUORUM-2-SOLVED.md` for technical details.
 
+## Funding Your Wallet
+
+Your AI agent wallet needs Yellow Network test tokens (ytest.usd):
+
+**Yellow Faucet:**
+- Visit: https://faucet.yellow.org/
+- Paste your agent address
+- Select: ytest.usd
+- Request tokens
+
+**Or via API:**
+```bash
+curl -X POST https://clearnet-sandbox.yellow.com/faucet/requestTokens \
+  -H "Content-Type: application/json" \
+  -d '{"userAddress":"YOUR_AGENT_ADDRESS"}'
+```
+
 ## Verify Installation
 
 ```bash
-# Check Redis connection (devcontainer)
-redis-cli -h redis ping  # Should output: PONG
-
-# View stored sessions
-redis-cli -h redis keys "session:*"
-
 # Run tests
 npm test
+
+# Test SIWx integration (after funding wallet)
+npm run demo:siwx
 ```
 
 ## Documentation
