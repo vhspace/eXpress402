@@ -196,7 +196,11 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
     }
   }
 
+  // Log request for debugging
+  console.error(`[requirePayment] Tool: ${toolName}, Has SIWx: ${!!siwxHeader}, Has payment: ${!!payment}, Has session: ${!!yellowMeta.appSessionId}`);
+
   if (!payment && !yellowMeta.appSessionId) {
+    console.error('[requirePayment] No payment or session, throwing 402');
     throw new McpError(402, 'Payment required', paymentRequired);
   }
 

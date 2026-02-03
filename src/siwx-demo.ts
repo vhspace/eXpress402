@@ -7,6 +7,13 @@
  * 2. Subsequent requests: Verify wallet -> Reuse session -> No payment
  */
 
+/**
+ * Load .env explicitly before any other code
+ * Use override: true to override empty env vars from devcontainer
+ */
+import { config } from 'dotenv';
+config({ override: true });
+
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -24,6 +31,8 @@ const env = getYellowConfig();
 
 if (!env.agentPrivateKey || !env.merchantAddress) {
   console.error('YELLOW_AGENT_PRIVATE_KEY and YELLOW_MERCHANT_ADDRESS are required.');
+  console.error('Current env.agentPrivateKey:', env.agentPrivateKey ? 'SET' : 'NOT SET');
+  console.error('Current env.merchantAddress:', env.merchantAddress);
   process.exit(1);
 }
 
@@ -65,126 +74,135 @@ async function main() {
   try {
     console.log('--- First Request: Authentication + Payment ---\n');
 
-    // First call without authentication
+    // First call without authentication - expect 402 error with payment data
     const firstResult = await mcpClient.callTool({
       name: 'stock_price',
       arguments: { symbol: 'AAPL' },
     });
 
-    if (
-      firstResult.isError &&
-      Array.isArray(firstResult.content) &&
-      firstResult.content[0]?.type === 'text'
-    ) {
-      const errorData = JSON.parse((firstResult.content[0] as any).text);
-      const paymentRequired = errorData as any;
+    // Check if we got a 402 response (isError with payment data)
+    if (!firstResult.isError) {
+      console.error('Unexpected: Tool succeeded without payment');
+      console.log(firstResult.content);
+      console.log('\n=== Demo Complete (No payment required) ===\n');
+      return;
+    }
 
-      console.log('Received 402 Payment Required');
-      console.log(`Resource: ${paymentRequired.resource.url}`);
-      console.log(
-        `Price: ${paymentRequired.accepts[0].amount} ${paymentRequired.accepts[0].asset}\n`,
-      );
+    // Extract payment required data from MCP error
+    // The MCP SDK includes it in the result even when isError=true
+    const paymentRequired = (firstResult as any)._meta?.['x402/payment-required'] ?? 
+                           (firstResult as any).data;
 
-      // Check for SIWx extension
-      const siwxExt = paymentRequired.extensions?.['sign-in-with-x'];
-      if (siwxExt) {
-        console.log('SIWx authentication available!');
-        console.log(`Domain: ${siwxExt.info.domain}`);
-        console.log(`Nonce: ${siwxExt.info.nonce}\n`);
+    if (!paymentRequired) {
+      console.error('No payment data in 402 response');
+      throw new Error('Invalid 402 response format');
+    }
 
-        // Sign SIWx message
-        const siwxInfo: CompleteSIWxInfo = {
-          ...siwxExt.info,
-          chainId: siwxExt.supportedChains[0].chainId,
-          type: 'eip191' as const,
-        };
+    console.log('Received 402 Payment Required');
+    console.log(`Resource: ${paymentRequired.resource.url}`);
+    console.log(
+      `Price: ${paymentRequired.accepts[0].amount} ${paymentRequired.accepts[0].asset}\n`,
+    );
 
-        console.log('Signing SIWx challenge with wallet...');
-        const siwxPayload = await createSIWxPayload(siwxInfo, agentWallet);
-        const siwxHeader = encodeSIWxHeader(siwxPayload);
+    // Check for SIWx extension
+    const siwxExt = paymentRequired.extensions?.['sign-in-with-x'];
+    if (siwxExt) {
+      console.log('SIWx authentication available!');
+      console.log(`Domain: ${siwxExt.info.domain}`);
+      console.log(`Nonce: ${siwxExt.info.nonce}\n`);
 
-        // Cache for subsequent requests
-        siwxAuthCache.set(paymentRequired.resource.url, siwxHeader);
-        console.log('SIWx signature created and cached\n');
+      // Sign SIWx message
+      const siwxInfo: CompleteSIWxInfo = {
+        ...siwxExt.info,
+        chainId: siwxExt.supportedChains[0].chainId,
+        type: 'eip191' as const,
+      };
 
-        // Create Yellow session
-        console.log('Creating Yellow payment session...');
-        const signer = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
-        const sessionMessage = await createAppSessionMessage(signer, {
-          definition: {
-            application: 'siwx-demo',
-            protocol: RPCProtocolVersion.NitroRPC_0_4,
-            participants: [agentAddress, env.merchantAddress as `0x${string}`],
-            weights: [1, 1],
-            quorum: 1,
-            challenge: 0,
-            nonce: Date.now(),
+      console.log('Signing SIWx challenge with wallet...');
+      const siwxPayload = await createSIWxPayload(siwxInfo, agentWallet);
+      const siwxHeader = encodeSIWxHeader(siwxPayload);
+
+      // Cache for subsequent requests
+      siwxAuthCache.set(paymentRequired.resource.url, siwxHeader);
+      console.log('SIWx signature created and cached\n');
+
+      // Create Yellow session
+      console.log('Creating Yellow payment session...');
+      const signer = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
+      const sessionMessage = await createAppSessionMessage(signer, {
+        definition: {
+          application: 'siwx-demo',
+          protocol: RPCProtocolVersion.NitroRPC_0_4,
+          participants: [agentAddress, env.merchantAddress as `0x${string}`],
+          weights: [1, 1],
+          quorum: 1,
+          challenge: 0,
+          nonce: Date.now(),
+        },
+        allocations: [
+          {
+            participant: agentAddress,
+            asset: env.assetSymbol,
+            amount: '1.0',
           },
-          allocations: [
-            {
-              participant: agentAddress,
-              asset: env.assetSymbol,
-              amount: '1.0',
-            },
-            {
-              participant: env.merchantAddress as `0x${string}`,
-              asset: env.assetSymbol,
-              amount: '0.0',
-            },
-          ],
-        });
-
-        const sessionResponse = await yellowClient.sendRawMessage(sessionMessage);
-        const appSessionId = (sessionResponse as any).result?.appSessionId;
-
-        if (!appSessionId) {
-          console.error('Failed to create Yellow session');
-          process.exit(1);
-        }
-
-        console.log(`Yellow session created: ${appSessionId}\n`);
-
-        // Retry request with SIWx + Yellow session
-        console.log('Retrying request with authentication and payment...');
-        const secondResult = await mcpClient.callTool({
-          name: 'stock_price',
-          arguments: { symbol: 'AAPL' },
-          _meta: {
-            'SIGN-IN-WITH-X': siwxHeader,
-            'x402/yellow': {
-              appSessionId,
-              payer: agentAddress,
-            },
+          {
+            participant: env.merchantAddress as `0x${string}`,
+            asset: env.assetSymbol,
+            amount: '0.0',
           },
-        } as any);
+        ],
+      });
 
-        if (!secondResult.isError && Array.isArray(secondResult.content)) {
-          console.log('Success! Data received:');
-          console.log((secondResult.content as any)[0]);
-          console.log('');
-        } else {
-          console.error('Request failed:', secondResult.content);
-        }
+      const sessionResponse = await yellowClient.sendRawMessage(sessionMessage);
+      const appSessionId = (sessionResponse as any).result?.appSessionId;
 
-        // Second request - should reuse session
-        console.log('--- Subsequent Request: Session Reuse ---\n');
-        console.log('Making second request with cached SIWx signature...');
+      if (!appSessionId) {
+        console.error('Failed to create Yellow session');
+        process.exit(1);
+      }
 
-        const thirdResult = await mcpClient.callTool({
-          name: 'market_rumors',
-          arguments: { symbol: 'GOOGL' },
-          _meta: {
-            'SIGN-IN-WITH-X': siwxHeader,
+      console.log(`Yellow session created: ${appSessionId}\n`);
+
+      // Retry request with SIWx + Yellow session
+      console.log('Retrying request with authentication and payment...');
+      const secondResult = await mcpClient.callTool({
+        name: 'stock_price',
+        arguments: { symbol: 'AAPL' },
+        _meta: {
+          'SIGN-IN-WITH-X': siwxHeader,
+          'x402/yellow': {
+            appSessionId,
+            payer: agentAddress,
           },
-        } as any);
+        },
+      } as any);
 
-        if (!thirdResult.isError && Array.isArray(thirdResult.content)) {
-          console.log('Success! Session reused - no payment needed!');
-          console.log((thirdResult.content as any)[0]);
-          console.log('');
-        } else {
-          console.error('Request failed:', thirdResult.content);
-        }
+      if (!secondResult.isError && Array.isArray(secondResult.content)) {
+        console.log('Success! Data received:');
+        console.log((secondResult.content as any)[0]);
+        console.log('');
+      } else {
+        console.error('Request failed:', secondResult.content);
+      }
+
+      // Second request - should reuse session
+      console.log('--- Subsequent Request: Session Reuse ---\n');
+      console.log('Making second request with cached SIWx signature...');
+
+      const thirdResult = await mcpClient.callTool({
+        name: 'market_rumors',
+        arguments: { symbol: 'GOOGL' },
+        _meta: {
+          'SIGN-IN-WITH-X': siwxHeader,
+        },
+      } as any);
+
+      if (!thirdResult.isError && Array.isArray(thirdResult.content)) {
+        console.log('Success! Session reused - no payment needed!');
+        console.log((thirdResult.content as any)[0]);
+        console.log('');
+      } else {
+        console.error('Request failed:', thirdResult.content);
       }
     }
 
