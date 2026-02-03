@@ -2,7 +2,7 @@
 /**
  * One-command development setup for eXpress402
  * Run: npm run setup
- * 
+ *
  * Automatically configures:
  * - Agent wallet (for AI agent)
  * - Merchant wallet (for receiving payments)
