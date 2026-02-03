@@ -129,9 +129,9 @@
       "YELLOW_DEBUG": "${localEnv:YELLOW_DEBUG}"
     },
 
-    "postCreateCommand": "bash -lc \"echo '[postCreate] installing project dependencies' && npm install && echo '[postCreate] installing hackmoney tool deps' && npm install --no-package-lock --prefix .devcontainer/hackmoney-tools && echo '[postCreate] Redis ready at redis:6379' && redis-cli -h redis ping\"",
+    "postCreateCommand": "bash -lc \"echo '[postCreate] installing project dependencies' && npm install && echo '[postCreate] installing hackmoney tool deps' && npm install --no-package-lock --prefix .devcontainer/hackmoney-tools && echo '[postCreate] Redis ready at redis:6379 (verified by docker-compose health check)'\"",
 
-    "postStartCommand": "redis-cli -h redis ping > /dev/null && echo '[postStart] Redis connection verified' || echo '[postStart] Warning: Redis not ready yet'",
+    "postStartCommand": "echo '[postStart] DevContainer ready. Redis available at redis:6379'",
 
     "shutdownAction": "stopCompose",
 

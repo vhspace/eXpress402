@@ -1,7 +1,7 @@
 /**
  * Unit tests for SIWx session storage
  * Tests Redis/KV operations
- * 
+ *
  * Note: These tests require KV_URL to be a REST API endpoint (Upstash format)
  * or will be skipped for local redis:// URLs
  */
@@ -10,7 +10,10 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { SIWxSessionStorage } from '../src/x402/siwx/storage.js';
 
 // Skip tests if using local redis:// URL (Upstash client needs REST API)
-const isUpstashFormat = process.env.KV_URL?.startsWith('http') || process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL?.startsWith('http');
+const isUpstashFormat =
+  process.env.KV_URL?.startsWith('http') ||
+  process.env.UPSTASH_REDIS_REST_URL ||
+  process.env.KV_REST_API_URL?.startsWith('http');
 const describeOrSkip = isUpstashFormat ? describe : describe.skip;
 
 describeOrSkip('SIWxSessionStorage', () => {
