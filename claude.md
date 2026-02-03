@@ -10,7 +10,7 @@ This project implements x402 v2 with SIWx (Sign-In-With-X) wallet authentication
 
 ## AI Agent Wallets
 
-AI agents MUST use EOA (Externally Owned Account) wallets with private keys. 
+AI agents MUST use EOA (Externally Owned Account) wallets with private keys.
 
 **Automatic setup (recommended):**
 ```bash

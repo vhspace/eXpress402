@@ -52,7 +52,8 @@ async function main() {
   }
 
   // Generate merchant wallet if needed (for testing)
-  const hasMerchantAddress = envContent.includes('YELLOW_MERCHANT_ADDRESS=0x');
+  envContent = readFileSync('.env', 'utf-8'); // Reload after agent wallet update
+  const hasMerchantAddress = /YELLOW_MERCHANT_ADDRESS=0x[a-fA-F0-9]{40}/.test(envContent);
   let merchantAddress: string | undefined;
 
   if (!hasMerchantAddress) {
@@ -61,12 +62,12 @@ async function main() {
     const merchantAccount = privateKeyToAccount(merchantPrivateKey);
     merchantAddress = merchantAccount.address;
 
-    envContent = readFileSync('.env', 'utf-8'); // Reload after agent wallet update
     envContent = updateEnvVar(envContent, 'YELLOW_MERCHANT_ADDRESS', merchantAddress);
     envContent = updateEnvVar(envContent, 'YELLOW_MERCHANT_PRIVATE_KEY', merchantPrivateKey);
     writeFileSync('.env', envContent);
 
-    console.log(`Merchant wallet created: ${merchantAddress}\n`);
+    console.log(`Merchant wallet created: ${merchantAddress}`);
+    console.log('Note: For testing only. In production, use your actual merchant address.\n');
   } else {
     merchantAddress = envContent.match(/YELLOW_MERCHANT_ADDRESS=(0x[a-fA-F0-9]+)/)?.[1];
     console.log(`Merchant wallet already configured: ${merchantAddress}\n`);
