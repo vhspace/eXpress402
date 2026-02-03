@@ -11,8 +11,9 @@ import {
 import type { PaymentPayload } from '../x402/types.js';
 import { getYellowConfig } from '../yellow/config.js';
 import { YellowRpcClient } from '../yellow/rpc.js';
-import { verifyYellowTransfer } from '../yellow/verify.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import { parseSIWxHeader, validateAndVerifySIWx } from '../x402/siwx/index.js';
+import { siwxStorage } from '../x402/siwx/storage.js';
 
 const PAYMENT_RESOURCE_BASE = 'mcp://tool';
 
@@ -150,6 +151,51 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
     `Paid tool: ${toolName}`,
   );
 
+  // Check for SIWx authentication header
+  const siwxHeader = extra._meta?.['SIGN-IN-WITH-X'] as string | undefined;
+
+  if (siwxHeader) {
+    try {
+      // Parse and verify SIWx payload
+      const siwxPayload = parseSIWxHeader(siwxHeader);
+      const verification = await validateAndVerifySIWx(
+        siwxPayload,
+        resourceUrl,
+        async nonce => await siwxStorage.markNonceUsed(nonce),
+      );
+
+      if (verification.valid && verification.address) {
+        // Check if this wallet has an existing Yellow session
+        const existingSession = await siwxStorage.getSession(verification.address, resourceUrl);
+
+        if (existingSession) {
+          // Reuse existing session - no payment needed!
+          console.error(`[SIWx] Reusing session for wallet ${verification.address}`);
+          return buildSettlementResponse(
+            true,
+            config.network,
+            verification.address,
+            existingSession,
+          );
+        }
+
+        // Valid auth but no session - store for later after payment
+        console.error('[SIWx] Valid authentication, proceeding to payment');
+        if (yellowMeta.appSessionId) {
+          await siwxStorage.storeSession(
+            verification.address,
+            resourceUrl,
+            yellowMeta.appSessionId,
+          );
+        }
+      } else {
+        console.error(`[SIWx] Invalid signature: ${verification.error}`);
+      }
+    } catch (error) {
+      console.error('[SIWx] Header parsing failed:', error);
+    }
+  }
+
   if (!payment && !yellowMeta.appSessionId) {
     throw new McpError(402, 'Payment required', paymentRequired);
   }
@@ -162,6 +208,17 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
 
     if (sessionBalanceCache) {
       sessionBalanceCache.set(yellowMeta.appSessionId, Number(remaining) - Number(pricePerCall));
+    }
+
+    // If SIWx authentication present, store session mapping
+    if (siwxHeader) {
+      try {
+        const siwxPayload = parseSIWxHeader(siwxHeader);
+        await siwxStorage.storeSession(siwxPayload.address, resourceUrl, yellowMeta.appSessionId);
+        console.error('[SIWx] Stored session mapping after payment');
+      } catch (error) {
+        console.error('[SIWx] Failed to store session mapping:', error);
+      }
     }
 
     return buildSettlementResponse(true, config.network, payer, yellowMeta.appSessionId);
