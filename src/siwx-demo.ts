@@ -143,11 +143,11 @@ async function main() {
 
     // Create SIWx signature for wallet authentication
     console.log('--- Step 2: Create SIWx Authentication ---\n');
-    
+
     const resourceUrl = 'mcp://tool/stock_price';
     // Use Base Sepolia for SIWx (EVM chain needed for SIWE)
     const evmChainId = 'eip155:84532'; // Base Sepolia
-    
+
     const siwxInfo: CompleteSIWxInfo = {
       domain: 'mcp.local',
       uri: resourceUrl,
@@ -166,11 +166,13 @@ async function main() {
 
     console.log('Signing with agent wallet...');
     const siwxPayload = await createSIWxPayload(siwxInfo, agentWallet);
-    
+
     console.log('\nSIWx Signed Payload:');
     console.log('====================');
     console.log(`Wallet Address: ${siwxPayload.address}`);
-    console.log(`Signature: ${siwxPayload.signature.substring(0, 20)}...${siwxPayload.signature.substring(siwxPayload.signature.length - 10)}`);
+    console.log(
+      `Signature: ${siwxPayload.signature.substring(0, 20)}...${siwxPayload.signature.substring(siwxPayload.signature.length - 10)}`,
+    );
     console.log(`Nonce: ${siwxPayload.nonce}`);
     console.log(`Issued At: ${siwxPayload.issuedAt}`);
     console.log('');
@@ -196,17 +198,17 @@ async function main() {
     if (!firstResult.isError && Array.isArray(firstResult.content)) {
       const resultText = (firstResult.content[0] as any)?.text;
       const data = resultText ? JSON.parse(resultText) : firstResult.content[0];
-      
+
       console.log('Success! Stock data received:');
       console.log('=============================');
       console.log(JSON.stringify(data, null, 2));
       console.log('');
-      console.log('What happened:');
-      console.log('  1. Server verified SIWx signature (wallet proved ownership)');
-      console.log('  2. Server used Yellow session for payment');
-      console.log('  3. Server stored mapping: wallet -> Yellow session');
-      console.log('  4. Returned stock data');
-      console.log('  5. Cost: 0.1 ytest.usd deducted from session\n');
+      console.log('Server actions:');
+      console.log('  1. Verified SIWx signature (EIP-191)');
+      console.log('  2. Marked nonce as used (prevents replay)');
+      console.log('  3. Stored mapping: wallet -> Yellow session ID');
+      console.log('  4. Deducted 0.1 ytest.usd from session balance');
+      console.log('  5. Returned stock data\n');
     } else {
       console.error('Request failed:', firstResult.content);
       throw new Error('First request failed');
@@ -250,7 +252,7 @@ async function main() {
     if (!secondResult.isError && Array.isArray(secondResult.content)) {
       const resultText = (secondResult.content[0] as any)?.text;
       const data = resultText ? JSON.parse(resultText) : secondResult.content[0];
-      
+
       console.log('Success! Market rumors received:');
       console.log('=================================');
       console.log(`Reddit posts: ${data.reddit?.length ?? 0}`);
@@ -262,12 +264,12 @@ async function main() {
         console.log(`  Score: ${data.reddit[0].score}, Subreddit: r/${data.reddit[0].subreddit}`);
       }
       console.log('');
-      console.log('What happened:');
-      console.log('  1. Server verified SIWx signature (different nonce!)');
-      console.log('  2. Server looked up session by wallet address');
-      console.log('  3. Found existing Yellow session from Step 3');
-      console.log('  4. Reused session - NO NEW PAYMENT!');
-      console.log('  5. Cost: $0 (session already paid for)');
+      console.log('Server actions:');
+      console.log('  1. Verified SIWx signature (different nonce)');
+      console.log('  2. Looked up session by wallet address in storage');
+      console.log(`  3. Found session: ${appSessionId.substring(0, 20)}...`);
+      console.log('  4. Reused existing Yellow session');
+      console.log('  5. No payment deducted');
       console.log('  6. Returned market data\n');
     } else {
       console.error('Request failed:', secondResult.content);
@@ -275,23 +277,20 @@ async function main() {
     }
 
     console.log('=== Demo Complete ===\n');
-    console.log('Summary of Innovation:');
-    console.log('======================');
+    console.log('Summary:');
+    console.log('========');
+    console.log(`Yellow session: ${appSessionId}`);
+    console.log(`Wallet: ${agentAddress}`);
     console.log('');
-    console.log('Traditional (x402 v1):');
-    console.log('  Request 1: Pay 0.1 -> Get data');
-    console.log('  Request 2: Pay 0.1 -> Get data');
-    console.log('  Total: 0.2 ytest.usd');
+    console.log('Calls made:');
+    console.log('  1. stock_price(AAPL) - Created session mapping, paid 0.1 ytest.usd');
+    console.log('  2. market_rumors(GOOGL) - Reused session, paid 0 ytest.usd');
     console.log('');
-    console.log('With SIWx + Yellow (x402 v2):');
-    console.log('  Request 1: Sign + Pay 1.0 (creates session) -> Get data');
-    console.log('  Request 2: Sign + Reuse session -> Get data (no payment!)');
-    console.log('  Request 3+: Sign + Reuse session -> Get data (no payment!)');
-    console.log('  Total: 1.0 ytest.usd for unlimited calls');
-    console.log('');
-    console.log('Savings: ~90% cost reduction for high-frequency agents');
-    console.log('Speed: Sub-millisecond session lookup vs blockchain confirmation');
-    console.log('UX: Seamless - just sign once, works forever\n');
+    console.log('Technical flow:');
+    console.log('  - Authentication: CAIP-122 SIWx (EIP-191 signatures)');
+    console.log('  - Payment: Yellow Network off-chain session');
+    console.log('  - Storage: In-memory wallet -> session mapping');
+    console.log('  - Nonce tracking: Replay prevention with TTL\n');
   } catch (error) {
     console.error('Demo failed:', error);
     process.exit(1);
