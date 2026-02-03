@@ -22,6 +22,11 @@ The wallet is used to:
 
 DO NOT use MetaMask, hardware wallets, or smart contract wallets for AI agents.
 
+**Fund the wallet:**
+- Yellow Faucet: https://faucet.yellow.org/
+- Asset: ytest.usd (sandbox test token)
+- Or API: `curl -X POST https://clearnet-sandbox.yellow.com/faucet/requestTokens -H "Content-Type: application/json" -d '{"userAddress":"YOUR_ADDRESS"}'`
+
 ## Architecture Flow
 
 **First Request:**

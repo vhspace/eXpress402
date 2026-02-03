@@ -57,7 +57,18 @@ async function generateWallet() {
 
   console.log('Updated .env with agent wallet\n');
   console.log('SECURITY: Keep .env file secret! Never commit to git.');
-  console.log('Next step: Fund this address with test tokens to start testing.\n');
+  console.log('\nNext step: Fund this wallet with Yellow Network test tokens');
+  console.log('===========================================================');
+  console.log(`Wallet address: ${account.address}`);
+  console.log('\nOption 1 - Yellow Faucet Web UI:');
+  console.log('  Visit: https://faucet.yellow.org/');
+  console.log(`  Paste address: ${account.address}`);
+  console.log('  Asset: ytest.usd (sandbox test token)');
+  console.log('\nOption 2 - API Request:');
+  console.log(`  curl -X POST https://clearnet-sandbox.yellow.com/faucet/requestTokens \\`);
+  console.log(`    -H "Content-Type: application/json" \\`);
+  console.log(`    -d '{"userAddress":"${account.address}"}'`);
+  console.log('\nAfter funding, run: npm run demo:siwx\n');
 }
 
 generateWallet().catch(console.error);
