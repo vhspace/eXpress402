@@ -29,6 +29,18 @@ Web3 agents need market data, but traditional per-call blockchain transactions c
 
 ## Features
 
+### 🎉 NEW: Full Quorum 2 Support!
+
+The minimal session demo (`npm run minimal-session`) now demonstrates **complete quorum 2 governance** where both agent AND merchant sign all operations:
+- ✅ `create_app_session` with quorum 2
+- ✅ `close_app_session` with quorum 2
+- ✅ Full balance verification at each step
+- ✅ Merchant payment confirmed
+
+See `QUORUM-2-SOLVED.md` for the technical breakthrough!
+
+### Core Features
+
 - **Prepaid Payment Sessions**: Fund once via x402, query thousands of times without additional transactions
 - **Off-Chain Settlement**: Yellow Network channels eliminate per-call blockchain fees
 - **Real Market Data**: Live stock prices, market sentiment, and financial news from production APIs
