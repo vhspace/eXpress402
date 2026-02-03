@@ -64,7 +64,8 @@ describe('Yellow Network Session Payment E2E', () => {
       if (response.ok) {
         await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for faucet
         const newBalances = await yellow.getLedgerBalances(agentAddress);
-        initialAgentBalance = newBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
+        initialAgentBalance =
+          newBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
       }
     }
   }, 30000);
@@ -83,7 +84,8 @@ describe('Yellow Network Session Payment E2E', () => {
       amount: allocationsRaw[participant] || '0',
     }));
 
-    const { createAppSessionMessage, createECDSAMessageSigner } = await import('@erc7824/nitrolite/dist/rpc/api.js');
+    const { createAppSessionMessage, createECDSAMessageSigner } =
+      await import('@erc7824/nitrolite/dist/rpc/api.js');
     const { RPCProtocolVersion } = await import('@erc7824/nitrolite/dist/rpc/types/index.js');
 
     const signer = createECDSAMessageSigner(AGENT_PRIVATE_KEY as `0x${string}`);
@@ -102,14 +104,17 @@ describe('Yellow Network Session Payment E2E', () => {
       session_data: JSON.stringify({ ttlSeconds: 3600 }),
     });
 
-    const response = await yellow.sendRawMessage(message) as any;
-    sessionId = (response.appSessionId || response.app_session_id || response.appSession?.appSessionId) as string;
+    const response = (await yellow.sendRawMessage(message)) as any;
+    sessionId = (response.appSessionId ||
+      response.app_session_id ||
+      response.appSession?.appSessionId) as string;
 
     expect(sessionId).toBeDefined();
 
     // Verify session was funded
     const sessionBalances = await yellow.getLedgerBalances(sessionId);
-    const sessionAmount = sessionBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
+    const sessionAmount =
+      sessionBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
     expect(sessionAmount).toBe(CONFIG.sessionAllocation);
   }, 15000);
 
@@ -136,7 +141,8 @@ describe('Yellow Network Session Payment E2E', () => {
 
     // Check that session is now empty (funds distributed)
     const sessionBalancesAfter = await yellow.getLedgerBalances(sessionId);
-    const sessionAmountAfter = sessionBalancesAfter.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
+    const sessionAmountAfter =
+      sessionBalancesAfter.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
     expect(sessionAmountAfter).toBe('0');
 
     // Verify balance update notifications were received
@@ -149,15 +155,21 @@ describe('Yellow Network Session Payment E2E', () => {
     const finalAgentBalances = await yellow.getLedgerBalances(agentAddress);
     const finalMerchantBalances = await yellow.getLedgerBalances(MERCHANT_ADDRESS);
 
-    finalAgentBalance = finalAgentBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
-    const finalMerchantBalance = finalMerchantBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
+    finalAgentBalance =
+      finalAgentBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
+    const finalMerchantBalance =
+      finalMerchantBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
 
     // Agent should have initial balance minus the payment allocated to merchant
-    const expectedAgentBalance = (Number(initialAgentBalance) - Number(CONFIG.spendAmount)).toFixed(1);
+    const expectedAgentBalance = (Number(initialAgentBalance) - Number(CONFIG.spendAmount)).toFixed(
+      1,
+    );
     expect(finalAgentBalance).toBe(expectedAgentBalance);
 
     // Session close allocated 0.1 to merchant and 0.2 to agent
-    console.log(`Payment distribution: Merchant allocated ${CONFIG.spendAmount}, Agent gets ${(Number(CONFIG.sessionAllocation) - Number(CONFIG.spendAmount)).toFixed(1)}`);
+    console.log(
+      `Payment distribution: Merchant allocated ${CONFIG.spendAmount}, Agent gets ${(Number(CONFIG.sessionAllocation) - Number(CONFIG.spendAmount)).toFixed(1)}`,
+    );
     console.log(`Final agent balance: ${finalAgentBalance} (net: -${CONFIG.spendAmount})`);
     console.log(`Merchant would receive: ${CONFIG.spendAmount} (allocated via session close)`);
 

@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../..:/workspaces:cached
+      - eXpress402-dev-home-data:/home/vscode
+      - eXpress402-dev-docker-data:/var/lib/docker
+    command: sleep infinity
+    privileged: true
+    environment:
+      - KV_URL=redis://redis:6379
+      - KV_REST_API_TOKEN=local-dev-token
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - devcontainer
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --save 60 1
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - devcontainer
+
+networks:
+  devcontainer:
+    driver: bridge
+
+volumes:
+  eXpress402-dev-home-data:
+    external: true
+  eXpress402-dev-docker-data:
+    external: true
+  redis-data:

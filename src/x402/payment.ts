@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import {
   PaymentPayload,
   PaymentRequired,
@@ -29,6 +30,41 @@ const yellowExtensionSchema = {
   additionalProperties: true,
 };
 
+/**
+ * JSON Schema for SIWx extension
+ */
+const siwxExtensionSchema = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  type: 'object',
+  properties: {
+    domain: { type: 'string' },
+    address: { type: 'string' },
+    statement: { type: 'string' },
+    uri: { type: 'string', format: 'uri' },
+    version: { type: 'string' },
+    chainId: { type: 'string' },
+    type: { type: 'string' },
+    nonce: { type: 'string' },
+    issuedAt: { type: 'string', format: 'date-time' },
+    expirationTime: { type: 'string', format: 'date-time' },
+    notBefore: { type: 'string', format: 'date-time' },
+    requestId: { type: 'string' },
+    resources: { type: 'array', items: { type: 'string', format: 'uri' } },
+    signature: { type: 'string' },
+  },
+  required: [
+    'domain',
+    'address',
+    'uri',
+    'version',
+    'chainId',
+    'type',
+    'nonce',
+    'issuedAt',
+    'signature',
+  ],
+};
+
 export function buildPaymentRequired(
   config: YellowPaymentConfig,
   resourceUrl: string,
@@ -45,6 +81,19 @@ export function buildPaymentRequired(
       settlement: 'yellow',
     },
   };
+
+  // Generate SIWx extension for wallet authentication
+  const nonce = randomBytes(16).toString('hex');
+  const issuedAt = new Date().toISOString();
+  const expirationTime = new Date(Date.now() + 300000).toISOString(); // 5 minutes
+
+  // Extract domain from resource URL
+  let domain: string;
+  try {
+    domain = new URL(resourceUrl).hostname;
+  } catch {
+    domain = 'mcp.local'; // Fallback for MCP URLs
+  }
 
   return {
     x402Version: 2,
@@ -64,6 +113,20 @@ export function buildPaymentRequired(
           pricePerCall: config.pricePerCall,
         },
         schema: yellowExtensionSchema,
+      },
+      'sign-in-with-x': {
+        info: {
+          domain,
+          uri: resourceUrl,
+          version: '1',
+          nonce,
+          issuedAt,
+          expirationTime,
+          statement: `Sign in to access ${description}`,
+          resources: [resourceUrl],
+        },
+        supportedChains: [{ chainId: config.network, type: 'eip191' }],
+        schema: siwxExtensionSchema,
       },
     },
   };
