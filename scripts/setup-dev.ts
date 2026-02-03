@@ -2,12 +2,21 @@
 /**
  * One-command development setup for eXpress402
  * Run: npm run setup
+ * 
+ * Automatically configures:
+ * - Agent wallet (for AI agent)
+ * - Merchant wallet (for receiving payments)
+ * - Funds wallets via Yellow faucet
  */
-import { existsSync, readFileSync, copyFileSync } from 'fs';
+import { existsSync, readFileSync, copyFileSync, writeFileSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
 const execAsync = promisify(exec);
+
+const SANDBOX_FAUCET_URL = 'https://clearnet-sandbox.yellow.com/faucet/requestTokens';
+const MIN_BALANCE_THRESHOLD = 10; // ytest.usd
 
 async function main() {
   console.log('\neXpress402 Development Setup');
@@ -20,16 +29,47 @@ async function main() {
     console.log('Success: .env created\n');
   }
 
-  // Check if agent wallet exists
-  const envContent = readFileSync('.env', 'utf-8');
+  let envContent = readFileSync('.env', 'utf-8');
+
+  // Generate agent wallet if needed
   const hasAgentKey = envContent.includes('YELLOW_AGENT_PRIVATE_KEY=0x');
+  let agentAddress: string | undefined;
 
   if (!hasAgentKey) {
     console.log('Generating AI agent wallet...');
-    await execAsync('npm run generate-wallet');
-    console.log('');
+    const agentPrivateKey = generatePrivateKey();
+    const agentAccount = privateKeyToAccount(agentPrivateKey);
+    agentAddress = agentAccount.address;
+
+    envContent = updateEnvVar(envContent, 'YELLOW_AGENT_PRIVATE_KEY', agentPrivateKey);
+    envContent = updateEnvVar(envContent, 'YELLOW_AGENT_ADDRESS', agentAddress);
+    writeFileSync('.env', envContent);
+
+    console.log(`Agent wallet created: ${agentAddress}\n`);
   } else {
-    console.log('Agent wallet already configured\n');
+    agentAddress = envContent.match(/YELLOW_AGENT_ADDRESS=(0x[a-fA-F0-9]+)/)?.[1];
+    console.log(`Agent wallet already configured: ${agentAddress}\n`);
+  }
+
+  // Generate merchant wallet if needed (for testing)
+  const hasMerchantAddress = envContent.includes('YELLOW_MERCHANT_ADDRESS=0x');
+  let merchantAddress: string | undefined;
+
+  if (!hasMerchantAddress) {
+    console.log('Generating merchant wallet (for testing)...');
+    const merchantPrivateKey = generatePrivateKey();
+    const merchantAccount = privateKeyToAccount(merchantPrivateKey);
+    merchantAddress = merchantAccount.address;
+
+    envContent = readFileSync('.env', 'utf-8'); // Reload after agent wallet update
+    envContent = updateEnvVar(envContent, 'YELLOW_MERCHANT_ADDRESS', merchantAddress);
+    envContent = updateEnvVar(envContent, 'YELLOW_MERCHANT_PRIVATE_KEY', merchantPrivateKey);
+    writeFileSync('.env', envContent);
+
+    console.log(`Merchant wallet created: ${merchantAddress}\n`);
+  } else {
+    merchantAddress = envContent.match(/YELLOW_MERCHANT_ADDRESS=(0x[a-fA-F0-9]+)/)?.[1];
+    console.log(`Merchant wallet already configured: ${merchantAddress}\n`);
   }
 
   // Check Redis connection (if in devcontainer)
@@ -45,26 +85,74 @@ async function main() {
   await execAsync('npm install');
   console.log('');
 
+  console.log('');
+
+  // Check balance and auto-fund
+  const finalEnvContent = readFileSync('.env', 'utf-8');
+  const clearnodeUrl =
+    finalEnvContent.match(/YELLOW_CLEARNODE_URL=([^\n]+)/)?.[1] ||
+    'wss://clearnet-sandbox.yellow.com/ws';
+  const isDevelopment = clearnodeUrl.includes('sandbox');
+
+  if (agentAddress && isDevelopment) {
+    console.log('Checking Yellow Network balance...');
+    try {
+      // Check balance via Yellow RPC
+      const { YellowRpcClient } = await import('../src/yellow/rpc.js');
+      const yellow = new YellowRpcClient({ url: clearnodeUrl });
+      await yellow.connect();
+      const balances = await yellow.getLedgerBalances(agentAddress);
+      const ytestBalance = balances.find((b: any) => b.asset === 'ytest.usd');
+      const currentBalance = Number(ytestBalance?.amount ?? '0');
+
+      console.log(`Current balance: ${currentBalance} ytest.usd\n`);
+
+      if (currentBalance < MIN_BALANCE_THRESHOLD) {
+        console.log(`Balance below ${MIN_BALANCE_THRESHOLD}, auto-funding from Yellow faucet...`);
+        const response = await fetch(SANDBOX_FAUCET_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userAddress: agentAddress }),
+        });
+
+        if (response.ok) {
+          console.log('Faucet request successful! Waiting for funds...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          // Check new balance
+          const newBalances = await yellow.getLedgerBalances(agentAddress);
+          const newYtestBalance = newBalances.find((b: any) => b.asset === 'ytest.usd');
+          const newBalance = Number(newYtestBalance?.amount ?? '0');
+          console.log(`New balance: ${newBalance} ytest.usd\n`);
+        } else {
+          const errorText = await response.text();
+          console.log(`Faucet request failed: ${errorText}`);
+          console.log('Manual funding required - see instructions below\n');
+        }
+      } else {
+        console.log('Balance sufficient for testing\n');
+      }
+
+      await yellow.disconnect();
+    } catch (error) {
+      console.log('Could not check balance (Yellow RPC may not be available yet)');
+      console.log('Manual funding may be required - see instructions below\n');
+    }
+  }
+
   console.log('Setup Complete!\n');
   console.log('Next steps:');
   console.log('===========\n');
 
-  // Extract agent address
-  const updatedEnvContent = readFileSync('.env', 'utf-8');
-  const agentAddress = updatedEnvContent.match(/YELLOW_AGENT_ADDRESS=(0x[a-fA-F0-9]+)/)?.[1];
-
   if (agentAddress) {
-    console.log('1. Fund your agent wallet with Yellow Network test tokens:');
+    console.log('If manual funding is needed:');
     console.log(`   Wallet: ${agentAddress}`);
-    console.log('');
     console.log('   Yellow Faucet: https://faucet.yellow.org/');
-    console.log(`   Or via API: curl -X POST https://clearnet-sandbox.yellow.com/faucet/requestTokens \\`);
-    console.log(`     -H "Content-Type: application/json" \\`);
-    console.log(`     -d '{"userAddress":"${agentAddress}"}'`);
+    console.log('   Asset: ytest.usd (sandbox test token)');
     console.log('');
   }
-  console.log('2. Run demo: npm run demo:siwx');
-  console.log('3. Start MCP server: npm run dev\n');
+  console.log('Run demo: npm run demo:siwx');
+  console.log('Start MCP server: npm run dev\n');
 }
 
 main().catch(error => {
