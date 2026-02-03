@@ -31,7 +31,7 @@ sequenceDiagram
     participant Server as MCP Server
     participant Redis as Redis/Vercel KV
     participant Yellow as Yellow Network
-    
+
     Note over Agent,Yellow: First Request - Authenticate and Pay
     Agent->>Server: GET /stock_price
     Server->>Agent: 402 Payment Required + SIWx challenge + Yellow info
@@ -42,7 +42,7 @@ sequenceDiagram
     Server->>Server: Verify SIWx signature
     Server->>Redis: Store wallet to session mapping
     Server->>Agent: 200 OK + stock data
-    
+
     Note over Agent,Yellow: Subsequent Requests - Reuse Session
     Agent->>Server: GET /market_rumors + SIGN-IN-WITH-X header
     Server->>Redis: Lookup session (sub-millisecond)
@@ -221,6 +221,6 @@ npm run test:coverage # With coverage report
 ## Links
 
 - [Yellow Network](https://yellow.org) - Off-chain payment infrastructure
-- [x402 Specification](https://x402.org) - Payment protocol standard  
+- [x402 Specification](https://x402.org) - Payment protocol standard
 - [x402 SIWx PR #921](https://github.com/coinbase/x402/pull/921) - SIWx implementation reference
 - [Model Context Protocol](https://modelcontextprotocol.io) - Tool integration framework
