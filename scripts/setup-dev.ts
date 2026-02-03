@@ -155,6 +155,17 @@ async function main() {
   console.log('Start MCP server: npm run dev\n');
 }
 
+/**
+ * Helper to update or add environment variable in .env content
+ */
+function updateEnvVar(content: string, key: string, value: string): string {
+  const regex = new RegExp(`^${key}=.*$`, 'm');
+  if (regex.test(content)) {
+    return content.replace(regex, `${key}=${value}`);
+  }
+  return content + `\n${key}=${value}`;
+}
+
 main().catch(error => {
   console.error('Setup failed:', error);
   process.exit(1);

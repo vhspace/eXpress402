@@ -10,10 +10,16 @@ This project implements x402 v2 with SIWx (Sign-In-With-X) wallet authentication
 
 ## AI Agent Wallets
 
-AI agents MUST use EOA (Externally Owned Account) wallets with private keys. Generate with:
+AI agents MUST use EOA (Externally Owned Account) wallets with private keys. 
 
+**Automatic setup (recommended):**
 ```bash
-npm run generate-wallet
+npm run setup  # Auto-generates agent + merchant wallets, auto-funds from faucet
+```
+
+**Manual wallet generation:**
+```bash
+npm run generate-wallet  # Generates agent wallet only
 ```
 
 The wallet is used to:
@@ -22,10 +28,7 @@ The wallet is used to:
 
 DO NOT use MetaMask, hardware wallets, or smart contract wallets for AI agents.
 
-**Fund the wallet:**
-- Yellow Faucet: https://faucet.yellow.org/
-- Asset: ytest.usd (sandbox test token)
-- Or API: `curl -X POST https://clearnet-sandbox.yellow.com/faucet/requestTokens -H "Content-Type: application/json" -d '{"userAddress":"YOUR_ADDRESS"}'`
+**Funding:** Automatic in sandbox mode via `npm run setup` (requests from Yellow faucet if balance < 10 ytest.usd)
 
 ## Architecture Flow
 
