@@ -1,0 +1,106 @@
+# SIWx Development Workflow
+
+## Code Style
+
+- Use TypeScript for all scripts (no shell scripts)
+- Never use emojis in code or logs
+- Use console.error for logging (not console.log)
+- Follow existing code formatting (Prettier)
+
+## CRITICAL: Type Safety Lessons from docs/history/MISTAKES.md
+
+Based on team's experience debugging Yellow quorum 2:
+
+1. **ALWAYS Read Type Definitions First**
+   - Check PR #921 TypeScript type definitions before writing code
+   - Don't guess from protocol documentation or examples
+   - Types are the contract - they tell you exactly what to pass
+   - Example: `cat node_modules/@vercel/kv/dist/index.d.ts`
+
+2. **Pass Correct Data Structures**
+   - If type expects object, pass object (not JSON string)
+   - If type expects array, pass array (not stringified)
+   - Let libraries handle serialization internally
+   - Example: `MessageSigner` expects `RPCData` array, not JSON.stringify(array)
+
+3. **Systematic Testing**
+   - Test each component in isolation
+   - Add detailed logging at each step
+   - Verify end-to-end (both client and server)
+   - Show Expected vs Got values in logs
+
+4. **Never Pre-Serialize Data**
+   - Don't call JSON.stringify before passing to library functions
+   - Libraries handle canonical serialization internally
+   - Pre-stringifying breaks cryptographic verification
+
+5. **Verify All Party Perspectives**
+   - Check agent state after operation
+   - Check merchant state after operation
+   - Check session state in Redis
+   - Confirm all expected values match actual values
+
+## AI Agent Wallets
+
+- Always use EOA wallets (private key based)
+- Never use MetaMask, hardware wallets, or smart contracts for agents
+- Generate wallets with: npm run generate-wallet
+- Store keys in .env (never commit)
+
+## Redis/KV Storage
+
+- Use @vercel/kv for both local and production
+- Local: connects to Redis at redis:6379 (service name in docker-compose)
+- Production: auto-configured by Vercel
+- No environment-specific code needed
+- Test storage operations with unit tests
+
+## Testing Requirements
+
+- Write unit tests for all components
+- Write e2e test for complete flow
+- Run full integration test: npm run demo:siwx
+- Check Redis: redis-cli -h redis ping
+- View sessions: redis-cli -h redis keys "session:*"
+- All tests must pass before committing
+- Coverage must be > 80%
+
+## SIWx Implementation
+
+- Follow CAIP-122 specification exactly
+- Use EIP-191 for EOA signature verification
+- Store nonces with 5-minute TTL (auto-expiry)
+- Map wallet addresses to Yellow session IDs
+- Reference PR #921 types, but write clean code
+
+## Session Flow
+
+**First request:**
+1. Verify SIWx signature (check type definitions)
+2. Create Yellow session if valid
+3. Store wallet → session mapping in Redis
+4. Log all state changes
+
+**Subsequent requests:**
+1. Verify SIWx signature
+2. Look up existing session from Redis
+3. Reuse session (no payment)
+4. Log session reuse for debugging
+
+## Security
+
+- Never log private keys
+- Use git-ignored .env for secrets
+- Rotate agent wallets periodically
+- Minimal wallet balance
+- Nonce replay prevention
+
+## Debugging Approach
+
+When something fails:
+1. Add detailed logging
+2. Check type definitions
+3. Verify data structures match expected types
+4. Compare Expected vs Got values
+5. Test components in isolation
+6. Don't give up - systematic investigation finds the issue

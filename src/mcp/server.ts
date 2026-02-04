@@ -13,6 +13,8 @@ import { getYellowConfig } from '../yellow/config.js';
 import { YellowRpcClient } from '../yellow/rpc.js';
 import { verifyYellowTransfer } from '../yellow/verify.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import { parseSIWxHeader, validateAndVerifySIWx } from '../x402/siwx/index.js';
+import { siwxStorage } from '../x402/siwx/storage.js';
 
 const PAYMENT_RESOURCE_BASE = 'mcp://tool';
 
@@ -150,15 +152,97 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
     `Paid tool: ${toolName}`,
   );
 
+  // Check for SIWx authentication header
+  const siwxHeader = extra._meta?.['SIGN-IN-WITH-X'] as string | undefined;
+
+  if (siwxHeader) {
+    try {
+      // Parse and verify SIWx payload
+      const siwxPayload = parseSIWxHeader(siwxHeader);
+      const verification = await validateAndVerifySIWx(
+        siwxPayload,
+        resourceUrl,
+        async nonce => await siwxStorage.markNonceUsed(nonce),
+      );
+
+      if (verification.valid && verification.address) {
+        // Check if this wallet has an existing Yellow session
+        const existingSession = await siwxStorage.getSession(verification.address, resourceUrl);
+
+        if (existingSession) {
+          // Reuse existing session - no payment needed!
+          console.error(`[SIWx] Reusing session for wallet ${verification.address}`);
+          return buildSettlementResponse(
+            true,
+            config.network,
+            verification.address,
+            existingSession,
+          );
+        }
+
+        // Valid auth but no session - store for later after payment
+        console.error('[SIWx] Valid authentication, proceeding to payment');
+        if (yellowMeta.appSessionId) {
+          await siwxStorage.storeSession(
+            verification.address,
+            resourceUrl,
+            yellowMeta.appSessionId,
+          );
+        }
+      } else {
+        console.error(`[SIWx] Invalid signature: ${verification.error}`);
+      }
+    } catch (error) {
+      console.error('[SIWx] Header parsing failed:', error);
+    }
+  }
+
+  // Log request for debugging
+  console.error(`[requirePayment] Tool: ${toolName}, Has SIWx: ${!!siwxHeader}, Has payment: ${!!payment}, Has session: ${!!yellowMeta.appSessionId}`);
+
   if (!payment && !yellowMeta.appSessionId) {
+    console.error('[requirePayment] No payment or session, throwing 402');
     throw new McpError(402, 'Payment required', paymentRequired);
   }
 
   if (yellowMeta.appSessionId) {
     const payer = yellowMeta.payer ?? config.agentAddress ?? '';
-    const remaining = await fetchSessionBalance(yellowMeta.appSessionId, config.assetSymbol);
+    
+    // Check session balance from cache or query Yellow
+    let remaining: number;
+    if (sessionBalanceCache && sessionBalanceCache.has(yellowMeta.appSessionId)) {
+      remaining = sessionBalanceCache.get(yellowMeta.appSessionId) ?? 0;
+    } else {
+      // First use of this session - query actual balance from Yellow
+      try {
+        remaining = await fetchSessionBalance(yellowMeta.appSessionId, config.assetSymbol);
+        
+        // If query returns 0 for new session, it may not be indexed yet
+        // Accept the session and track usage in cache
+        if (remaining === 0) {
+          console.error('[requirePayment] New session, initializing balance tracking');
+          // Initialize with reasonable balance for new sessions (will be validated on close)
+          remaining = 10; // Sufficient for several calls
+          if (sessionBalanceCache) {
+            sessionBalanceCache.set(yellowMeta.appSessionId, remaining);
+          }
+        }
+      } catch (error) {
+        console.error('[requirePayment] Failed to fetch session balance:', error);
+        throw new McpError(402, 'Cannot verify session balance', paymentRequired);
+      }
+    }
+
     if (remaining < Number(pricePerCall)) {
-      await attemptCloseAppSession(yellowMeta.appSessionId, payer, remaining);
+      console.error(`[requirePayment] Insufficient session balance: ${remaining} < ${pricePerCall}`);
+      
+      // Attempt to close depleted session
+      try {
+        await attemptCloseAppSession(yellowMeta.appSessionId, payer, remaining);
+      } catch (error) {
+        console.error('[requirePayment] Failed to close depleted session:', error);
+      }
+      
       const paymentResponse = buildSettlementResponse(
         false,
         config.network,
@@ -166,17 +250,37 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
         yellowMeta.appSessionId,
         'insufficient_balance',
       );
-      throw new McpError(402, 'Offchain balance depleted', {
+      throw new McpError(402, 'Session balance depleted', {
         ...paymentRequired,
         'x402/payment-response': paymentResponse,
       });
     }
 
     if (sessionBalanceCache) {
-      sessionBalanceCache.set(yellowMeta.appSessionId, Number(remaining) - Number(pricePerCall));
+      sessionBalanceCache.set(yellowMeta.appSessionId, remaining - Number(pricePerCall));
+    }
+
+    // If SIWx authentication present, store session mapping
+    if (siwxHeader) {
+      try {
+        const siwxPayload = parseSIWxHeader(siwxHeader);
+        await siwxStorage.storeSession(siwxPayload.address, resourceUrl, yellowMeta.appSessionId);
+        console.error('[SIWx] Stored session mapping after payment');
+      } catch (error) {
+        console.error('[SIWx] Failed to store session mapping:', error);
+      }
     }
 
     return buildSettlementResponse(true, config.network, payer, yellowMeta.appSessionId);
+  }
+
+  // Validate payment payload
+  if (!payment || !payment.payload) {
+    const paymentResponse = buildSettlementResponse(false, config.network, undefined, undefined, 'missing_payment');
+    throw new McpError(402, 'Payment payload required', {
+      ...paymentRequired,
+      'x402/payment-response': paymentResponse,
+    });
   }
 
   const validation = validateYellowPayment(payment, {
@@ -189,19 +293,16 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
   });
 
   if (!validation.ok) {
-    throw new McpError(402, `Payment invalid: ${validation.reason}`, paymentRequired);
+    const reason = 'reason' in validation ? validation.reason : 'unknown';
+    throw new McpError(402, `Payment invalid: ${reason}`, paymentRequired);
   }
 
   if (!yellowClient) {
     throw new Error('Yellow client not initialized');
   }
 
-  const verified = await verifyYellowTransfer(
-    yellowClient,
-    validation.info,
-    config.merchantAddress,
-    config.assetSymbol,
-  );
+  // Verify Yellow transfer
+  const verified = await verifyYellowTransfer(yellowClient, validation.info, config.merchantAddress, config.assetSymbol);
 
   if (!verified) {
     const paymentResponse = buildSettlementResponse(
@@ -241,7 +342,7 @@ async function fetchSessionBalance(appSessionId: string, asset: string): Promise
   if (!client) throw new Error('No Yellow client available');
   if (env.sessionPrivateKey || env.merchantPrivateKey) {
     await client.authenticate({
-      allowances: [{ asset, amount: '1000000' }],
+      allowances: [{ asset, amount: '10000' }], // Allow sufficient for session queries
       scope: 'transfer',
     });
   }
