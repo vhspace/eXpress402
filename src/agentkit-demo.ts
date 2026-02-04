@@ -1,11 +1,11 @@
 /**
  * Coinbase AgentKit Demo - Two Scenarios
- * 
+ *
  * Scenario 1: Regular trading research flow
  * - AI agent researches Ethereum before trade
  * - Uses SIWx authentication + Yellow session
  * - Completes successfully with merchant payment
- * 
+ *
  * Scenario 2: MCP offline during research
  * - MCP server becomes unavailable mid-research
  * - Quorum 2 settlement recovers funds fairly
@@ -34,7 +34,9 @@ import type { CompleteSIWxInfo } from './x402/siwx/types.js';
 const env = getYellowConfig();
 
 if (!env.agentPrivateKey || !env.merchantAddress || !env.merchantPrivateKey) {
-  console.error('Required: YELLOW_AGENT_PRIVATE_KEY, YELLOW_MERCHANT_ADDRESS, YELLOW_MERCHANT_PRIVATE_KEY');
+  console.error(
+    'Required: YELLOW_AGENT_PRIVATE_KEY, YELLOW_MERCHANT_ADDRESS, YELLOW_MERCHANT_PRIVATE_KEY',
+  );
   process.exit(1);
 }
 
@@ -50,12 +52,14 @@ class TradingAgent {
     console.log(`[AI Agent] Symbol: ${this.symbol}`);
     console.log(`[AI Agent] Current price: ${stockData.close}`);
     console.log(`[AI Agent] Volume: ${stockData.volume}`);
-    console.log(`[AI Agent] Sentiment sources: ${rumors.reddit?.length ?? 0} Reddit, ${rumors.tavily?.length ?? 0} Tavily`);
-    
+    console.log(
+      `[AI Agent] Sentiment sources: ${rumors.reddit?.length ?? 0} Reddit, ${rumors.tavily?.length ?? 0} Tavily`,
+    );
+
     // Simulated analysis
     const decision = stockData.close > 250 ? 'HOLD' : 'BUY';
     console.log(`[AI Agent] Decision: ${decision}`);
-    
+
     return decision;
   }
 }
@@ -68,7 +72,7 @@ async function scenario1_RegularResearch() {
   console.log('Shows: Complete flow from query to merchant payment\n');
 
   const agent = new TradingAgent('ETH');
-  
+
   // Setup MCP client
   const transport = new StdioClientTransport({
     command: 'tsx',
@@ -91,9 +95,9 @@ async function scenario1_RegularResearch() {
   try {
     // Clear old sessions
     await siwxStorage.deleteSession(agentAddress, 'mcp://tool/stock_price');
-    
+
     console.log('--- Step 1: Agent Creates Yellow Session (Quorum 2) ---\n');
-    
+
     await yellowClient.connect();
     await yellowClient.authenticate({
       allowances: [{ asset: env.assetSymbol, amount: '10.0' }],
@@ -103,7 +107,7 @@ async function scenario1_RegularResearch() {
     // Create session with quorum 2
     const agentSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
     const merchantSigner = createECDSAMessageSigner(env.merchantPrivateKey as `0x${string}`);
-    
+
     const sessionParams = {
       definition: {
         application: 'trading-agent',
@@ -116,7 +120,11 @@ async function scenario1_RegularResearch() {
       },
       allocations: [
         { participant: agentAddress, asset: env.assetSymbol, amount: '1.0' },
-        { participant: env.merchantAddress as `0x${string}`, asset: env.assetSymbol, amount: '0.0' },
+        {
+          participant: env.merchantAddress as `0x${string}`,
+          asset: env.assetSymbol,
+          amount: '0.0',
+        },
       ],
     };
 
@@ -136,7 +144,7 @@ async function scenario1_RegularResearch() {
 
     // Create SIWx authentication
     console.log('--- Step 2: Agent Signs SIWx Challenge ---\n');
-    
+
     const siwxInfo: CompleteSIWxInfo = {
       domain: 'mcp.local',
       uri: 'mcp://tool/stock_price',
@@ -150,12 +158,12 @@ async function scenario1_RegularResearch() {
 
     const siwxPayload = await createSIWxPayload(siwxInfo, agentWallet);
     const siwxHeader = encodeSIWxHeader(siwxPayload);
-    
+
     console.log('[AI Agent] Wallet authenticated via SIWx\n');
 
     // Query 1: Stock price
     console.log('--- Step 3: Agent Queries Stock Price ---\n');
-    
+
     const priceResult = await mcpClient.callTool({
       name: 'stock_price',
       arguments: { symbol: 'ETH' },
@@ -171,7 +179,7 @@ async function scenario1_RegularResearch() {
 
     // Query 2: Market sentiment
     console.log('--- Step 4: Agent Queries Market Sentiment ---\n');
-    
+
     const siwxInfo2: CompleteSIWxInfo = {
       ...siwxInfo,
       uri: 'mcp://tool/market_rumors',
@@ -186,8 +194,14 @@ async function scenario1_RegularResearch() {
       _meta: { 'SIGN-IN-WITH-X': siwxHeader2 },
     } as any);
 
-    const rumors = JSON.parse((rumorsResult.content[0] as any)?.text || '{}');
-    console.log('Sentiment data received');
+    let rumors;
+    try {
+      rumors = JSON.parse((rumorsResult.content[0] as any)?.text || '{}');
+      console.log('Sentiment data received');
+    } catch {
+      console.log('Sentiment query failed (API rate limit), continuing with available data');
+      rumors = { reddit: [], tavily: [] };
+    }
     console.log('Session reused - no additional payment\n');
 
     // AI decision
@@ -197,31 +211,35 @@ async function scenario1_RegularResearch() {
 
     // Close session with quorum 2
     console.log('--- Step 6: Close Session (Merchant Payment) ---\n');
-    
+
     const merchantPayment = '0.2';
     const agentRefund = '0.8';
-    
+
     const agentCloseSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
     const merchantCloseSigner = createECDSAMessageSigner(env.merchantPrivateKey as `0x${string}`);
-    
+
     const agentCloseMessage = await createCloseAppSessionMessage(agentCloseSigner, {
       app_session_id: appSessionId as `0x${string}`,
       allocations: [
         { participant: agentAddress, asset: env.assetSymbol, amount: agentRefund },
-        { participant: env.merchantAddress as `0x${string}`, asset: env.assetSymbol, amount: merchantPayment },
+        {
+          participant: env.merchantAddress as `0x${string}`,
+          asset: env.assetSymbol,
+          amount: merchantPayment,
+        },
       ],
     });
-    
+
     const closeParsed = JSON.parse(agentCloseMessage);
     const merchantCloseSig = await merchantCloseSigner(closeParsed.req);
     closeParsed.sig.push(merchantCloseSig);
 
     await yellowClient.sendRawMessage(JSON.stringify(closeParsed));
-    
+
     console.log('Session closed with Quorum 2');
     console.log(`Merchant received: ${merchantPayment} ytest.usd`);
     console.log(`Agent refunded: ${agentRefund} ytest.usd\n`);
-    
+
     console.log('=== Scenario 1 Complete ===');
     console.log('Result: Successful research, merchant paid, agent ready to trade\n');
 
@@ -241,13 +259,13 @@ async function scenario2_MCPOffline() {
 
   // TODO: Implement scenario 2
   // This will demonstrate the offline MCP handling from your fraud prevention work
-  
+
   console.log('Scenario 2: Coming soon - demonstrates offline resilience\n');
 }
 
 async function main() {
   const scenario = process.argv[2] || '1';
-  
+
   if (scenario === '1') {
     await scenario1_RegularResearch();
   } else if (scenario === '2') {
