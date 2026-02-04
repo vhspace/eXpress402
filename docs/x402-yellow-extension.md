@@ -114,9 +114,32 @@ Example:
 - Run `npm run demo` or `npm run e2e:paid-tools` from the repository root so the scripts can spawn `npm run dev` for the MCP server.
 - The e2e script can request sandbox funds automatically when `YELLOW_AUTO_FAUCET` is not `false` (use `YELLOW_FAUCET_URL` to override).
 - CI e2e runs expect `YELLOW_AGENT_PRIVATE_KEY`, `YELLOW_MERCHANT_PRIVATE_KEY`, and `YELLOW_MERCHANT_ADDRESS` to be set as secrets or environment variables.
-- The demo/e2e app-session flow requires `YELLOW_APP_SESSION_PARTICIPANTS`, `YELLOW_APP_SESSION_ALLOCATIONS`, and `YELLOW_APP_SESSION_TTL_SECONDS` to be set explicitly.
+- The demo/e2e app-session flow requires `YELLOW_APP_SESSION_TTL_SECONDS`.
+- If `YELLOW_APP_SESSION_PARTICIPANTS` is not set, the demo derives it from the agent and merchant addresses.
+- If `YELLOW_APP_SESSION_ALLOCATIONS` is not set, you can provide `YELLOW_APP_SESSION_AGENT_ALLOCATION` and `YELLOW_APP_SESSION_MERCHANT_ALLOCATION` or the demo defaults to 1.0 (agent) and 0.0 (merchant).
+- If `YELLOW_APP_SESSION_TTL_SECONDS` is not set, the demo defaults to 3600 seconds.
+- `YELLOW_APP_SESSION_QUORUM` defaults to `1`. If you set it higher, closing the session must include signatures that satisfy the quorum (the demo expects agent + merchant keys).
+- The demo verifies the app session with `get_app_sessions` before closing (participants + quorum + challenge). Set `YELLOW_SKIP_APP_SESSION_VERIFICATION=true` if clearnode indexing is slow.
+- To run the on-chain dispute step, set `YELLOW_ONCHAIN_DISPUTE_ENABLED=true` and provide:
+  - `YELLOW_RPC_URL`, `YELLOW_CHAIN_ID`, `YELLOW_CUSTODY_ADDRESS`, `YELLOW_CUSTODY_ABI_PATH`
+  - Either `YELLOW_ONCHAIN_ARGS_JSON` (array of args for the custody contract call) or
+    `YELLOW_ONCHAIN_CHANNEL_ID`, `YELLOW_ONCHAIN_STATE_JSON`, and `YELLOW_ONCHAIN_SIGS_JSON`
+  - Optional: `YELLOW_ONCHAIN_DISPUTE_MODE` (`challenge`, `checkpoint`, `close`) or `YELLOW_ONCHAIN_FUNCTION`
 - E2E runs `market_rumors`, so `TAVILY_API_KEY` must be set (no skip flag).
 - Use the hosted sandbox clearnode for testing: `wss://clearnet-sandbox.yellow.com/ws`.
+
+## Demo Configuration
+
+The demo automatically refills Yellow faucet balance when needed and can be customized with these environment variables:
+
+- `YELLOW_DEMO_SESSION_ALLOCATION` - Amount to allocate to the Yellow session (default: "1.0")
+- `YELLOW_DEMO_SUCCESSFUL_CALLS` - Number of successful MCP calls to make (default: 2)
+- `YELLOW_DEMO_OFFLINE_FAILURES` - Number of offline failure attempts (default: 1)
+- `YELLOW_DEMO_CALL_SYMBOLS` - Comma-separated stock symbols (default: "AAPL,GOOGL,MSFT")
+
+## Fraud and abuse prevention demo
+
+The demo script includes an offline MCP scenario. After creating a prepaid app session, the MCP server is stopped to simulate going offline. The client then closes the app session directly to reclaim the unused allocation. This demonstrates that unspent funds remain under the payer's control even when the MCP is unavailable.
 
 ## Production deposit flow (overview)
 
@@ -136,6 +159,7 @@ Channels are always **wallet ↔ broker** (not wallet ↔ wallet). Think of a ch
 ![Yellow broker channel flow](assets/yellow-broker-flow.png)
 
 Sender flow:
+
 1. Deposit on‑chain to custody.
 2. Open channel (sender ↔ broker).
 3. Resize (signed by sender, confirmed on‑chain).
@@ -143,6 +167,7 @@ Sender flow:
 5. Make off‑chain transfers (including to recipient).
 
 Recipient flow:
+
 1. Optionally open channel (recipient ↔ broker) if withdrawing on‑chain.
 2. Resize to move off‑chain funds into the channel.
 3. Close/withdraw to on‑chain wallet.
