@@ -204,7 +204,28 @@ npm test
 
 # Test SIWx integration (after funding wallet)
 npm run demo:siwx
+npm run demo:agentkit  # Trading agent scenario
 ```
+
+## Debugging with Verbose Logging
+
+Enable comprehensive operation logging:
+
+```bash
+VERBOSE_LOGGING=true npm run demo:agentkit
+```
+
+**Captures:**
+- Agent setup, queries, decisions
+- Wallet signing operations
+- SIWx authentication flow
+- MCP tool calls and results
+- Yellow Network operations
+- Session storage operations
+- Nonce tracking (use/replay)
+- Payment flow details
+
+All logs exported with timestamps and structured data.
 
 ## Documentation
 
