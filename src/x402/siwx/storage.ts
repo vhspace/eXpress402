@@ -196,8 +196,8 @@ export class SIWxSessionStorage {
 
     const client = getKV();
     if (!client) {
-      console.error('[SIWx Storage] Warning: No storage, nonce tracking disabled');
-      return true; // Allow without tracking if no storage
+      console.error('[SIWx Storage] Error: Storage required for nonce tracking');
+      return false; // Reject if no storage available
     }
 
     const exists = await client.exists(key);

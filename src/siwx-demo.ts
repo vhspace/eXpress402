@@ -311,9 +311,8 @@ async function main() {
 
     // Close session with QUORUM 2 and pay merchant
     console.log('--- Step 5: Close Session (Off-ramp to Merchant) ---\n');
-
-    // Session has 1.0 total (server doesn't track decrements for demo)
-    // Allocate full amount: 0.2 to merchant (payment), 0.8 back to agent
+    
+    // Allocate session funds: 0.2 to merchant (payment), 0.8 back to agent
     const merchantPayment = '0.2';
     const agentRefund = '0.8';
 

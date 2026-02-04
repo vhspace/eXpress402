@@ -282,7 +282,8 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
   });
 
   if (!validation.ok) {
-    throw new McpError(402, `Payment invalid: ${(validation as any).reason}`, paymentRequired);
+    const reason = 'reason' in validation ? validation.reason : 'unknown';
+    throw new McpError(402, `Payment invalid: ${reason}`, paymentRequired);
   }
 
   if (!yellowClient) {
@@ -330,7 +331,7 @@ async function fetchSessionBalance(appSessionId: string, asset: string): Promise
   if (!client) throw new Error('No Yellow client available');
   if (env.sessionPrivateKey || env.merchantPrivateKey) {
     await client.authenticate({
-      allowances: [{ asset, amount: '1000000' }],
+      allowances: [{ asset, amount: '10000' }], // Allow sufficient for session queries
       scope: 'transfer',
     });
   }
