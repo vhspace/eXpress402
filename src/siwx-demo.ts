@@ -19,6 +19,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { privateKeyToAccount } from 'viem/accounts';
 import {
   createAppSessionMessage,
+  createCloseAppSessionMessage,
   createECDSAMessageSigner,
 } from '@erc7824/nitrolite/dist/rpc/api.js';
 import { RPCProtocolVersion } from '@erc7824/nitrolite/dist/rpc/types/index.js';
@@ -276,20 +277,58 @@ async function main() {
       throw new Error('Second request failed');
     }
 
+    // Close session and pay merchant
+    console.log('--- Step 5: Close Session (Off-ramp to Merchant) ---\n');
+    
+    // Two calls made at 0.1 each = 0.2 paid
+    // From 1.0 initial: 0.8 remains
+    // Allocate: 0.2 to merchant (payment), 0.6 back to agent
+    const merchantPayment = '0.2';
+    const agentRefund = '0.6';
+    
+    console.log('Closing Yellow session with final allocations:');
+    console.log(`  Merchant: ${merchantPayment} ${env.assetSymbol} (payment for 2 API calls)`);
+    console.log(`  Agent: ${agentRefund} ${env.assetSymbol} (refund of unused)`);
+    console.log('');
+    
+    const closeSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
+    const closeMessage = await createCloseAppSessionMessage(closeSigner, {
+      appSessionId: appSessionId as `0x${string}`,
+      allocations: [
+        {
+          participant: agentAddress,
+          asset: env.assetSymbol,
+          amount: agentRefund,
+        },
+        {
+          participant: env.merchantAddress as `0x${string}`,
+          asset: env.assetSymbol,
+          amount: merchantPayment,
+        },
+      ],
+    });
+    
+    await yellowClient.sendRawMessage(closeMessage);
+    console.log('Session closed successfully');
+    console.log(`Merchant off-ramped: ${merchantPayment} ${env.assetSymbol}\n`);
+
     console.log('=== Demo Complete ===\n');
     console.log('Summary:');
     console.log('========');
-    console.log(`Yellow session: ${appSessionId}`);
+    console.log(`Yellow session: ${appSessionId} (CLOSED)`);
     console.log(`Wallet: ${agentAddress}`);
     console.log('');
-    console.log('Calls made:');
-    console.log('  1. stock_price(AAPL) - Created session mapping, paid 0.1 ytest.usd');
-    console.log('  2. market_rumors(GOOGL) - Reused session, paid 0 ytest.usd');
+    console.log('Session lifecycle:');
+    console.log(`  1. Created with ${env.assetSymbol} 1.0 from agent`);
+    console.log('  2. stock_price(AAPL) - Deducted 0.1');
+    console.log('  3. market_rumors(GOOGL) - Deducted 0.1');
+    console.log(`  4. Closed - Merchant received 0.2, Agent received 0.6`);
     console.log('');
     console.log('Technical flow:');
     console.log('  - Authentication: CAIP-122 SIWx (EIP-191 signatures)');
     console.log('  - Payment: Yellow Network off-chain session');
-    console.log('  - Storage: In-memory wallet -> session mapping');
+    console.log('  - Storage: wallet -> session mapping');
+    console.log('  - Off-ramp: close_app_session with final allocations');
     console.log('  - Nonce tracking: Replay prevention with TTL\n');
   } catch (error) {
     console.error('Demo failed:', error);
