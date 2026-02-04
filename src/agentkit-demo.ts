@@ -30,6 +30,7 @@ import { YellowRpcClient } from './yellow/rpc.js';
 import { createSIWxPayload, encodeSIWxHeader } from './x402/siwx/client.js';
 import { siwxStorage } from './x402/siwx/storage.js';
 import type { CompleteSIWxInfo } from './x402/siwx/types.js';
+import { logger } from './logger.js';
 
 const env = getYellowConfig();
 
@@ -139,6 +140,13 @@ async function scenario1_RegularResearch() {
       (sessionResponse as any).app_session_id ??
       (sessionResponse as any).appSessionId;
 
+    logger.yellowSessionCreate({
+      sessionId: appSessionId,
+      participants: [agentAddress, env.merchantAddress as string],
+      quorum: 2,
+      amount: '1.0',
+    });
+
     console.log(`Yellow session created: ${appSessionId}`);
     console.log('Both agent and merchant signed (Quorum 2)\n');
 
@@ -158,11 +166,23 @@ async function scenario1_RegularResearch() {
 
     const siwxPayload = await createSIWxPayload(siwxInfo, agentWallet);
     const siwxHeader = encodeSIWxHeader(siwxPayload);
+    
+    logger.siwxSign({
+      wallet: agentAddress,
+      nonce: siwxPayload.nonce,
+      signature: siwxPayload.signature,
+    });
 
     console.log('[AI Agent] Wallet authenticated via SIWx\n');
 
     // Query 1: Stock price
     console.log('--- Step 3: Agent Queries Stock Price ---\n');
+
+    logger.mcpToolCall({
+      tool: 'stock_price',
+      arguments: { symbol: 'ETH' },
+      hasAuth: true,
+    });
 
     const priceResult = await mcpClient.callTool({
       name: 'stock_price',
@@ -176,6 +196,12 @@ async function scenario1_RegularResearch() {
     const stockData = JSON.parse(
       (Array.isArray(priceResult.content) ? (priceResult.content[0] as any)?.text : '{}') || '{}'
     );
+    logger.mcpToolResult({
+      tool: 'stock_price',
+      success: true,
+      dataSize: JSON.stringify(stockData).length,
+    });
+
     console.log('Stock data received:', stockData);
     console.log('Transaction: 0.1 ytest.usd deducted from session\n');
 
@@ -239,6 +265,15 @@ async function scenario1_RegularResearch() {
     closeParsed.sig.push(merchantCloseSig);
 
     await yellowClient.sendRawMessage(JSON.stringify(closeParsed));
+    
+    logger.yellowSessionClose({
+      sessionId: appSessionId,
+      allocations: {
+        agent: agentRefund,
+        merchant: merchantPayment,
+      },
+      quorum: 2,
+    });
 
     console.log('Session closed with Quorum 2');
     console.log(`Merchant received: ${merchantPayment} ytest.usd`);
@@ -247,8 +282,15 @@ async function scenario1_RegularResearch() {
     console.log('=== Scenario 1 Complete ===');
     console.log('Result: Successful research, merchant paid, agent ready to trade\n');
 
+    // Export logs if verbose
+    if (process.env.VERBOSE_LOGGING === 'true') {
+      console.log('\n--- Full Operation Log ---');
+      console.log(logger.exportLogs('text'));
+    }
+
     await mcpClient.close();
   } catch (error) {
+    logger.error('SCENARIO', 'Execution Failed', error as Error);
     console.error('Scenario 1 failed:', error);
     throw error;
   }
