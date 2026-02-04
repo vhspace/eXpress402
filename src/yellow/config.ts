@@ -12,9 +12,13 @@ function resolveMode(clearnodeUrl: string, explicitMode?: string): YellowMode {
 
 export function getYellowConfig() {
   const explicitMode = process.env.YELLOW_ENV;
+  const clearnodeUrlEnv = process.env.YELLOW_CLEARNODE_URL?.trim();
   const clearnodeUrl =
-    process.env.YELLOW_CLEARNODE_URL ??
-    (explicitMode === 'production' ? PRODUCTION_CLEARNODE_URL : SANDBOX_CLEARNODE_URL);
+    clearnodeUrlEnv && clearnodeUrlEnv.length > 0
+      ? clearnodeUrlEnv
+      : explicitMode === 'production'
+        ? PRODUCTION_CLEARNODE_URL
+        : SANDBOX_CLEARNODE_URL;
   const mode = resolveMode(clearnodeUrl, explicitMode);
 
   return {
