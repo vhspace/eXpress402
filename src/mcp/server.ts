@@ -208,18 +208,30 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
   if (yellowMeta.appSessionId) {
     const payer = yellowMeta.payer ?? config.agentAddress ?? '';
     
-    // Check session balance
+    // Check session balance from cache or query Yellow
     let remaining: number;
     if (sessionBalanceCache && sessionBalanceCache.has(yellowMeta.appSessionId)) {
       remaining = sessionBalanceCache.get(yellowMeta.appSessionId) ?? 0;
     } else {
-      // First use of this session - assume sufficient balance
-      // In production, query Yellow clearnode for actual balance
-      remaining = 1000; // Reasonable default for new sessions
+      // First use of this session - query actual balance from Yellow
+      try {
+        remaining = await fetchSessionBalance(yellowMeta.appSessionId, config.assetSymbol);
+      } catch (error) {
+        console.error('[requirePayment] Failed to fetch session balance:', error);
+        throw new McpError(402, 'Cannot verify session balance', paymentRequired);
+      }
     }
 
     if (remaining < Number(pricePerCall)) {
       console.error(`[requirePayment] Insufficient session balance: ${remaining} < ${pricePerCall}`);
+      
+      // Attempt to close depleted session
+      try {
+        await attemptCloseAppSession(yellowMeta.appSessionId, payer, remaining);
+      } catch (error) {
+        console.error('[requirePayment] Failed to close depleted session:', error);
+      }
+      
       const paymentResponse = buildSettlementResponse(
         false,
         config.network,
