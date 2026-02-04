@@ -7,7 +7,7 @@
 - Use console.error for logging (not console.log)
 - Follow existing code formatting (Prettier)
 
-## CRITICAL: Type Safety Lessons from MISTAKES.md
+## CRITICAL: Type Safety Lessons from docs/history/MISTAKES.md
 
 Based on team's experience debugging Yellow quorum 2:
 

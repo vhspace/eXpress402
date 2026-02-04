@@ -320,10 +320,9 @@ All with instant updates, zero gas fees, and cryptographic security!
 ## Files Created During This Journey
 
 1. `src/minimal-session-demo.ts` - Final working demo
-2. `QUORUM-2-SOLVED.md` - Technical solution
-3. `QUORUM-2-FINAL-SUMMARY.md` - Achievement summary
-4. `QUORUM-2-STATUS.md` - Earlier investigation (superseded)
-5. `MISTAKES.md` - This file
+2. `docs/history/QUORUM-2-SOLVED.md` - Technical solution
+3. `docs/history/QUORUM-2-FINAL-SUMMARY.md` - Achievement summary
+4. `docs/history/MISTAKES.md` - This file
 
 ---
 
