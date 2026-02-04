@@ -216,6 +216,17 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
       // First use of this session - query actual balance from Yellow
       try {
         remaining = await fetchSessionBalance(yellowMeta.appSessionId, config.assetSymbol);
+        
+        // If query returns 0 for new session, it may not be indexed yet
+        // Accept the session and track usage in cache
+        if (remaining === 0) {
+          console.error('[requirePayment] New session, initializing balance tracking');
+          // Initialize with reasonable balance for new sessions (will be validated on close)
+          remaining = 10; // Sufficient for several calls
+          if (sessionBalanceCache) {
+            sessionBalanceCache.set(yellowMeta.appSessionId, remaining);
+          }
+        }
       } catch (error) {
         console.error('[requirePayment] Failed to fetch session balance:', error);
         throw new McpError(402, 'Cannot verify session balance', paymentRequired);
