@@ -48,30 +48,61 @@ function createKVClient(): RedisClient | null {
   // Local Redis - use ioredis for redis:// URLs
   if (url.startsWith('redis://')) {
     console.error(`[SIWx Storage] Connecting to local Redis: ${url}`);
-    const client = new IORedisClient(url);
+    
+    // Configure ioredis to not throw on connection errors
+    const client = new IORedisClient(url, {
+      lazyConnect: true,
+      retryStrategy: () => null, // Don't retry if connection fails
+      enableOfflineQueue: false,
+    });
+
+    // Connect without throwing if fails
+    client.connect().catch(() => {
+      console.error('[SIWx Storage] Warning: Redis not available, storage disabled');
+    });
 
     // Wrap ioredis to match our interface
     return {
       async get(key: string) {
-        const value = await client.get(key);
-        return value ? JSON.parse(value) : null;
+        try {
+          const value = await client.get(key);
+          return value ? JSON.parse(value) : null;
+        } catch {
+          return null;
+        }
       },
       async set(key: string, value: any, options?: { ex?: number }) {
-        const json = JSON.stringify(value);
-        if (options?.ex) {
-          await client.setex(key, options.ex, json);
-        } else {
-          await client.set(key, json);
+        try {
+          const json = JSON.stringify(value);
+          if (options?.ex) {
+            await client.setex(key, options.ex, json);
+          } else {
+            await client.set(key, json);
+          }
+        } catch {
+          // Silently fail if Redis unavailable
         }
       },
       async exists(key: string) {
-        return await client.exists(key);
+        try {
+          return await client.exists(key);
+        } catch {
+          return 0;
+        }
       },
       async del(key: string) {
-        await client.del(key);
+        try {
+          await client.del(key);
+        } catch {
+          // Silently fail
+        }
       },
       async ping() {
-        return await client.ping();
+        try {
+          return await client.ping();
+        } catch {
+          return 'UNAVAILABLE';
+        }
       },
     } as RedisClient;
   }
