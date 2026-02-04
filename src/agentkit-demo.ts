@@ -35,8 +35,8 @@ import { config } from 'dotenv';
 config({ override: true });
 
 import Anthropic from '@anthropic-ai/sdk';
-import { CdpAgentkit } from '@coinbase/agentkit';
-import { createMCPClient } from '@coinbase/agentkit-model-context-protocol';
+// AgentKit available but not used yet - wallet management via viem for now
+// import { AgentKit } from '@coinbase/agentkit';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { privateKeyToAccount } from 'viem/accounts';
