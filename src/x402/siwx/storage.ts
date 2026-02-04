@@ -5,7 +5,7 @@
  */
 
 import { Redis as UpstashRedis } from '@upstash/redis';
-import IORedis from 'ioredis';
+import { Redis as IORedisClient } from 'ioredis';
 
 type SessionMapping = {
   walletAddress: string;
@@ -48,7 +48,7 @@ function createKVClient(): RedisClient | null {
   // Local Redis - use ioredis for redis:// URLs
   if (url.startsWith('redis://')) {
     console.error(`[SIWx Storage] Connecting to local Redis: ${url}`);
-    const client = new IORedis(url);
+    const client = new IORedisClient(url);
 
     // Wrap ioredis to match our interface
     return {
