@@ -13,6 +13,7 @@ startMcpServer()
   })
   .catch(error => {
     console.error('Fatal error starting MCP server:', error);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     console.error('Error stack:', error.stack);
     process.exit(1);
   });

@@ -8,7 +8,7 @@
  * 4. Verifies merchant actually receives the payment
  *
  * Uses NitroRPC/0.4 with proper multi-party signature collection.
- * 
+ *
  * **Key Discovery:** Signers must receive the RPCData ARRAY, not stringified JSON!
  */
 
@@ -56,10 +56,10 @@ async function createAppSession(
 
   // Create session with quorum 2 - BOTH must sign!
   console.log('  Creating session with Quorum 2 (both parties must sign)...');
-  
+
   const agentSigner = createECDSAMessageSigner(agentPrivateKey as `0x${string}`);
   const merchantSigner = createECDSAMessageSigner(merchantPrivateKey as `0x${string}`);
-  
+
   const sessionParams = {
     definition: {
       application: 'minimal-session-demo',
@@ -73,22 +73,38 @@ async function createAppSession(
     allocations,
     session_data: JSON.stringify({ ttlSeconds: 3600 }),
   };
-  
+
   // Agent creates message
   const agentMessage = await createAppSessionMessage(agentSigner, sessionParams);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const parsed = JSON.parse(agentMessage);
-  
+
   // Merchant signs the ARRAY (not string!) - this is the key!
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const merchantSig = await merchantSigner(parsed.req);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   parsed.sig.push(merchantSig);
-  
+
   console.log('  ✓ Agent signed');
   console.log('  ✓ Merchant signed');
   console.log('  ✓ Quorum: 2/2 signatures collected');
-  
-  const response = (await agentRpc.sendRawMessage(JSON.stringify(parsed))) as any;
 
-  const sessionId = response.appSessionId || response.app_session_id;
+  const response = await agentRpc.sendRawMessage(JSON.stringify(parsed));
+
+  // Extract session ID from Yellow RPC response (supports both formats)
+  type YellowSessionResponse = {
+    appSessionId?: string;
+    app_session_id?: string;
+  };
+  const typedResponse = response as YellowSessionResponse;
+  const sessionId = typedResponse.appSessionId ?? typedResponse.app_session_id;
+
+  if (!sessionId) {
+    console.error('Failed to create session');
+    console.error('Response:', JSON.stringify(response, null, 2));
+    throw new Error('No session ID in response');
+  }
+
   console.log(`✓ App session created: ${sessionId}`);
   console.log(`  Initial balance: Agent=${initialAmount}, Merchant=0`);
 
@@ -128,26 +144,29 @@ async function closeAppSession(
 
   // Close session with quorum 2 - BOTH must sign!
   console.log('  Closing session with Quorum 2 (both parties must sign)...');
-  
+
   // Create signers
   const agentSigner = createECDSAMessageSigner(agentPrivateKey as `0x${string}`);
   const merchantSigner = createECDSAMessageSigner(merchantPrivateKey as `0x${string}`);
-  
+
   // Agent creates close message
   const agentCloseMessage = await createCloseAppSessionMessage(agentSigner, {
     app_session_id: sessionId as `0x${string}`,
     allocations,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const closeParsed = JSON.parse(agentCloseMessage);
-  
+
   // Merchant signs the ARRAY (not string!)
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const merchantCloseSig = await merchantSigner(closeParsed.req);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   closeParsed.sig.push(merchantCloseSig);
-  
+
   console.log('  ✓ Agent signed');
   console.log('  ✓ Merchant signed');
   console.log('  ✓ Quorum: 2/2 signatures collected');
-  
+
   await agentRpc.sendRawMessage(JSON.stringify(closeParsed));
 
   console.log('✓ App session closed');
@@ -186,7 +205,8 @@ async function main() {
     console.log('\n=== Step 1: Initial Balances ===');
     const initialAgentBalance = await agentRpc.getLedgerBalances();
     const initialAgentAmount =
-      initialAgentBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount || '0';
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      initialAgentBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount ?? '0';
 
     // Connect as merchant to check their initial balance
     const merchantRpc = new YellowRpcClient({
@@ -200,7 +220,8 @@ async function main() {
 
     const initialMerchantBalance = await merchantRpc.getLedgerBalances();
     const initialMerchantAmount =
-      initialMerchantBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount || '0';
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      initialMerchantBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount ?? '0';
 
     console.log(`Agent:    ${initialAgentAmount} ${ASSET_SYMBOL}`);
     console.log(`Session:  0 ${ASSET_SYMBOL} (no session yet)`);
@@ -225,14 +246,17 @@ async function main() {
     console.log('\n=== Step 2: After Creating Session ===');
     const afterCreateAgentBalance = await agentRpc.getLedgerBalances();
     const afterCreateAgentAmount =
-      afterCreateAgentBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount || '0';
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      afterCreateAgentBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount ?? '0';
 
     const sessionBalance = await agentRpc.getLedgerBalances(sessionId);
-    const sessionAmount = sessionBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount || '0';
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const sessionAmount = sessionBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount ?? '0';
 
     const afterCreateMerchantBalance = await merchantRpc.getLedgerBalances();
     const afterCreateMerchantAmount =
-      afterCreateMerchantBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount || '0';
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      afterCreateMerchantBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount ?? '0';
 
     const expectedAgentAfterCreate = (Number(initialAgentAmount) - Number(initialAmount)).toFixed(
       1,
@@ -276,16 +300,19 @@ async function main() {
 
     const finalAgentBalance = await agentRpc.getLedgerBalances();
     const finalAgentAmount =
-      finalAgentBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount || '0';
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      finalAgentBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount ?? '0';
 
     // Check session is empty
     const finalSessionBalance = await agentRpc.getLedgerBalances(sessionId);
     const finalSessionAmount =
-      finalSessionBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount || '0';
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      finalSessionBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount ?? '0';
 
     const finalMerchantBalance = await merchantRpc.getLedgerBalances();
     const finalMerchantAmount =
-      finalMerchantBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount || '0';
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      finalMerchantBalance.find((b: any) => b.asset === ASSET_SYMBOL)?.amount ?? '0';
 
     // Calculate expected values
     const expectedAgentFinal = (Number(initialAgentAmount) - Number(paymentAmount)).toFixed(1);
@@ -313,11 +340,15 @@ async function main() {
     );
 
     console.log('\n✓ Demo complete!');
-    console.log(`✓ All balances verified successfully`);
-    console.log('\n🎉🎉 QUORUM 2 SUCCESS! Both create_app_session AND close_app_session used quorum 2!');
+    console.log('✓ All balances verified successfully');
+    console.log(
+      '\n🎉🎉 QUORUM 2 SUCCESS! Both create_app_session AND close_app_session used quorum 2!',
+    );
     console.log('\n--- KEY LEARNING ---');
     console.log('To make quorum 2 work, pass the REQUEST ARRAY to signers, not stringified JSON!');
-    console.log('Example: await merchantSigner(parsed.req)  // req is [id, method, params, timestamp]');
+    console.log(
+      'Example: await merchantSigner(parsed.req)  // req is [id, method, params, timestamp]',
+    );
   } catch (error) {
     console.error('\n✗ Error:', error);
     throw error;

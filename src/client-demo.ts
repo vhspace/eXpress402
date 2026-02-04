@@ -5,7 +5,7 @@ import {
   createCloseAppSessionMessage,
   createECDSAMessageSigner,
 } from '@erc7824/nitrolite/dist/rpc/api.js';
-import { RPCProtocolVersion } from '@erc7824/nitrolite/dist/rpc/types/index.js';
+import { RPCProtocolVersion, RPCChannelStatus } from '@erc7824/nitrolite/dist/rpc/types/index.js';
 import { readFile } from 'node:fs/promises';
 import { createWalletClient, defineChain, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -303,7 +303,7 @@ async function createAppSession(
   assetSymbol: string,
   ttlSeconds: number,
   quorum: number,
-  allocationAmount?: string,
+  _allocationAmount?: string,
 ) {
   const signer = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
   const allocations = parseAllocations(participants, sessionAllocationsRaw, assetSymbol);
@@ -355,7 +355,7 @@ async function verifyAppDefinition(
   while (Date.now() - start <= maxWaitMs) {
     attempt += 1;
     try {
-      const sessions = await yellow.getAppSessions(expectedParticipants[0], 'open');
+      const sessions = await yellow.getAppSessions(expectedParticipants[0], RPCChannelStatus.Open);
       session = sessions.find(s => s.appSessionId === appSessionId) ?? null;
       if (session) {
         break;
@@ -595,7 +595,7 @@ async function main() {
       } else {
         console.log('⚠️ Faucet refill failed, continuing with current balance');
       }
-    } catch (error) {
+    } catch {
       console.log('⚠️ Faucet refill error, continuing with current balance');
     }
   }
@@ -657,7 +657,7 @@ async function main() {
 
   // Make configurable number of successful MCP calls
   const tools = ['stock_price', 'market_rumors'];
-  let usedSymbols: string[] = [];
+  const usedSymbols: string[] = [];
 
   for (let i = 0; i < env.demo.successfulCalls; i++) {
     const toolName = tools[i % tools.length];

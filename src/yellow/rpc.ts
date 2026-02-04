@@ -5,12 +5,16 @@ import {
   createAuthRequestMessage,
   createAuthVerifyMessageFromChallenge,
   createCloseAppSessionMessage,
+  createCloseChannelMessage,
+  createCreateChannelMessage,
   createECDSAMessageSigner,
   createEIP712AuthMessageSigner,
   createGetAppSessionsMessageV2,
   createGetLedgerBalancesMessage,
+  createResizeChannelMessage,
   createTransferMessage,
 } from '@erc7824/nitrolite/dist/rpc/api.js';
+import type { RPCChannelStatus } from '@erc7824/nitrolite/dist/rpc/types/index.js';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { createWalletClient, custom } from 'viem';
 
@@ -373,10 +377,13 @@ export class YellowRpcClient extends EventEmitter {
     return response.ledgerBalances ?? response.ledger_balances ?? [];
   }
 
-  async getAppSessions(participant: `0x${string}`, status?: string): Promise<AppSession[]> {
-    const message = createGetAppSessionsMessageV2(participant, status as any);
-    const response = (await this.sendRaw(message)) as Record<string, unknown>;
-    return (response?.appSessions ?? []) as AppSession[];
+  async getAppSessions(
+    participant: `0x${string}`,
+    status?: RPCChannelStatus,
+  ): Promise<AppSession[]> {
+    const message = createGetAppSessionsMessageV2(participant, status);
+    const response = (await this.sendRaw(message)) as { appSessions?: AppSession[] };
+    return response.appSessions ?? [];
   }
 
   async getAppDefinition(appSessionId: string): Promise<AppDefinition> {
@@ -431,6 +438,52 @@ export class YellowRpcClient extends EventEmitter {
       },
       signingKeys,
     );
+  }
+
+  async createChannel(chainId: number, tokenAddress: `0x${string}`) {
+    if (!this.options.privateKey) {
+      throw new Error('Missing private key for create_channel');
+    }
+    await this.authenticate();
+    const signingKey = this.sessionPrivateKey ?? (this.options.privateKey as `0x${string}`);
+    const signer = createECDSAMessageSigner(signingKey);
+    const message = await createCreateChannelMessage(signer, {
+      chain_id: chainId,
+      token: tokenAddress,
+    });
+    return await this.sendRaw(message);
+  }
+
+  async resizeChannel(
+    channelId: `0x${string}`,
+    resizeAmount: bigint,
+    allocateAmount: bigint,
+    fundsDestination: `0x${string}`,
+  ) {
+    if (!this.options.privateKey) {
+      throw new Error('Missing private key for resize_channel');
+    }
+    await this.authenticate();
+    const signingKey = this.sessionPrivateKey ?? (this.options.privateKey as `0x${string}`);
+    const signer = createECDSAMessageSigner(signingKey);
+    const message = await createResizeChannelMessage(signer, {
+      channel_id: channelId,
+      resize_amount: resizeAmount,
+      allocate_amount: allocateAmount,
+      funds_destination: fundsDestination,
+    });
+    return await this.sendRaw(message);
+  }
+
+  async closeChannel(channelId: `0x${string}`, fundsDestination: `0x${string}`) {
+    if (!this.options.privateKey) {
+      throw new Error('Missing private key for close_channel');
+    }
+    await this.authenticate();
+    const signingKey = this.sessionPrivateKey ?? (this.options.privateKey as `0x${string}`);
+    const signer = createECDSAMessageSigner(signingKey);
+    const message = await createCloseChannelMessage(signer, channelId, fundsDestination);
+    return await this.sendRaw(message);
   }
 
   private handleMessage(raw: string) {
@@ -527,5 +580,18 @@ export class YellowRpcClient extends EventEmitter {
 
   async sendRawMessage(message: string) {
     return this.sendRaw(message);
+  }
+
+  /**
+   * Disconnect and cleanup
+   */
+  disconnect(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws.removeAllListeners();
+      this.ws = undefined;
+    }
+    this.pending.clear();
+    this.authenticated = false;
   }
 }

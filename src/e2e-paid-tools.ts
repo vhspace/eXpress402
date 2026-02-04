@@ -5,7 +5,7 @@ import {
   createCloseAppSessionMessage,
   createECDSAMessageSigner,
 } from '@erc7824/nitrolite/dist/rpc/api.js';
-import { RPCProtocolVersion } from '@erc7824/nitrolite/dist/rpc/types/index.js';
+import { RPCProtocolVersion, RPCChannelStatus } from '@erc7824/nitrolite/dist/rpc/types/index.js';
 import { privateKeyToAccount } from 'viem/accounts';
 import { getFundingHint, getYellowConfig } from './yellow/config.js';
 import { YellowRpcClient } from './yellow/rpc.js';
@@ -105,9 +105,9 @@ async function resolveAssetSymbol(
   yellow: YellowRpcClient,
   env: ReturnType<typeof getYellowConfig>,
 ) {
-  const assetsResponse = (await yellow.request('get_assets', {})) as {
-    assets?: Array<{ symbol: string }>;
-  };
+  type Asset = { symbol: string };
+  type AssetsResponse = { assets?: Asset[] };
+  const assetsResponse = await yellow.request<AssetsResponse>('get_assets', {});
   const assets = assetsResponse.assets ?? [];
   const selectedAsset =
     assets.find(asset => asset.symbol.toLowerCase() === env.assetSymbol.toLowerCase()) ?? assets[0];
@@ -262,7 +262,10 @@ async function runAppSessionFlow(
 
   // Pre-run validation: Check session doesn't exist yet
   logStage('Pre-run: Validating no active session exists');
-  const existingSessions = await yellow.getAppSessions(agentAddress as `0x${string}`, 'open');
+  const existingSessions = await yellow.getAppSessions(
+    agentAddress as `0x${string}`,
+    RPCChannelStatus.Open,
+  );
   const existingSessionForApp = existingSessions.find(
     session => session.application === 'eXpress402-mcp',
   );
@@ -282,14 +285,10 @@ async function runAppSessionFlow(
   console.log(`  Agent address: ${agentAddress}`);
   console.log(`  Merchant (from participants): ${merchantParticipant}`);
   console.log(`  Merchant (from env): ${env.merchantAddress}`);
-  console.log(`  All participants:`, participants);
+  console.log('  All participants:', participants);
 
   logStage('Pre-run: Recording merchant initial balance');
-  const merchantBalanceBefore = await getBalance(
-    yellow,
-    merchantParticipant as string,
-    assetSymbol,
-  );
+  const merchantBalanceBefore = await getBalance(yellow, merchantParticipant, assetSymbol);
   console.log(`Merchant balance before: ${merchantBalanceBefore} ${assetSymbol}`);
 
   await ensureSandboxBalance(
@@ -348,7 +347,10 @@ async function runAppSessionFlow(
 
   // Before closing, check what the session thinks its state is
   logStage('Pre-close: Checking app session state');
-  const sessionsBefore = await yellow.getAppSessions(agentAddress as `0x${string}`, 'open');
+  const sessionsBefore = await yellow.getAppSessions(
+    agentAddress as `0x${string}`,
+    RPCChannelStatus.Open,
+  );
   const sessionBefore = sessionsBefore.find(s => s.appSessionId === appSessionId);
   if (sessionBefore) {
     console.log('Session state before close:');
@@ -364,12 +366,12 @@ async function runAppSessionFlow(
 
   logStage('Demo: close app session');
   const closeAllocations = participants.map(participant => ({
-    participant: participant as `0x${string}`,
+    participant,
     asset: assetSymbol,
     amount:
       participant.toLowerCase() === agentAddress.toLowerCase()
         ? localSessionBalance.toString()
-        : participant.toLowerCase() === (merchantParticipant as string).toLowerCase()
+        : participant.toLowerCase() === merchantParticipant.toLowerCase()
           ? spentTotal.toString()
           : '0',
   }));
@@ -404,7 +406,7 @@ async function runAppSessionFlow(
   // Poll for balance update with exponential backoff
   for (attempts = 0; attempts < maxAttempts; attempts++) {
     await new Promise(resolve => setTimeout(resolve, delayMs));
-    merchantBalanceAfter = await getBalance(yellow, merchantParticipant as string, assetSymbol);
+    merchantBalanceAfter = await getBalance(yellow, merchantParticipant, assetSymbol);
     const merchantBalanceChange = merchantBalanceAfter - merchantBalanceBefore;
 
     console.log(
@@ -456,7 +458,10 @@ async function runAppSessionFlow(
 
   // Post-run validation: Verify session is closed
   logStage('Post-run: Validating session is closed');
-  const finalSessionsOpen = await yellow.getAppSessions(agentAddress as `0x${string}`, 'open');
+  const finalSessionsOpen = await yellow.getAppSessions(
+    agentAddress as `0x${string}`,
+    RPCChannelStatus.Open,
+  );
   const stillOpenSession = finalSessionsOpen.find(session => session.appSessionId === appSessionId);
   if (stillOpenSession) {
     throw new Error(`Session ${appSessionId} is still open after close_app_session`);

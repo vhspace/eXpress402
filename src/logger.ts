@@ -1,7 +1,7 @@
 /**
  * Structured logger for debugging agent workflows
  * Captures all key operations: wallet calls, MCP tools, Yellow RPC
- * 
+ *
  * Enable: VERBOSE_LOGGING=true
  */
 
@@ -20,7 +20,12 @@ interface LogEntry {
 class Logger {
   private logs: LogEntry[] = [];
 
-  private log(level: LogLevel, category: string, operation: string, details?: Record<string, unknown>) {
+  private log(
+    level: LogLevel,
+    category: string,
+    operation: string,
+    details?: Record<string, unknown>,
+  ) {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level,

@@ -48,13 +48,16 @@ function createKVClient(): RedisClient | null {
   // Local Redis - use ioredis for redis:// URLs
   if (url.startsWith('redis://')) {
     console.error(`[SIWx Storage] Connecting to local Redis: ${url}`);
-    
+
     // Configure ioredis to not throw on connection errors
     const client = new IORedisClient(url, {
       lazyConnect: true,
       retryStrategy: () => null, // Don't retry if connection fails
       enableOfflineQueue: false,
     });
+
+    // Track for cleanup
+    setIORedisClient(client);
 
     // Connect without throwing if fails
     client.connect().catch(() => {
@@ -66,6 +69,7 @@ function createKVClient(): RedisClient | null {
       async get(key: string) {
         try {
           const value = await client.get(key);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
           return value ? JSON.parse(value) : null;
         } catch {
           return null;
@@ -114,6 +118,7 @@ function createKVClient(): RedisClient | null {
 // Lazy initialization to allow env vars to be set first
 let kv: RedisClient | null = null;
 let kvInitialized = false;
+let ioredisClient: IORedisClient | null = null;
 
 function getKV(): RedisClient | null {
   if (!kvInitialized) {
@@ -121,6 +126,11 @@ function getKV(): RedisClient | null {
     kvInitialized = true;
   }
   return kv;
+}
+
+// Track ioredis client for cleanup
+function setIORedisClient(client: IORedisClient | null) {
+  ioredisClient = client;
 }
 
 /**
@@ -163,7 +173,7 @@ export class SIWxSessionStorage {
    * @param resource - Resource URL
    * @returns Yellow session ID or null if not found
    */
-  async getSession(wallet: string, resource: string): Promise<string | null> {
+  async getSession(wallet: string, _resource: string): Promise<string | null> {
     // Lookup session by wallet only (not per-resource)
     // One Yellow session works for all resources
     const key = `session:${wallet.toLowerCase()}`;
@@ -174,10 +184,13 @@ export class SIWxSessionStorage {
       return null;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const data = await client.get(key);
 
     if (data) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       console.error(`[SIWx] Session found in Redis: ${wallet} -> ${data.yellowSessionId}`);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
       return data.yellowSessionId;
     }
 
@@ -219,7 +232,7 @@ export class SIWxSessionStorage {
    * @param wallet - Wallet address
    * @param resource - Resource URL
    */
-  async deleteSession(wallet: string, resource: string): Promise<void> {
+  async deleteSession(wallet: string, _resource: string): Promise<void> {
     // Delete session by wallet only
     const key = `session:${wallet.toLowerCase()}`;
 
@@ -251,6 +264,20 @@ export class SIWxSessionStorage {
       console.error('[SIWx Storage] Connection failed:', error);
       return false;
     }
+  }
+
+  /**
+   * Close and cleanup Redis connection
+   * Call this when shutting down to prevent hanging processes
+   */
+  async close(): Promise<void> {
+    if (ioredisClient) {
+      await ioredisClient.quit();
+      ioredisClient = null;
+      console.error('[SIWx Storage] Redis connection closed');
+    }
+    kv = null;
+    kvInitialized = false;
   }
 }
 

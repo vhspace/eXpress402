@@ -1,5 +1,5 @@
 /**
- * Coinbase AgentKit Demo - Two Scenarios
+ * Coinbase AgentKit Demo - Complete Payment Lifecycle
  *
  * Architecture:
  * - AgentKit: Provides AI reasoning (Claude) using ViemWalletProvider
@@ -11,10 +11,10 @@
  * - Works with existing YELLOW_AGENT_PRIVATE_KEY
  * - Compatible with Yellow Network's signing requirements
  *
- * Scenario 1: Regular trading research flow
+ * Scenario 1: Complete trading research flow
  * - AI agent researches Ethereum before trade
  * - Uses SIWx authentication + Yellow session
- * - Completes successfully with merchant payment
+ * - Merchant receives payment
  *
  * Scenario 2: MCP offline during research
  * - MCP server becomes unavailable mid-research
@@ -32,8 +32,6 @@ import { config } from 'dotenv';
 config({ override: true });
 
 import Anthropic from '@anthropic-ai/sdk';
-// Note: AgentKit installed but has viem version conflicts
-// Using Claude directly for AI reasoning (what matters for trading decisions)
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -59,7 +57,7 @@ if (!env.agentPrivateKey || !env.merchantAddress || !env.merchantPrivateKey) {
   process.exit(1);
 }
 
-const agentPrivateKey = env.agentPrivateKey as string;
+const agentPrivateKey = env.agentPrivateKey;
 const agentWallet = privateKeyToAccount(agentPrivateKey as `0x${string}`);
 const agentAddress = agentWallet.address;
 
@@ -88,7 +86,10 @@ class TradingAgent {
     }
   }
 
-  async analyzeMarketData(stockData: any, rumors: any): Promise<string> {
+  async analyzeMarketData(
+    stockData: { close: number; volume: number },
+    rumors: { reddit?: unknown[]; tavily?: unknown[] },
+  ): Promise<string> {
     console.log('\n[AI Agent] Analyzing market data for trade decision...');
     console.log(`[AI Agent] Symbol: ${this.symbol}`);
     console.log(`[AI Agent] Current price: ${stockData.close}`);
@@ -122,8 +123,8 @@ Tavily Results: ${rumors.tavily?.length ?? 0}
 Based on this data, should we BUY or HOLD?`;
 
       const response = await this.anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 10,
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 20,
         messages: [{ role: 'user', content: prompt }],
       });
 
@@ -147,10 +148,10 @@ Based on this data, should we BUY or HOLD?`;
 
 async function scenario1_RegularResearch() {
   console.log('\n================================================');
-  console.log('SCENARIO 1: Regular Trading Research Flow');
+  console.log('SCENARIO 1: Complete Trading Research Flow');
   console.log('================================================\n');
   console.log('AI Agent wants to research Ethereum before trading');
-  console.log('Shows: Complete flow from query to merchant payment\n');
+  console.log('Shows: Complete flow from query to merchant payment to on-chain offramp\n');
 
   const agent = new TradingAgent('ETH');
 
@@ -160,7 +161,7 @@ async function scenario1_RegularResearch() {
     args: ['src/index.ts'],
     env: {
       ...process.env,
-      KV_URL: process.env.KV_URL || 'redis://redis:6379',
+      KV_URL: process.env.KV_URL ?? 'redis://redis:6379',
     },
   });
 
@@ -200,7 +201,7 @@ async function scenario1_RegularResearch() {
         nonce: Date.now(),
       },
       allocations: [
-        { participant: agentAddress as `0x${string}`, asset: env.assetSymbol, amount: '1.0' },
+        { participant: agentAddress, asset: env.assetSymbol, amount: '1.0' },
         {
           participant: env.merchantAddress as `0x${string}`,
           asset: env.assetSymbol,
@@ -210,19 +211,37 @@ async function scenario1_RegularResearch() {
     };
 
     const agentSessionMessage = await createAppSessionMessage(agentSigner, sessionParams);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const sessionParsed = JSON.parse(agentSessionMessage);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const merchantSessionSig = await merchantSigner(sessionParsed.req);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     sessionParsed.sig.push(merchantSessionSig);
 
     const sessionResponse = await yellowClient.sendRawMessage(JSON.stringify(sessionParsed));
+
+    // Extract session ID from Yellow RPC response (supports both formats)
+    type YellowSessionResponse = {
+      result?: { appSessionId?: string; app_session_id?: string };
+      appSessionId?: string;
+      app_session_id?: string;
+    };
+    const response = sessionResponse as YellowSessionResponse;
     const appSessionId =
-      (sessionResponse as any).result?.appSessionId ??
-      (sessionResponse as any).app_session_id ??
-      (sessionResponse as any).appSessionId;
+      response.result?.appSessionId ??
+      response.result?.app_session_id ??
+      response.app_session_id ??
+      response.appSessionId;
+
+    if (!appSessionId) {
+      console.error('Failed to create Yellow session');
+      console.error('Response:', JSON.stringify(sessionResponse, null, 2));
+      throw new Error('No session ID in response');
+    }
 
     logger.yellowSessionCreate({
       sessionId: appSessionId,
-      participants: [agentAddress, env.merchantAddress as string],
+      participants: [agentAddress, env.merchantAddress],
       quorum: 2,
       amount: '1.0',
     });
@@ -271,10 +290,14 @@ async function scenario1_RegularResearch() {
         'SIGN-IN-WITH-X': siwxHeader,
         'x402/yellow': { appSessionId, payer: agentAddress },
       },
-    } as any);
+    });
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const firstContent = Array.isArray(priceResult.content) ? priceResult.content[0] : null;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const stockData = JSON.parse(
-      (Array.isArray(priceResult.content) ? (priceResult.content[0] as any)?.text : '{}') || '{}',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (firstContent?.type === 'text' ? firstContent.text : '{}') ?? '{}',
     );
 
     logger.mcpToolResult({
@@ -301,14 +324,14 @@ async function scenario1_RegularResearch() {
       name: 'market_rumors',
       arguments: { symbol: 'ETH' },
       _meta: { 'SIGN-IN-WITH-X': siwxHeader2 },
-    } as any);
+    });
 
     let rumors;
     try {
-      rumors = JSON.parse(
-        (Array.isArray(rumorsResult.content) ? (rumorsResult.content[0] as any)?.text : '{}') ||
-          '{}',
-      );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const rumorsContent = Array.isArray(rumorsResult.content) ? rumorsResult.content[0] : null;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      rumors = JSON.parse((rumorsContent?.type === 'text' ? rumorsContent.text : '{}') ?? '{}');
       console.log('Sentiment data received');
     } catch {
       console.log('Sentiment query failed (API rate limit), continuing with available data');
@@ -333,7 +356,7 @@ async function scenario1_RegularResearch() {
     const agentCloseMessage = await createCloseAppSessionMessage(agentCloseSigner, {
       app_session_id: appSessionId as `0x${string}`,
       allocations: [
-        { participant: agentAddress as `0x${string}`, asset: env.assetSymbol, amount: agentRefund },
+        { participant: agentAddress, asset: env.assetSymbol, amount: agentRefund },
         {
           participant: env.merchantAddress as `0x${string}`,
           asset: env.assetSymbol,
@@ -342,8 +365,11 @@ async function scenario1_RegularResearch() {
       ],
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const closeParsed = JSON.parse(agentCloseMessage);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const merchantCloseSig = await merchantCloseSigner(closeParsed.req);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     closeParsed.sig.push(merchantCloseSig);
 
     await yellowClient.sendRawMessage(JSON.stringify(closeParsed));
@@ -362,7 +388,7 @@ async function scenario1_RegularResearch() {
     console.log(`Agent refunded: ${agentRefund} ytest.usd\n`);
 
     console.log('=== Scenario 1 Complete ===');
-    console.log('Result: Successful research, merchant paid, agent ready to trade\n');
+    console.log('Result: Successful research, payment received by merchant\n');
 
     // Export logs if verbose
     if (process.env.VERBOSE_LOGGING === 'true') {
@@ -370,7 +396,10 @@ async function scenario1_RegularResearch() {
       console.log(logger.exportLogs('text'));
     }
 
+    // Cleanup connections
     await mcpClient.close();
+    yellowClient.disconnect();
+    await siwxStorage.close();
   } catch (error) {
     logger.error('SCENARIO', 'Execution Failed', error as Error);
     console.error('Scenario 1 failed:', error);

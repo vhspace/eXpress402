@@ -1,5 +1,5 @@
-import { getYellowConfig } from "./yellow/config.js";
-import { YellowRpcClient } from "./yellow/rpc.js";
+import { getYellowConfig } from './yellow/config.js';
+import { YellowRpcClient } from './yellow/rpc.js';
 
 const env = getYellowConfig();
 
@@ -7,12 +7,12 @@ const destination = process.argv[2];
 const amount = process.argv[3];
 
 if (!env.merchantPrivateKey) {
-  console.error("YELLOW_MERCHANT_PRIVATE_KEY is required.");
+  console.error('YELLOW_MERCHANT_PRIVATE_KEY is required.');
   process.exit(1);
 }
 
 if (!destination || !amount) {
-  console.error("Usage: npm run merchant-spend -- <destination> <amount>");
+  console.error('Usage: npm run merchant-spend -- <destination> <amount>');
   process.exit(1);
 }
 
@@ -21,7 +21,7 @@ async function main() {
     url: env.clearnodeUrl,
     privateKey: env.merchantPrivateKey,
     authDomain: env.authDomain,
-    debug: env.debug
+    debug: env.debug,
   });
 
   const transferResponse = (await yellow.transfer({
@@ -29,16 +29,16 @@ async function main() {
     allocations: [
       {
         asset: env.assetSymbol,
-        amount
-      }
-    ]
+        amount,
+      },
+    ],
   })) as { transactions?: Array<Record<string, unknown>> };
 
-  console.error("Merchant transfer result:");
+  console.error('Merchant transfer result:');
   console.error(JSON.stringify(transferResponse, null, 2));
 }
 
-main().catch((error) => {
-  console.error("Merchant spend failed:", error);
+main().catch(error => {
+  console.error('Merchant spend failed:', error);
   process.exit(1);
 });

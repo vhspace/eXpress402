@@ -17,6 +17,7 @@ alwaysApply: true
 - Include comprehensive descriptions with context, implementation details, and testing notes
 - Use proper markdown formatting and structure
 - Reference related issues or previous PRs when applicable
+- Always fully implement all features, never take easier paths for a demo or hackathon
 ## Git Workflow
 
 ### Branch Strategy
@@ -31,10 +32,11 @@ alwaysApply: true
 After writing any code changes:
 
 1. Lint: Run npm run lint to check code style and quality
-2. Type Check: Run npm run type-check for TypeScript validation
-3. Unit Tests: Run npm test to ensure unit tests pass
-4. E2E Tests: Run npm run e2e:paid-tools for end-to-end validation (currently disabled in CI)
-5. Build: Run npm run build to ensure clean compilation
+2. Run eslint as well
+3. Type Check: Run npm run type-check for TypeScript validation
+4. Unit Tests: Run npm test to ensure unit tests pass
+5. E2E Tests: Run npm run e2e:paid-tools for end-to-end validation (currently disabled in CI)
+6. Build: Run npm run build to ensure clean compilation
 
 ### Testing Philosophy
 - Never mock external dependencies or APIs
@@ -54,6 +56,7 @@ After writing any code changes:
 - Research and evaluate libraries before adding
 - Prefer libraries with good TypeScript support
 - Check maintenance status and community activity
+- Always use the latest versions
 - Consider bundle size and performance impact
 
 ## Documentation & Research
@@ -75,6 +78,7 @@ After writing any code changes:
 Before creating a PR, verify:
 
 - [ ] All linting passes without errors or warnings
+- [ ] All eslint warnings are fixed
 - [ ] All unit tests pass locally
 - [ ] All e2e tests pass locally (npm run e2e:paid-tools with sandbox)
 - [ ] TypeScript compilation is clean

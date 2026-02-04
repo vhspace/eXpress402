@@ -16,6 +16,7 @@ config({ override: true });
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { privateKeyToAccount } from 'viem/accounts';
 import {
   createAppSessionMessage,
@@ -41,9 +42,6 @@ if (!env.agentPrivateKey || !env.merchantAddress) {
 const agentWallet = privateKeyToAccount(env.agentPrivateKey as `0x${string}`);
 const agentAddress = agentWallet.address;
 
-// SIWx auth cache - store signed challenges for reuse
-const siwxAuthCache = new Map<string, string>();
-
 async function main() {
   console.log('\n=== SIWx + Yellow Session Demo ===\n');
   console.log(`Agent wallet: ${agentAddress}`);
@@ -55,8 +53,8 @@ async function main() {
     args: ['src/index.ts'],
     env: {
       ...process.env,
-      KV_URL: process.env.KV_URL || 'redis://redis:6379',
-      KV_REST_API_TOKEN: process.env.KV_REST_API_TOKEN || 'local-dev-token',
+      KV_URL: process.env.KV_URL ?? 'redis://redis:6379',
+      KV_REST_API_TOKEN: process.env.KV_REST_API_TOKEN ?? 'local-dev-token',
     },
   });
 
@@ -76,7 +74,7 @@ async function main() {
   console.log('--- MCP Server Tools Available ---\n');
   const toolsList = await mcpClient.listTools();
   console.log('Available tools:');
-  toolsList.tools.forEach((tool: any) => {
+  toolsList.tools.forEach((tool: Tool) => {
     console.log(`  - ${tool.name}: ${tool.description}`);
   });
   console.log('');
@@ -136,10 +134,13 @@ async function main() {
 
     // Agent creates and signs message
     const agentSessionMessage = await createAppSessionMessage(agentSigner, sessionParams);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const sessionParsed = JSON.parse(agentSessionMessage);
 
     // Merchant signs the ARRAY (critical lesson from MISTAKES.md!)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const merchantSessionSig = await merchantSigner(sessionParsed.req);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     sessionParsed.sig.push(merchantSessionSig);
 
     console.log('Agent signed session creation');
@@ -149,11 +150,17 @@ async function main() {
     const sessionResponse = await yellowClient.sendRawMessage(JSON.stringify(sessionParsed));
 
     // Check both camelCase and snake_case formats
+    type YellowSessionResponse = {
+      result?: { appSessionId?: string; app_session_id?: string };
+      appSessionId?: string;
+      app_session_id?: string;
+    };
+    const response = sessionResponse as YellowSessionResponse;
     const appSessionId =
-      (sessionResponse as any).result?.appSessionId ??
-      (sessionResponse as any).result?.app_session_id ??
-      (sessionResponse as any).app_session_id ??
-      (sessionResponse as any).appSessionId;
+      response.result?.appSessionId ??
+      response.result?.app_session_id ??
+      response.app_session_id ??
+      response.appSessionId;
 
     if (!appSessionId) {
       console.error('Failed to create Yellow session');
@@ -216,10 +223,14 @@ async function main() {
           payer: agentAddress,
         },
       },
-    } as any);
+    });
 
     if (!firstResult.isError && Array.isArray(firstResult.content)) {
-      const resultText = (firstResult.content[0] as any)?.text;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const firstContent = firstResult.content[0];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const resultText = firstContent?.type === 'text' ? firstContent.text : null;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const data = resultText ? JSON.parse(resultText) : firstResult.content[0];
 
       console.log('Success! Stock data received:');
@@ -270,12 +281,16 @@ async function main() {
       _meta: {
         'SIGN-IN-WITH-X': siwxHeader2,
       },
-    } as any);
+    });
 
     if (!secondResult.isError && Array.isArray(secondResult.content)) {
-      const resultText = (secondResult.content[0] as any)?.text;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const secondContent = secondResult.content[0];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const resultText = secondContent?.type === 'text' ? secondContent.text : null;
       let data;
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data = resultText ? JSON.parse(resultText) : secondResult.content[0];
       } catch {
         console.log('Data received (non-JSON):', resultText);
@@ -284,12 +299,17 @@ async function main() {
 
       console.log('Success! Market rumors received:');
       console.log('=================================');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       console.log(`Reddit posts: ${data.reddit?.length ?? 0}`);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       console.log(`Tavily results: ${data.tavily?.length ?? 0}`);
       console.log('');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (data.reddit?.[0]) {
         console.log('Sample Reddit post:');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         console.log(`  "${data.reddit[0].title}"`);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         console.log(`  Score: ${data.reddit[0].score}, Subreddit: r/${data.reddit[0].subreddit}`);
         console.log('');
       }
@@ -302,16 +322,17 @@ async function main() {
       console.log('  6. Returned market data\n');
     } else {
       // Handle error gracefully
-      const errorText = Array.isArray(secondResult.content)
-        ? (secondResult.content[0] as any)?.text
-        : 'Unknown error';
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const errorContent = Array.isArray(secondResult.content) ? secondResult.content[0] : null;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const errorText = errorContent?.type === 'text' ? errorContent.text : 'Unknown error';
       console.log(`Request encountered error: ${errorText}`);
       console.log('(Continuing to session close...)\n');
     }
 
     // Close session with QUORUM 2 and pay merchant
     console.log('--- Step 5: Close Session (Off-ramp to Merchant) ---\n');
-    
+
     // Allocate session funds: 0.2 to merchant (payment), 0.8 back to agent
     const merchantPayment = '0.2';
     const agentRefund = '0.8';
@@ -340,11 +361,14 @@ async function main() {
       app_session_id: appSessionId as `0x${string}`,
       allocations: closeAllocations,
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const closeParsed = JSON.parse(agentCloseMessage);
 
     // Merchant signs the ARRAY (not string!) - critical lesson from MISTAKES.md
     const merchantCloseSigner = createECDSAMessageSigner(env.merchantPrivateKey as `0x${string}`);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const merchantCloseSig = await merchantCloseSigner(closeParsed.req);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     closeParsed.sig.push(merchantCloseSig);
 
     console.log('Agent signed session close');
@@ -365,7 +389,7 @@ async function main() {
     console.log(`  1. Created with ${env.assetSymbol} 1.0 from agent (Quorum 2)`);
     console.log('  2. stock_price(AAPL) - Used session');
     console.log('  3. market_rumors(GOOGL) - Reused session');
-    console.log(`  4. Closed - Merchant received 0.2, Agent received 0.8 (Quorum 2)`);
+    console.log('  4. Closed - Merchant received 0.2, Agent received 0.8 (Quorum 2)');
     console.log('');
     console.log('Technical flow:');
     console.log('  - Authentication: CAIP-122 SIWx (EIP-191 signatures)');
