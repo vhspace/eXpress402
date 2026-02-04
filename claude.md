@@ -67,7 +67,7 @@ Local development uses Redis (auto-started in devcontainer).
 Production uses Vercel KV (auto-configured).
 Same code works in both environments via @vercel/kv package.
 
-## Critical Lessons from MISTAKES.md
+## Critical Lessons from docs/history/MISTAKES.md
 
 Based on team's experience debugging Yellow quorum 2:
 

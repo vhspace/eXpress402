@@ -103,7 +103,7 @@ All with:
 ## Files Created
 
 - **`src/minimal-session-demo.ts`** - Complete working demo with quorum 2
-- **`QUORUM-2-SOLVED.md`** - Technical documentation of the solution
+- **`docs/history/QUORUM-2-SOLVED.md`** - Technical documentation of the solution
 - **`npm run minimal-session`** - Run command
 
 ## Run It Yourself
