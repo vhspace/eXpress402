@@ -11,6 +11,7 @@ import {
 import type { PaymentPayload } from '../x402/types.js';
 import { getYellowConfig } from '../yellow/config.js';
 import { YellowRpcClient } from '../yellow/rpc.js';
+import { verifyYellowTransfer } from '../yellow/verify.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { parseSIWxHeader, validateAndVerifySIWx } from '../x402/siwx/index.js';
 import { siwxStorage } from '../x402/siwx/storage.js';
@@ -206,12 +207,34 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
 
   if (yellowMeta.appSessionId) {
     const payer = yellowMeta.payer ?? config.agentAddress ?? '';
-    // For demo purposes, skip session balance checking since sandbox has eventual consistency issues
-    // In production, this balance check should be enabled
-    const remaining = 999999; // Sufficient for demo
+    
+    // Check session balance
+    let remaining: number;
+    if (sessionBalanceCache && sessionBalanceCache.has(yellowMeta.appSessionId)) {
+      remaining = sessionBalanceCache.get(yellowMeta.appSessionId) ?? 0;
+    } else {
+      // First use of this session - assume sufficient balance
+      // In production, query Yellow clearnode for actual balance
+      remaining = 1000; // Reasonable default for new sessions
+    }
+
+    if (remaining < Number(pricePerCall)) {
+      console.error(`[requirePayment] Insufficient session balance: ${remaining} < ${pricePerCall}`);
+      const paymentResponse = buildSettlementResponse(
+        false,
+        config.network,
+        payer,
+        yellowMeta.appSessionId,
+        'insufficient_balance',
+      );
+      throw new McpError(402, 'Session balance depleted', {
+        ...paymentRequired,
+        'x402/payment-response': paymentResponse,
+      });
+    }
 
     if (sessionBalanceCache) {
-      sessionBalanceCache.set(yellowMeta.appSessionId, Number(remaining) - Number(pricePerCall));
+      sessionBalanceCache.set(yellowMeta.appSessionId, remaining - Number(pricePerCall));
     }
 
     // If SIWx authentication present, store session mapping
@@ -228,18 +251,23 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
     return buildSettlementResponse(true, config.network, payer, yellowMeta.appSessionId);
   }
 
-  // For demo purposes with app sessions, bypass strict validation
-  // In production, proper x402 payment validation should be implemented
-  const validation = payment?.payload
-    ? validateYellowPayment(payment, {
-        clearnodeUrl: config.clearnodeUrl,
-        merchantAddress: config.merchantAddress,
-        assetSymbol: config.assetSymbol,
-        pricePerCall,
-        network: config.network,
-        maxTimeoutSeconds: config.maxTimeoutSeconds,
-      })
-    : { ok: true, info: { transferId: 'demo', payer: 'demo', amount: pricePerCall } };
+  // Validate payment payload
+  if (!payment || !payment.payload) {
+    const paymentResponse = buildSettlementResponse(false, config.network, undefined, undefined, 'missing_payment');
+    throw new McpError(402, 'Payment payload required', {
+      ...paymentRequired,
+      'x402/payment-response': paymentResponse,
+    });
+  }
+
+  const validation = validateYellowPayment(payment, {
+    clearnodeUrl: config.clearnodeUrl,
+    merchantAddress: config.merchantAddress,
+    assetSymbol: config.assetSymbol,
+    pricePerCall,
+    network: config.network,
+    maxTimeoutSeconds: config.maxTimeoutSeconds,
+  });
 
   if (!validation.ok) {
     throw new McpError(402, `Payment invalid: ${(validation as any).reason}`, paymentRequired);
@@ -249,10 +277,8 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
     throw new Error('Yellow client not initialized');
   }
 
-  // For app session payments, we can't verify via merchant ledger immediately
-  // due to eventual consistency. Instead, trust Yellow's payment processing
-  // In production, this should be properly verified
-  const verified = true; // Temporarily bypass verification for app sessions
+  // Verify Yellow transfer
+  const verified = await verifyYellowTransfer(yellowClient, validation.info, config.merchantAddress, config.assetSymbol);
 
   if (!verified) {
     const paymentResponse = buildSettlementResponse(

@@ -173,7 +173,9 @@ async function scenario1_RegularResearch() {
       },
     } as any);
 
-    const stockData = JSON.parse((priceResult.content[0] as any)?.text || '{}');
+    const stockData = JSON.parse(
+      (Array.isArray(priceResult.content) ? (priceResult.content[0] as any)?.text : '{}') || '{}'
+    );
     console.log('Stock data received:', stockData);
     console.log('Transaction: 0.1 ytest.usd deducted from session\n');
 
@@ -196,7 +198,9 @@ async function scenario1_RegularResearch() {
 
     let rumors;
     try {
-      rumors = JSON.parse((rumorsResult.content[0] as any)?.text || '{}');
+      rumors = JSON.parse(
+        (Array.isArray(rumorsResult.content) ? (rumorsResult.content[0] as any)?.text : '{}') || '{}'
+      );
       console.log('Sentiment data received');
     } catch {
       console.log('Sentiment query failed (API rate limit), continuing with available data');
