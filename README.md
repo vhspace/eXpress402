@@ -67,7 +67,7 @@ The minimal session demo (`npm run minimal-session`) now demonstrates **complete
 - ✅ Full balance verification at each step
 - ✅ Merchant payment confirmed
 
-See `QUORUM-2-SOLVED.md` for the technical breakthrough!
+See `docs/history/QUORUM-2-SOLVED.md` for the technical breakthrough!
 
 ### Core Features
 
@@ -184,7 +184,7 @@ Complete paid workflow with balance tracking and session lifecycle.
 npm run minimal-session
 ```
 
-Demonstrates quorum 2 governance with agent + merchant signatures. See `QUORUM-2-SOLVED.md` for technical details.
+Demonstrates quorum 2 governance with agent + merchant signatures. See `docs/history/QUORUM-2-SOLVED.md` for technical details.
 
 ## Funding (Automated in Development)
 
@@ -250,7 +250,7 @@ Environment variables are auto-injected by Vercel. No manual configuration neede
 - `claude.md` - Context for Claude AI agents
 - `AGENTS.md` - Guide for AI agents using this server
 - `.cursor/commands/` - Quick commands for common tasks
-- `MISTAKES.md` - Lessons learned from debugging Yellow quorum 2
+- `docs/history/MISTAKES.md` - Lessons learned from debugging Yellow quorum 2
 
 ## Testing
 
