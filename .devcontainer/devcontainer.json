@@ -1,12 +1,9 @@
 {
     "name": "eXpress402 Development",
 
-    "build": {
-      "dockerfile": "Dockerfile"
-    },
-
-    "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
-    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "app",
+    "workspaceFolder": "/workspaces/eXpress402",
 
     "features": {
       "ghcr.io/devcontainers/features/common-utils:2": {
@@ -110,6 +107,8 @@
     "remoteEnv": {
       "PATH": "${containerEnv:PATH}:/home/vscode/.foundry/bin:/home/vscode/go/bin:/home/vscode/.local/bin",
       "EDITOR": "code --wait",
+      "KV_URL": "redis://redis:6379",
+      "KV_REST_API_TOKEN": "local-dev-token",
       "GITHUB_PERSONAL_ACCESS_TOKEN": "${localEnv:CURSOR_HACKATHON_TOKEN}",
       "TAVILY_API_KEY": "${localEnv:TAVILY_API_KEY}",
       "ALCHEMY_API_KEY": "${localEnv:ALCHEMY_API_KEY}",
@@ -130,7 +129,11 @@
       "YELLOW_DEBUG": "${localEnv:YELLOW_DEBUG}"
     },
 
-    "postCreateCommand": "bash -lc \"echo '[postCreate] installing project dependencies' && npm install && echo '[postCreate] installing hackmoney tool deps' && npm install --no-package-lock --prefix .devcontainer/hackmoney-tools\"",
+    "postCreateCommand": "bash -lc \"echo '[postCreate] installing project dependencies' && npm install && echo '[postCreate] installing hackmoney tool deps' && npm install --no-package-lock --prefix .devcontainer/hackmoney-tools && echo '[postCreate] Redis ready at redis:6379 (verified by docker-compose health check)'\"",
+
+    "postStartCommand": "echo '[postStart] DevContainer ready. Redis available at redis:6379'",
+
+    "shutdownAction": "stopCompose",
 
     "mounts": [
       {

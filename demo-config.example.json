@@ -1,0 +1,38 @@
+{
+  "description": "Example demo configuration - set these as environment variables. Demo automatically refills Yellow faucet balance when needed.",
+  "env": {
+    "YELLOW_DEMO_SESSION_ALLOCATION": "1.0",
+    "YELLOW_DEMO_SUCCESSFUL_CALLS": "2",
+    "YELLOW_DEMO_OFFLINE_FAILURES": "1",
+    "YELLOW_DEMO_CALL_SYMBOLS": "AAPL,GOOGL,MSFT,TSLA,NVDA"
+  },
+  "scenarios": {
+    "basic": {
+      "description": "Basic anti-fraud demo with 2 calls and 1 offline failure",
+      "env": {
+        "YELLOW_DEMO_SESSION_ALLOCATION": "1.0",
+        "YELLOW_DEMO_SUCCESSFUL_CALLS": "2",
+        "YELLOW_DEMO_OFFLINE_FAILURES": "1",
+        "YELLOW_DEMO_CALL_SYMBOLS": "AAPL,GOOGL"
+      }
+    },
+    "stress_test": {
+      "description": "Stress test with many calls and offline failures",
+      "env": {
+        "YELLOW_DEMO_SESSION_ALLOCATION": "5.0",
+        "YELLOW_DEMO_SUCCESSFUL_CALLS": "10",
+        "YELLOW_DEMO_OFFLINE_FAILURES": "3",
+        "YELLOW_DEMO_CALL_SYMBOLS": "AAPL,GOOGL,MSFT,TSLA,NVDA,AMD,JPM,V,UNH,HD"
+      }
+    },
+    "offline_focus": {
+      "description": "Focus on offline failure handling",
+      "env": {
+        "YELLOW_DEMO_SESSION_ALLOCATION": "2.0",
+        "YELLOW_DEMO_SUCCESSFUL_CALLS": "1",
+        "YELLOW_DEMO_OFFLINE_FAILURES": "5",
+        "YELLOW_DEMO_CALL_SYMBOLS": "AAPL,GOOGL,MSFT,TSLA,NVDA"
+      }
+    }
+  }
+}
