@@ -26,6 +26,7 @@ import { RPCProtocolVersion } from '@erc7824/nitrolite/dist/rpc/types/index.js';
 import { getYellowConfig } from './yellow/config.js';
 import { YellowRpcClient } from './yellow/rpc.js';
 import { createSIWxPayload, encodeSIWxHeader } from './x402/siwx/client.js';
+import { siwxStorage } from './x402/siwx/storage.js';
 import type { CompleteSIWxInfo } from './x402/siwx/types.js';
 
 const env = getYellowConfig();
@@ -87,6 +88,11 @@ async function main() {
   });
 
   try {
+    // Clear any old sessions from storage for clean demo
+    console.log('Clearing old sessions from storage...');
+    await siwxStorage.deleteSession(agentAddress, 'mcp://tool/stock_price');
+    console.log('');
+
     console.log('--- Step 1: Create Yellow Session ---\n');
 
     // Authenticate with Yellow clearnode
@@ -252,19 +258,25 @@ async function main() {
 
     if (!secondResult.isError && Array.isArray(secondResult.content)) {
       const resultText = (secondResult.content[0] as any)?.text;
-      const data = resultText ? JSON.parse(resultText) : secondResult.content[0];
+      let data;
+      try {
+        data = resultText ? JSON.parse(resultText) : secondResult.content[0];
+      } catch {
+        console.log('Data received (non-JSON):', resultText);
+        data = {};
+      }
 
       console.log('Success! Market rumors received:');
       console.log('=================================');
       console.log(`Reddit posts: ${data.reddit?.length ?? 0}`);
       console.log(`Tavily results: ${data.tavily?.length ?? 0}`);
       console.log('');
-      console.log('Sample Reddit post:');
       if (data.reddit?.[0]) {
+        console.log('Sample Reddit post:');
         console.log(`  "${data.reddit[0].title}"`);
         console.log(`  Score: ${data.reddit[0].score}, Subreddit: r/${data.reddit[0].subreddit}`);
+        console.log('');
       }
-      console.log('');
       console.log('Server actions:');
       console.log('  1. Verified SIWx signature (different nonce)');
       console.log('  2. Looked up session by wallet address in storage');
@@ -273,8 +285,12 @@ async function main() {
       console.log('  5. No payment deducted');
       console.log('  6. Returned market data\n');
     } else {
-      console.error('Request failed:', secondResult.content);
-      throw new Error('Second request failed');
+      // Handle error gracefully
+      const errorText = Array.isArray(secondResult.content)
+        ? (secondResult.content[0] as any)?.text
+        : 'Unknown error';
+      console.log(`Request encountered error: ${errorText}`);
+      console.log('(Continuing to session close...)\n');
     }
 
     // Close session and pay merchant
@@ -293,7 +309,7 @@ async function main() {
     
     const closeSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
     const closeMessage = await createCloseAppSessionMessage(closeSigner, {
-      appSessionId: appSessionId as `0x${string}`,
+      app_session_id: appSessionId as `0x${string}`,
       allocations: [
         {
           participant: agentAddress,
