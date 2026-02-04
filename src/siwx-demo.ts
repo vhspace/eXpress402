@@ -103,20 +103,20 @@ async function main() {
       scope: 'transfer',
     });
     console.log('Authenticated successfully\n');
-    
+
     // Create Yellow payment session with QUORUM 2 (both signatures required)
     console.log('Creating session with Quorum 2 (both agent and merchant must sign)...');
-    
+
     const agentSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
     const merchantSigner = createECDSAMessageSigner(env.merchantPrivateKey as `0x${string}`);
-    
+
     const sessionParams = {
       definition: {
         application: 'siwx-demo',
         protocol: RPCProtocolVersion.NitroRPC_0_4,
         participants: [agentAddress, env.merchantAddress as `0x${string}`],
         weights: [1, 1],
-        quorum: 2,  // BOTH must sign!
+        quorum: 2, // BOTH must sign!
         challenge: 0,
         nonce: Date.now(),
       },
@@ -133,15 +133,15 @@ async function main() {
         },
       ],
     };
-    
+
     // Agent creates and signs message
     const agentSessionMessage = await createAppSessionMessage(agentSigner, sessionParams);
     const sessionParsed = JSON.parse(agentSessionMessage);
-    
+
     // Merchant signs the ARRAY (critical lesson from MISTAKES.md!)
     const merchantSessionSig = await merchantSigner(sessionParsed.req);
     sessionParsed.sig.push(merchantSessionSig);
-    
+
     console.log('Agent signed session creation');
     console.log('Merchant signed session creation');
     console.log('');
@@ -311,17 +311,17 @@ async function main() {
 
     // Close session with QUORUM 2 and pay merchant
     console.log('--- Step 5: Close Session (Off-ramp to Merchant) ---\n');
-    
+
     // Session has 1.0 total (server doesn't track decrements for demo)
     // Allocate full amount: 0.2 to merchant (payment), 0.8 back to agent
     const merchantPayment = '0.2';
     const agentRefund = '0.8';
-    
+
     console.log('Closing Yellow session with Quorum 2 (both must sign):');
     console.log(`  Merchant: ${merchantPayment} ${env.assetSymbol} (payment for 2 API calls)`);
     console.log(`  Agent: ${agentRefund} ${env.assetSymbol} (refund of unused)`);
     console.log('');
-    
+
     const closeAllocations = [
       {
         participant: agentAddress,
@@ -334,7 +334,7 @@ async function main() {
         amount: merchantPayment,
       },
     ];
-    
+
     // Agent creates close message
     const agentCloseSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
     const agentCloseMessage = await createCloseAppSessionMessage(agentCloseSigner, {
@@ -342,16 +342,16 @@ async function main() {
       allocations: closeAllocations,
     });
     const closeParsed = JSON.parse(agentCloseMessage);
-    
+
     // Merchant signs the ARRAY (not string!) - critical lesson from MISTAKES.md
     const merchantCloseSigner = createECDSAMessageSigner(env.merchantPrivateKey as `0x${string}`);
     const merchantCloseSig = await merchantCloseSigner(closeParsed.req);
     closeParsed.sig.push(merchantCloseSig);
-    
+
     console.log('Agent signed session close');
     console.log('Merchant signed session close');
     console.log('');
-    
+
     await yellowClient.sendRawMessage(JSON.stringify(closeParsed));
     console.log('Session closed successfully with Quorum 2');
     console.log(`Merchant off-ramped: ${merchantPayment} ${env.assetSymbol}\n`);
