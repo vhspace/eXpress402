@@ -30,6 +30,9 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.72.1",
+    "@coinbase/agentkit": "^0.10.4",
+    "@coinbase/agentkit-model-context-protocol": "^0.2.0",
     "@erc7824/nitrolite": "^0.5.3",
     "@modelcontextprotocol/sdk": "^1.9.0",
     "@noble/hashes": "^2.0.1",

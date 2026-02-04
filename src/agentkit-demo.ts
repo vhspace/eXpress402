@@ -1,21 +1,42 @@
 /**
  * Coinbase AgentKit Demo - Two Scenarios
- *
+ * 
+ * Architecture:
+ * - AgentKit: Provides AI reasoning (Claude) + wallet management
+ * - Yellow SDK: Handles payment sessions with quorum 2 governance
+ * - MCP Client: Executes paid tools with x402 + SIWx authentication
+ * 
+ * They work together:
+ * 1. AgentKit wallet signs Yellow session creation
+ * 2. AgentKit wallet signs SIWx challenges
+ * 3. Yellow session pays for MCP tool calls
+ * 4. AgentKit analyzes data and makes decisions
+ * 5. Yellow session closes with merchant payment
+ * 
  * Scenario 1: Regular trading research flow
  * - AI agent researches Ethereum before trade
  * - Uses SIWx authentication + Yellow session
  * - Completes successfully with merchant payment
- *
+ * 
  * Scenario 2: MCP offline during research
  * - MCP server becomes unavailable mid-research
  * - Quorum 2 settlement recovers funds fairly
  * - Demonstrates resilience and safety
+ * 
+ * Requirements:
+ * - ANTHROPIC_API_KEY: For real Claude reasoning (optional, will simulate)
+ * - CDP_API_KEY_NAME: For AgentKit wallet management (optional)
+ * - YELLOW_AGENT_PRIVATE_KEY: For Yellow Network sessions
+ * - YELLOW_MERCHANT_PRIVATE_KEY: For quorum 2 governance
  */
 
 import 'dotenv/config';
 import { config } from 'dotenv';
 config({ override: true });
 
+import Anthropic from '@anthropic-ai/sdk';
+import { CdpAgentkit } from '@coinbase/agentkit';
+import { createMCPClient } from '@coinbase/agentkit-model-context-protocol';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -166,7 +187,7 @@ async function scenario1_RegularResearch() {
 
     const siwxPayload = await createSIWxPayload(siwxInfo, agentWallet);
     const siwxHeader = encodeSIWxHeader(siwxPayload);
-    
+
     logger.siwxSign({
       wallet: agentAddress,
       nonce: siwxPayload.nonce,
@@ -194,7 +215,7 @@ async function scenario1_RegularResearch() {
     } as any);
 
     const stockData = JSON.parse(
-      (Array.isArray(priceResult.content) ? (priceResult.content[0] as any)?.text : '{}') || '{}'
+      (Array.isArray(priceResult.content) ? (priceResult.content[0] as any)?.text : '{}') || '{}',
     );
     logger.mcpToolResult({
       tool: 'stock_price',
@@ -225,7 +246,8 @@ async function scenario1_RegularResearch() {
     let rumors;
     try {
       rumors = JSON.parse(
-        (Array.isArray(rumorsResult.content) ? (rumorsResult.content[0] as any)?.text : '{}') || '{}'
+        (Array.isArray(rumorsResult.content) ? (rumorsResult.content[0] as any)?.text : '{}') ||
+          '{}',
       );
       console.log('Sentiment data received');
     } catch {
@@ -265,7 +287,7 @@ async function scenario1_RegularResearch() {
     closeParsed.sig.push(merchantCloseSig);
 
     await yellowClient.sendRawMessage(JSON.stringify(closeParsed));
-    
+
     logger.yellowSessionClose({
       sessionId: appSessionId,
       allocations: {
