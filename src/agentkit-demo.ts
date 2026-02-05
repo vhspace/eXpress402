@@ -63,12 +63,25 @@ const agentPrivateKey = env.agentPrivateKey as string;
 const agentWallet = privateKeyToAccount(agentPrivateKey as `0x${string}`);
 const agentAddress = agentWallet.address;
 
+// Determine network from config
+const isProduction = env.mode === 'production';
+const blockchainNetwork = isProduction ? 'base' : 'sepolia';
+const chainId = isProduction ? 'eip155:8453' : 'eip155:84532';
+
 // Log agent setup
+console.log('\n=== Network Configuration ===');
+console.log(`Mode: ${env.mode.toUpperCase()}`);
+console.log(`Clearnode: ${env.clearnodeUrl}`);
+console.log(`Asset: ${env.assetSymbol}`);
+console.log(`Blockchain: ${blockchainNetwork} (chainId: ${chainId})`);
+console.log(`Agent: ${agentAddress}`);
+console.log(`Merchant: ${env.merchantAddress}\n`);
+
 if (process.env.ANTHROPIC_API_KEY) {
   console.log('Using Claude AI for trading decisions');
   logger.agentSetup({
     wallet: agentAddress,
-    network: 'base-sepolia',
+    network: blockchainNetwork,
   });
 }
 
@@ -237,7 +250,7 @@ async function scenario1_RegularResearch() {
       domain: 'mcp.local',
       uri: 'mcp://tool/stock_price',
       version: '1',
-      chainId: 'eip155:84532',
+      chainId: chainId,
       type: 'eip191' as const,
       nonce: Date.now().toString(36).padStart(8, '0'),
       issuedAt: new Date().toISOString(),
@@ -360,6 +373,48 @@ async function scenario1_RegularResearch() {
     console.log('Session closed with Quorum 2');
     console.log(`Merchant received: ${merchantPayment} ytest.usd`);
     console.log(`Agent refunded: ${agentRefund} ytest.usd\n`);
+
+    // Step 7: Merchant Offramp
+    console.log('\n--- Step 7: Merchant Offramp (Withdraw to On-Chain) ---\n');
+
+    try {
+      const { offrampMerchantFunds } = await import('./merchant-offramp.js');
+      const offrampResult = await offrampMerchantFunds(
+        process.env.YELLOW_MERCHANT_ADDRESS,
+        blockchainNetwork as 'sepolia' | 'base',
+      );
+
+      if (offrampResult) {
+        console.log('SUCCESS: Merchant offramp successful!\n');
+        console.log('Offramp Evidence:');
+        console.log('-----------------------------------------------------');
+        console.log('OFF-CHAIN EVIDENCE (Yellow Network):');
+        console.log(`  Channel ID: ${offrampResult.channelId}`);
+        console.log(`  Amount: ${offrampResult.amount} ${offrampResult.asset}`);
+        console.log(`  Source: Unified Balance (off-chain ledger)`);
+        console.log('');
+        const explorerName = blockchainNetwork === 'base' ? 'Basescan' : 'Sepolia Etherscan';
+        const explorerUrl = blockchainNetwork === 'base' ? 'basescan.org' : 'sepolia.etherscan.io';
+        console.log(`ON-CHAIN EVIDENCE (${explorerName}):`);
+        console.log(`  Destination: ${offrampResult.destination}`);
+        console.log('  Transactions:');
+        offrampResult.transactions.forEach((tx: { step: string; hash: string }) => {
+          console.log(`    - ${tx.step}: https://${explorerUrl}/tx/${tx.hash}`);
+        });
+        console.log('');
+        console.log('VERIFICATION STEPS:');
+        console.log(`  1. Open ${explorerName} links above`);
+        console.log('  2. Verify each transaction succeeded');
+        console.log('  3. Verify final withdrawal to merchant wallet');
+        console.log('  4. Check merchant wallet balance increased');
+        console.log('-----------------------------------------------------\n');
+      }
+    } catch (error) {
+      console.error('ERROR: Merchant offramp failed:', error);
+      console.log('INFO: Funds remain safely in unified balance');
+      console.log('  Merchant can retry offramp later\n');
+      logger.error('MERCHANT_OFFRAMP', 'Offramp Failed', error as Error);
+    }
 
     console.log('=== Scenario 1 Complete ===');
     console.log('Result: Successful research, merchant paid, agent ready to trade\n');
