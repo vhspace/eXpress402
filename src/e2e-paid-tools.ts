@@ -514,9 +514,10 @@ async function main() {
     scope: 'transfer',
   });
 
+  // Use -c (not -lc) to avoid login shell loading old Node via bash_profile
   const transport = new StdioClientTransport({
     command: 'bash',
-    args: ['-lc', 'npm run dev'],
+    args: ['-c', 'npm run dev'],
     env: Object.fromEntries(
       Object.entries(process.env).filter(([_, value]) => value !== undefined),
     ) as Record<string, string>,
