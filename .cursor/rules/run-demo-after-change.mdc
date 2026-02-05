@@ -8,5 +8,9 @@ alwaysApply: true
 After making code changes, run the demo to test:
 
 ```bash
-set -a && source .env && npm run demo
+# Default: AgentKit demo (sandbox)
+npm run demo
+
+# Production: Full flow with real USDC
+npm run demo:production
 ```
