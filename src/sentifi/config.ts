@@ -189,9 +189,7 @@ export function validateConfig(config: unknown): string[] {
   const result = SentifiConfigSchema.safeParse(config);
   if (result.success) return [];
 
-  return result.error.issues.map(
-    (err) => `${String(err.path.join('.'))}: ${err.message}`
-  );
+  return result.error.issues.map(err => `${String(err.path.join('.'))}: ${err.message}`);
 }
 
 /**
@@ -225,13 +223,10 @@ function parseBoolEnv(key: string): boolean | undefined {
   return val.toLowerCase() !== 'false' && val !== '0';
 }
 
-function parseArrayEnv<T = string>(
-  key: string,
-  transform?: (s: string) => T
-): T[] | undefined {
+function parseArrayEnv<T = string>(key: string, transform?: (s: string) => T): T[] | undefined {
   const val = process.env[key];
   if (!val) return undefined;
-  const arr = val.split(',').map((s) => s.trim());
+  const arr = val.split(',').map(s => s.trim());
   return transform ? arr.map(transform) : (arr as T[]);
 }
 
@@ -246,9 +241,7 @@ function parseJsonEnv(key: string): Record<string, unknown> | undefined {
 }
 
 function removeUndefined(obj: Record<string, unknown>): Record<string, unknown> {
-  return JSON.parse(
-    JSON.stringify(obj, (_, v) => (v === undefined ? undefined : v))
-  );
+  return JSON.parse(JSON.stringify(obj, (_, v) => (v === undefined ? undefined : v)));
 }
 
 // ============================================================================
@@ -266,7 +259,8 @@ export function createDemoConfig(overrides?: Partial<SentifiConfig>): SentifiCon
     yellow: {
       clearnodeUrl: 'wss://clearnet-sandbox.yellow.com/ws',
       agentPrivateKey: process.env.YELLOW_AGENT_PRIVATE_KEY || demoPrivateKey,
-      merchantAddress: process.env.YELLOW_MERCHANT_ADDRESS || '0x0000000000000000000000000000000000000001',
+      merchantAddress:
+        process.env.YELLOW_MERCHANT_ADDRESS || '0x0000000000000000000000000000000000000001',
       merchantPrivateKey: process.env.YELLOW_MERCHANT_PRIVATE_KEY || demoPrivateKey,
       assetSymbol: 'ytest.usd',
     },

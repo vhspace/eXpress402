@@ -12,12 +12,7 @@ import { z } from 'zod';
 // ============================================================================
 
 /** Sentiment label based on score thresholds */
-export type SentimentLabel =
-  | 'very_bullish'
-  | 'bullish'
-  | 'neutral'
-  | 'bearish'
-  | 'very_bearish';
+export type SentimentLabel = 'very_bullish' | 'bullish' | 'neutral' | 'bearish' | 'very_bearish';
 
 /** Raw sentiment item from data providers */
 export interface RawSentimentItem {
@@ -50,12 +45,7 @@ export interface SentimentSignal {
 // ============================================================================
 
 /** Price trend direction */
-export type TrendDirection =
-  | 'strong_up'
-  | 'up'
-  | 'sideways'
-  | 'down'
-  | 'strong_down';
+export type TrendDirection = 'strong_up' | 'up' | 'sideways' | 'down' | 'strong_down';
 
 /** Price bar for OHLCV data */
 export interface PriceBar {
@@ -83,12 +73,7 @@ export interface MomentumSignal {
 // ============================================================================
 
 /** Trading recommendation based on signals */
-export type Recommendation =
-  | 'strong_buy'
-  | 'buy'
-  | 'hold'
-  | 'sell'
-  | 'strong_sell';
+export type Recommendation = 'strong_buy' | 'buy' | 'hold' | 'sell' | 'strong_sell';
 
 /** Combined multi-signal analysis result */
 export interface AggregatedSignal {
@@ -332,14 +317,7 @@ export const TradeIntentSchema = z.object({
 // ============================================================================
 
 /** Agent processing phase */
-export type AgentPhase =
-  | 'init'
-  | 'monitor'
-  | 'decide'
-  | 'quote'
-  | 'execute'
-  | 'done'
-  | 'error';
+export type AgentPhase = 'init' | 'monitor' | 'decide' | 'quote' | 'execute' | 'done' | 'error';
 
 /** Agent state snapshot */
 export interface AgentState {

@@ -20,20 +20,11 @@ export {
   createSentimentAggregator,
 } from './providers/sentiment/aggregator.js';
 
-export {
-  SentimentAnalyzer,
-  createSentimentAnalyzer,
-} from './signals/sentiment/analyzer.js';
+export { SentimentAnalyzer, createSentimentAnalyzer } from './signals/sentiment/analyzer.js';
 
-export {
-  MomentumCalculator,
-  createMomentumCalculator,
-} from './signals/momentum/calculator.js';
+export { MomentumCalculator, createMomentumCalculator } from './signals/momentum/calculator.js';
 
-export {
-  SignalAggregator,
-  createSignalAggregator,
-} from './signals/aggregator.js';
+export { SignalAggregator, createSignalAggregator } from './signals/aggregator.js';
 
 export {
   StrategyRegistry,
@@ -47,15 +38,9 @@ export {
   createSentimentMomentumStrategy,
 } from './strategies/sentiment-momentum.js';
 
-export {
-  SentifiRiskManager,
-  createRiskManager,
-} from './risk/manager.js';
+export { SentifiRiskManager, createRiskManager } from './risk/manager.js';
 
-export {
-  CircuitBreaker,
-  createCircuitBreaker,
-} from './risk/circuit-breaker.js';
+export { CircuitBreaker, createCircuitBreaker } from './risk/circuit-breaker.js';
 
 export {
   LifiExecutor,
@@ -66,10 +51,7 @@ export {
   createSimulatedPortfolioManager,
 } from './execution/index.js';
 
-export {
-  MemoryPredictionTracker,
-  createPredictionTracker,
-} from './learning/tracker.js';
+export { MemoryPredictionTracker, createPredictionTracker } from './learning/tracker.js';
 
 // Import types for orchestrator
 import type {
@@ -94,9 +76,18 @@ import { DEFAULT_STRATEGY_CONFIG } from './strategies/types.js';
 import { SentifiRiskManager } from './risk/manager.js';
 import type { RiskAssessment, RiskConfig } from './risk/types.js';
 import { DEFAULT_RISK_CONFIG } from './risk/types.js';
-import { createLifiExecutor, createSimulatedExecutor, createSimulatedPortfolioManager } from './execution/index.js';
+import {
+  createLifiExecutor,
+  createSimulatedExecutor,
+  createSimulatedPortfolioManager,
+} from './execution/index.js';
 import { SimulatedPortfolioManager } from './execution/simulator.js';
-import type { TradeExecutor, QuoteResult, ExecutionResult, PortfolioManager } from './execution/types.js';
+import type {
+  TradeExecutor,
+  QuoteResult,
+  ExecutionResult,
+  PortfolioManager,
+} from './execution/types.js';
 import { createPredictionTracker } from './learning/tracker.js';
 import type { PredictionTracker, LearningMetrics } from './learning/types.js';
 
@@ -209,7 +200,7 @@ export class SentifiAgent {
   onEvent(handler: AgentEventHandler): () => void {
     this.eventHandlers.push(handler);
     return () => {
-      this.eventHandlers = this.eventHandlers.filter((h) => h !== handler);
+      this.eventHandlers = this.eventHandlers.filter(h => h !== handler);
     };
   }
 
@@ -280,7 +271,9 @@ export class SentifiAgent {
 
     // Analyze sentiment
     const sentimentSignal = this.sentimentAnalyzer.analyze(sentimentItems);
-    this.log(`Sentiment: ${sentimentSignal.label} (score: ${sentimentSignal.score.toFixed(1)}, confidence: ${(sentimentSignal.confidence * 100).toFixed(0)}%)`);
+    this.log(
+      `Sentiment: ${sentimentSignal.label} (score: ${sentimentSignal.score.toFixed(1)}, confidence: ${(sentimentSignal.confidence * 100).toFixed(0)}%)`,
+    );
 
     // Calculate momentum if price data available
     let momentumSignal;
@@ -298,7 +291,9 @@ export class SentifiAgent {
 
     this.state.lastSignal = aggregatedSignal;
     this.emit({ type: 'signal_update', signal: aggregatedSignal });
-    this.log(`Aggregated: score ${aggregatedSignal.overallScore.toFixed(1)}, confidence ${(aggregatedSignal.overallConfidence * 100).toFixed(0)}%, recommendation: ${aggregatedSignal.recommendation}`);
+    this.log(
+      `Aggregated: score ${aggregatedSignal.overallScore.toFixed(1)}, confidence ${(aggregatedSignal.overallConfidence * 100).toFixed(0)}%, recommendation: ${aggregatedSignal.recommendation}`,
+    );
 
     return aggregatedSignal;
   }
@@ -346,7 +341,9 @@ export class SentifiAgent {
     });
 
     if (intent) {
-      this.log(`Decision: ${intent.action.toUpperCase()} ${intent.symbol} (${intent.suggestedSizePercent.toFixed(1)}% of portfolio)`);
+      this.log(
+        `Decision: ${intent.action.toUpperCase()} ${intent.symbol} (${intent.suggestedSizePercent.toFixed(1)}% of portfolio)`,
+      );
       this.log(`Reason: ${intent.reason}`);
     } else {
       this.log('Decision: HOLD - No trade recommended');
@@ -416,7 +413,7 @@ export class SentifiAgent {
 
     // Calculate amount from portfolio
     const fromHolding = this.state.portfolio.find(
-      (h) => h.token === currentIntent.fromToken || h.address === currentIntent.fromToken,
+      h => h.token === currentIntent.fromToken || h.address === currentIntent.fromToken,
     );
     const amountValue = fromHolding
       ? (fromHolding.balance * currentIntent.suggestedSizePercent) / 100
@@ -439,7 +436,9 @@ export class SentifiAgent {
     this.emit({ type: 'quote', quote });
 
     if (quote.success) {
-      this.log(`Quote: ${quote.inputAmount} ${quote.inputToken} → ${quote.estimatedOutput} ${quote.outputToken}`);
+      this.log(
+        `Quote: ${quote.inputAmount} ${quote.inputToken} → ${quote.estimatedOutput} ${quote.outputToken}`,
+      );
       this.log(`Route: ${quote.routeName} | Gas: $${quote.gasCostUsd.toFixed(2)}`);
     } else {
       this.log(`Quote failed: ${quote.error}`);
@@ -485,13 +484,13 @@ export class SentifiAgent {
     this.emit({ type: 'execution', result });
 
     if (result.success) {
-      this.log(`Execution: SUCCESS`);
+      this.log('Execution: SUCCESS');
       this.log(`TX: ${result.txHash}`);
       this.log(`Output: ${result.outputAmount} | Gas: $${result.gasUsedUsd?.toFixed(2)}`);
 
       // Update portfolio after trade
       if (this.portfolioManager instanceof SimulatedPortfolioManager) {
-        const simManager = this.portfolioManager as SimulatedPortfolioManager;
+        const simManager = this.portfolioManager;
         await simManager.executeTrade(
           currentQuote.inputToken,
           currentQuote.outputToken,
@@ -507,9 +506,10 @@ export class SentifiAgent {
         await this.predictionTracker.recordPrediction({
           signal: this.state.lastSignal,
           intent: currentIntent,
-          currentPrice: parseFloat(currentQuote.inputAmount) > 0
-            ? parseFloat(currentQuote.estimatedOutput) / parseFloat(currentQuote.inputAmount)
-            : 1,
+          currentPrice:
+            parseFloat(currentQuote.inputAmount) > 0
+              ? parseFloat(currentQuote.estimatedOutput) / parseFloat(currentQuote.inputAmount)
+              : 1,
         });
       }
     } else {
@@ -566,11 +566,7 @@ export class SentifiAgent {
     }
 
     // Execute
-    const execution = await this.execute(
-      quote,
-      options.walletAddress,
-      options.autoExecute,
-    );
+    const execution = await this.execute(quote, options.walletAddress, options.autoExecute);
 
     return { signal, intent, assessment, quote, execution };
   }
