@@ -96,6 +96,11 @@ interface YellowMcpContext {
   yellow: YellowRpcClient | null;
   appSessionId: string | null;
   agentAddress: `0x${string}` | null;
+  merchantAddress: `0x${string}` | null;
+  assetSymbol: string | null;
+  participants: `0x${string}`[];
+  sessionInitialAmount: number;
+  sessionSpent: number;
   connected: boolean;
 }
 
@@ -104,6 +109,11 @@ const yellowContext: YellowMcpContext = {
   yellow: null,
   appSessionId: null,
   agentAddress: null,
+  merchantAddress: null,
+  assetSymbol: null,
+  participants: [],
+  sessionInitialAmount: 0,
+  sessionSpent: 0,
   connected: false,
 };
 
@@ -117,6 +127,9 @@ async function initializeYellow(): Promise<boolean> {
     }
 
     yellowContext.agentAddress = privateKeyToAccount(env.agentPrivateKey as `0x${string}`).address;
+    yellowContext.merchantAddress = env.merchantAddress as `0x${string}`;
+    yellowContext.assetSymbol = env.assetSymbol;
+    yellowContext.sessionSpent = 0;
     log(`🔑 Agent address: ${yellowContext.agentAddress}`);
 
     // Connect to Yellow Network and authenticate
@@ -149,13 +162,15 @@ async function initializeYellow(): Promise<boolean> {
     log('✓ Connected to MCP Server');
 
     // Create Yellow app session for payment tracking
-    const participants: `0x${string}`[] = [yellowContext.agentAddress, env.merchantAddress as `0x${string}`];
+    const participants: `0x${string}`[] = [yellowContext.agentAddress, yellowContext.merchantAddress];
+    yellowContext.participants = participants;
     const signer = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
     const allocations = participants.map((participant, i) => ({
       participant,
       asset: env.assetSymbol,
       amount: i === 0 ? '1.0' : '0.0',
     }));
+    yellowContext.sessionInitialAmount = Number(allocations[0]?.amount ?? 0);
 
     const message = await createAppSessionMessage(signer, {
       definition: {
@@ -191,6 +206,32 @@ async function initializeYellow(): Promise<boolean> {
   }
 }
 
+function getToolText(result: unknown): { text: string; isError: boolean } {
+  const r = result as {
+    content?: Array<{ type?: string; text?: string }>;
+    isError?: boolean;
+  };
+
+  const text = r.content?.find(entry => entry?.type === 'text')?.text ?? r.content?.[0]?.text ?? '';
+  return { text, isError: r.isError === true };
+}
+
+function parseJsonFromToolText<T>(toolName: string, text: string): T {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    const snippet = text.slice(0, 200).replace(/\s+/g, ' ').trim();
+    throw new Error(`${toolName} returned non-JSON text: ${snippet || '(empty)'}`);
+  }
+}
+
+function getToolPriceUsd(toolName: string): number {
+  const env = getYellowConfig();
+  const raw = env.toolPrices?.[toolName] ?? env.pricePerCall;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: boolean }> {
   // Call market_rumors via MCP with Yellow payment
   if (yellowContext.connected && yellowContext.client && yellowContext.appSessionId && yellowContext.agentAddress) {
@@ -208,12 +249,21 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
         },
       } as any);
 
-      const resultText = (result as { content?: Array<{ text?: string }> }).content?.[0]?.text;
-      if (resultText) {
-        const data = JSON.parse(resultText);
-        log(`✓ Live data: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} news articles`);
-        return { data, isLive: true };
+      const { text, isError } = getToolText(result);
+      if (!text) {
+        throw new Error('Empty response from market_rumors');
       }
+      if (isError) {
+        throw new Error(text);
+      }
+
+      const data = parseJsonFromToolText<any>('market_rumors', text);
+      yellowContext.sessionSpent += getToolPriceUsd('market_rumors');
+
+      log(
+        `✓ Live data: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} news articles`,
+      );
+      return { data, isLive: true };
     } catch (error) {
       log(`⚠️ MCP call failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -230,9 +280,28 @@ async function closeYellowSession(): Promise<void> {
       const env = getYellowConfig();
       const signer = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
 
+      const agent = yellowContext.agentAddress;
+      const merchant = yellowContext.merchantAddress;
+      const asset = yellowContext.assetSymbol ?? env.assetSymbol;
+
+      const initial = Number.isFinite(yellowContext.sessionInitialAmount)
+        ? yellowContext.sessionInitialAmount
+        : 0;
+      const spent = Math.max(0, yellowContext.sessionSpent);
+      const merchantAmount = Math.min(initial, spent);
+      const agentAmount = Math.max(0, initial - merchantAmount);
+
+      const allocations =
+        agent && merchant
+          ? [
+              { participant: agent, asset, amount: agentAmount.toFixed(6) },
+              { participant: merchant, asset, amount: merchantAmount.toFixed(6) },
+            ]
+          : [];
+
       const closeMessage = await createCloseAppSessionMessage(signer, {
         app_session_id: yellowContext.appSessionId as `0x${string}`,
-        allocations: [],
+        allocations,
       });
 
       await yellowContext.yellow.sendRawMessage(closeMessage);
@@ -893,7 +962,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     const { data: rumors, isLive } = await fetchMarketRumors(symbol);
     state.dataMode = isLive ? 'live' : 'fallback';
     state.yellowConnected = yellowContext.connected;
-    state.mcpConnected = yellowContext.connected; // Using Yellow directly, not MCP client
+    state.mcpConnected = Boolean(yellowContext.client); // Connected to MCP server via stdio
 
     const signal = await analyzeWithNewArchitecture(symbol, rumors, isLive);
     await makeDecision(signal);
@@ -904,7 +973,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  if (url.pathname === '/api/confirm' && req.method === 'POST') {
+  if ((url.pathname === '/api/confirm' || url.pathname === '/api/confirm-decision') && req.method === 'POST') {
     const body = await readBody(req);
     const { action, amount } = JSON.parse(body);
     confirmDecision(action, amount);
@@ -983,10 +1052,12 @@ async function main() {
   const yellowConnected = await initializeYellow();
 
   const PORT = parseInt(process.env.SENTIFI_PORT || '3456');
+  const HOST = process.env.SENTIFI_HOST || '127.0.0.1';
   const server = createServer(handleRequest);
 
-  server.listen(PORT, () => {
-    console.log(chalk.green(`\n✓ Server running at http://localhost:${PORT}\n`));
+  server.listen(PORT, HOST, () => {
+    const url = `http://${HOST}:${PORT}`;
+    console.log(chalk.green(`\n✓ Server running at ${url}\n`));
 
     if (yellowConnected) {
       console.log(chalk.dim('Data mode:'), chalk.green('LIVE (Yellow MCP)'));
@@ -1004,9 +1075,12 @@ async function main() {
     console.log(chalk.dim('  - Pluggable strategy architecture'));
     console.log(chalk.dim('  - Yellow MCP integration for live market data'));
 
-    const url = `http://localhost:${PORT}`;
-    const cmd = platform() === 'darwin' ? 'open' : platform() === 'win32' ? 'start' : 'xdg-open';
-    exec(`${cmd} ${url}`);
+    const shouldOpen =
+      process.env.SENTIFI_NO_OPEN !== 'true' && process.env.CI !== 'true' && HOST === '127.0.0.1';
+    if (shouldOpen) {
+      const cmd = platform() === 'darwin' ? 'open' : platform() === 'win32' ? 'start' : 'xdg-open';
+      exec(`${cmd} ${url}`);
+    }
   });
 
   process.on('SIGINT', async () => {

@@ -95,6 +95,7 @@ import { SentifiRiskManager } from './risk/manager.js';
 import type { RiskAssessment, RiskConfig } from './risk/types.js';
 import { DEFAULT_RISK_CONFIG } from './risk/types.js';
 import { createLifiExecutor, createSimulatedExecutor, createSimulatedPortfolioManager } from './execution/index.js';
+import { SimulatedPortfolioManager } from './execution/simulator.js';
 import type { TradeExecutor, QuoteResult, ExecutionResult, PortfolioManager } from './execution/types.js';
 import { createPredictionTracker } from './learning/tracker.js';
 import type { PredictionTracker, LearningMetrics } from './learning/types.js';
@@ -489,8 +490,8 @@ export class SentifiAgent {
       this.log(`Output: ${result.outputAmount} | Gas: $${result.gasUsedUsd?.toFixed(2)}`);
 
       // Update portfolio after trade
-      if (this.portfolioManager instanceof require('./execution/simulator.js').SimulatedPortfolioManager) {
-        const simManager = this.portfolioManager as import('./execution/simulator.js').SimulatedPortfolioManager;
+      if (this.portfolioManager instanceof SimulatedPortfolioManager) {
+        const simManager = this.portfolioManager as SimulatedPortfolioManager;
         await simManager.executeTrade(
           currentQuote.inputToken,
           currentQuote.outputToken,
