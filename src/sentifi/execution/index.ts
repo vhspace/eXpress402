@@ -4,6 +4,9 @@
  * Trade execution layer supporting live LI.FI swaps and simulated demo mode.
  */
 
+import { LifiExecutor } from './lifi-executor.js';
+import { SimulatedExecutor } from './simulator.js';
+
 // Types
 export type {
   ExecutionMode,
@@ -39,10 +42,10 @@ export function createExecutor(
   config?: { integrator?: string },
 ): import('./types.js').TradeExecutor {
   if (mode === 'demo') {
-    return new (require('./simulator.js').SimulatedExecutor)();
+    return new SimulatedExecutor();
   }
 
-  return new (require('./lifi-executor.js').LifiExecutor)({
+  return new LifiExecutor({
     mode,
     integrator: config?.integrator || 'eXpress402-Sentifi',
   });
