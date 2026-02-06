@@ -14,6 +14,7 @@ import { dirname, join } from 'path';
 import { exec } from 'child_process';
 import { platform } from 'os';
 import chalk from 'chalk';
+import { parseUnits } from 'viem';
 
 // Yellow and MCP imports
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -792,8 +793,19 @@ async function getQuote() {
   log(`📈 Getting ${state.useLifiQuotes ? 'LI.FI' : 'simulated'} quote...`);
 
   try {
-    const amount = parseFloat(state.decision.amount) || 0;
-    const amountWei = Math.floor(amount * Math.pow(10, 6)).toString();
+    const amountRaw = String(state.decision.amount ?? '').trim();
+    if (!amountRaw) {
+      throw new Error('Missing trade amount');
+    }
+
+    // Convert to smallest units deterministically (avoid NaN/scientific notation)
+    // In this demo, quotes are typically USDC-based.
+    const decimals =
+      state.decision.fromToken === 'USDC' || state.decision.fromToken === 'USDT' ? 6 : 18;
+    const amountWei = parseUnits(amountRaw, decimals).toString();
+    if (amountWei === '0') {
+      throw new Error(`Trade amount too small: ${amountRaw} ${state.decision.fromToken}`);
+    }
 
     // Use Yellow agent address for quotes (doesn't need funds for quote-only)
     const quoteAddress = yellowContext.agentAddress || '0xe74298ea70069822eB490cb4Fb4694302e94Dbe1';
