@@ -90,6 +90,12 @@ export class LifiExecutor implements TradeExecutor {
     try {
       ensureLifiInitialized(this.config.integrator);
 
+      if (!request.amount || !/^\d+$/.test(request.amount)) {
+        return this.createErrorQuote(
+          `Invalid amount (must be integer base-units string): ${String(request.amount)}`,
+        );
+      }
+
       // Resolve token addresses
       const fromTokenAddress = this.resolveTokenAddress(
         request.fromToken,
