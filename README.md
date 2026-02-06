@@ -170,13 +170,18 @@ Demonstrates:
 - First request: SIWx authentication + Yellow session creation + Payment
 - Subsequent request: Session reuse without payment
 
-### Full Yellow Session Demo
+### AgentKit Trading Demo (Default)
 
 ```bash
 npm run demo
 ```
 
-Complete paid workflow with balance tracking and session lifecycle.
+Full AI agent demo with Claude reasoning, market research, and quorum 2 settlement. Shows complete flow: agent creates session → researches stocks → pays merchant → merchant withdraws to wallet.
+
+**Production mode:**
+```bash
+npm run demo:production  # Automated production flow with real USDC on Base
+```
 
 ### Minimal Quorum 2 Demo
 
@@ -185,6 +190,61 @@ npm run minimal-session
 ```
 
 Demonstrates quorum 2 governance with agent + merchant signatures. See `docs/history/QUORUM-2-SOLVED.md` for technical details.
+
+## Merchant Operations
+
+### Understanding Merchant Funds
+
+After app sessions close, merchant funds go to **Yellow Network's Unified Balance** (off-chain ledger). This is by design for efficiency and zero gas fees.
+
+**Current merchant balance:** Check anytime with:
+```bash
+npm run merchant-spend -- 0xAnyAddress 0  # Shows balance in error message
+```
+
+### Transfer Unified Balance (RECOMMENDED)
+
+Move funds to other Yellow Network accounts instantly with zero gas:
+
+```bash
+# Transfer to another Yellow account
+npm run merchant-spend -- 0xRecipientAddress 10
+
+# Example (tested):
+npm run merchant-spend -- 0xe74298ea70069822eB490cb4Fb4694302e94Dbe1 1
+```
+
+**Result:**
+- Instant settlement (< 1 second)
+- Zero gas fees
+- Off-chain transfer
+- Yellow Network transaction ID for tracking
+
+**Use Cases:**
+- Pay suppliers or partners
+- Transfer to personal Yellow account
+- Move to account with existing channel
+- Consolidate funds across accounts
+
+### Payment Channel Offramp (FOR CUSTODY LEDGER FUNDS)
+
+For users who deposited on-chain initially:
+
+```bash
+npm run merchant-offramp
+```
+
+**Requirements:**
+- Funds in Custody contract ledger (on-chain deposits)
+- Gas fees for transactions (~0.0003 ETH)
+- Only works for custody ledger, not unified balance
+
+**Process:**
+1. Create payment channel (TX: Etherscan link #1)
+2. Close channel (TX: Etherscan link #2)
+3. Withdraw to wallet (TX: Etherscan link #3)
+
+**See:** [MERCHANT-FUND-MANAGEMENT-GUIDE.md](MERCHANT-FUND-MANAGEMENT-GUIDE.md) for complete architecture explanation and options.
 
 ## Funding (Automated in Development)
 
@@ -204,7 +264,12 @@ npm test
 
 # Test SIWx integration (after funding wallet)
 npm run demo:siwx
-npm run demo:agentkit  # Trading agent scenario
+
+# AgentKit trading demo (default)
+npm run demo
+
+# Legacy client demo
+npm run demo:client
 ```
 
 ## Debugging with Verbose Logging

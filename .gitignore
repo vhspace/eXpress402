@@ -4,3 +4,6 @@ node_modules/
 .env
 build/
 .local/
+
+# Attic directory (old development files)
+attic/
