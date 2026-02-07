@@ -1,0 +1,106 @@
+[
+  {
+    "decision": {
+      "id": "suifi-decision-1770497325406",
+      "timestamp": "2026-02-07T20:48:45.406Z",
+      "action": "deposit",
+      "project": "full-sail",
+      "pool": "0852f988-3bc5-497a-813e-f9809f744a5d",
+      "symbol": "USDC-ETH",
+      "apyAtDecision": 219.255,
+      "tvlAtDecision": 202419,
+      "confidence": 0.25,
+      "reason": "High APY (219.3%) with solid TVL ($202.4K) and score (443.5)",
+      "expectedApy": 219.255,
+      "riskLevel": "high",
+      "evaluated": true,
+      "score": 443.51,
+      "evaluatedAt": "2026-02-07T20:51:40.590Z",
+      "actualApy": 219.255,
+      "actualTvl": 202419,
+      "outcome": "correct",
+      "apyChange": 0,
+      "tvlChange": 0
+    },
+    "evaluation": {
+      "apyAfter": 219.255,
+      "tvlAfter": 202419,
+      "apyChange": 0,
+      "tvlChange": 0,
+      "metExpectation": true,
+      "evaluatedAt": "2026-02-07T20:51:40.590Z"
+    }
+  },
+  {
+    "decision": {
+      "id": "mock-decision-1770499398911-gjug219",
+      "timestamp": "2026-02-05T21:23:18.911Z",
+      "action": "deposit",
+      "project": "Turbos Finance",
+      "pool": "SUI-USDC LP",
+      "symbol": "SUI",
+      "apyAtDecision": 15.5,
+      "tvlAtDecision": 5000000,
+      "confidence": 0.8,
+      "reason": "Test decision for auto-evaluation",
+      "expectedApy": 15.5,
+      "riskLevel": "medium",
+      "score": 75,
+      "evaluated": false
+    }
+  },
+  {
+    "decision": {
+      "id": "mock-decision-1770499398911-gfpvoj2",
+      "timestamp": "2026-01-30T21:23:18.911Z",
+      "action": "deposit",
+      "project": "Turbos Finance",
+      "pool": "SUI-USDC LP",
+      "symbol": "SUI",
+      "apyAtDecision": 18.2,
+      "tvlAtDecision": 5000000,
+      "confidence": 0.8,
+      "reason": "Test decision for auto-evaluation",
+      "expectedApy": 18.2,
+      "riskLevel": "medium",
+      "score": 75,
+      "evaluated": false
+    }
+  },
+  {
+    "decision": {
+      "id": "mock-decision-1770499398911-fsp6rth",
+      "timestamp": "2026-01-03T21:23:18.911Z",
+      "action": "withdraw",
+      "project": "Turbos Finance",
+      "pool": "SUI-USDC LP",
+      "symbol": "SUI",
+      "apyAtDecision": 12.8,
+      "tvlAtDecision": 5000000,
+      "confidence": 0.8,
+      "reason": "Test decision for auto-evaluation",
+      "expectedApy": 12.8,
+      "riskLevel": "medium",
+      "score": 75,
+      "evaluated": false
+    }
+  },
+  {
+    "decision": {
+      "id": "mock-decision-1770499398911-mlkx5uz",
+      "timestamp": "2026-02-07T09:23:18.911Z",
+      "action": "deposit",
+      "project": "Turbos Finance",
+      "pool": "SUI-USDC LP",
+      "symbol": "SUI",
+      "apyAtDecision": 20.1,
+      "tvlAtDecision": 5000000,
+      "confidence": 0.8,
+      "reason": "Test decision for auto-evaluation",
+      "expectedApy": 20.1,
+      "riskLevel": "medium",
+      "score": 75,
+      "evaluated": false
+    }
+  }
+]
