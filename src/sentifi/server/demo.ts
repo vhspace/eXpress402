@@ -630,7 +630,7 @@ const state: DemoState = {
   execution: null,
   logs: [],
   debugLogs: [],
-  debugLogsEnabled: true, // Feature flag - default ON
+  debugLogsEnabled: false, // Feature flag - default OFF (click DEBUG badge to enable)
   portfolio: [],
   usdcBalance: 0,
   dataMode: 'fallback',
