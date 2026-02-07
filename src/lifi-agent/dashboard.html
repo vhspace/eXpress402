@@ -207,6 +207,18 @@
       color: var(--accent-red);
     }
 
+    .action-btn.login {
+      background: transparent;
+      border: 1px solid var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .action-btn.login:hover:not(:disabled) {
+      background: var(--accent-green);
+      color: var(--bg-void);
+      box-shadow: 0 0 20px rgba(0, 255, 163, 0.3);
+    }
+
     .action-btn .spinner {
       display: none;
       width: 14px;
@@ -1112,7 +1124,7 @@
             <span class="spinner"></span>
             4. EXECUTE
           </button>
-          <button class="action-btn reset" id="logoutBtn" onclick="logout()">LOGOUT</button>
+          <button class="action-btn reset" id="logoutBtn" onclick="toggleLogin()">LOGOUT</button>
         </div>
       </div>
     </div>
@@ -1395,7 +1407,6 @@
 
     async function logout() {
       const btn = document.getElementById('logoutBtn');
-      const originalText = btn.textContent;
       btn.disabled = true;
       btn.textContent = 'CLOSING SESSION...';
       
@@ -1408,13 +1419,37 @@
         selectedAction = null;
         updateDecisionButtons();
         
-        // Wait a moment to show merchant balance update
-        btn.textContent = 'REOPENING...';
+        // Wait for merchant balance to update
         await new Promise(resolve => setTimeout(resolve, 2000));
         
       } finally {
         btn.disabled = false;
-        btn.textContent = originalText;
+        // Button text will be updated by updateUI based on state.loggedIn
+      }
+    }
+
+    async function login() {
+      const btn = document.getElementById('logoutBtn');
+      btn.disabled = true;
+      btn.textContent = 'CREATING SESSION...';
+      
+      try {
+        await fetch('/api/login', { method: 'POST' });
+        
+        // Wait for session to be created
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+      } finally {
+        btn.disabled = false;
+        // Button text will be updated by updateUI based on state.loggedIn
+      }
+    }
+
+    function toggleLogin() {
+      if (state.loggedIn) {
+        logout();
+      } else {
+        login();
       }
     }
 
@@ -1550,6 +1585,18 @@
       // Debug badge
       updateDebugBadge();
 
+      // Login/Logout button
+      const loginBtn = document.getElementById('logoutBtn');
+      if (state.loggedIn) {
+        loginBtn.textContent = 'LOGOUT';
+        loginBtn.classList.remove('login');
+        loginBtn.classList.add('reset');
+      } else {
+        loginBtn.textContent = 'LOGIN';
+        loginBtn.classList.remove('reset');
+        loginBtn.classList.add('login');
+      }
+
       // Buttons - based on flow state
       const hasBalance = state.usdcBalance > 0;
       const hasDecision = state.decision && state.decision.action !== 'HOLD';
@@ -1558,12 +1605,12 @@
       // Check Yellow session balance for research
       let hasYellowBalance = true;
       if (state.yellowWallets && state.yellowConnected) {
-        // Assume 0.1 cost per query (default)
-        const minRequired = 0.1;
+        // MCP cost per query
+        const minRequired = 1.15;
         hasYellowBalance = state.yellowWallets.sessionRemaining >= minRequired;
       }
 
-      document.getElementById('analyzeBtn').disabled = !hasBalance || !hasYellowBalance || state.isRunning;
+      document.getElementById('analyzeBtn').disabled = !hasBalance || !hasYellowBalance || state.isRunning || !state.loggedIn;
       document.getElementById('quoteBtn').disabled = !hasDecision || !decisionConfirmed || state.isRunning;
       document.getElementById('executeBtn').disabled = !state.quote || state.isRunning;
 

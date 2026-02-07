@@ -242,7 +242,7 @@ async function initializeYellow(): Promise<boolean> {
     const allocations = participants.map((participant, i) => ({
       participant,
       asset: env.assetSymbol,
-      amount: i === 0 ? '1.0' : '0.0',
+      amount: i === 0 ? '11.0' : '0.0',
     }));
     yellowContext.sessionInitialAmount = Number(allocations[0]?.amount ?? 0);
 
@@ -474,7 +474,7 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
   }
 }
 
-async function closeYellowSession(): Promise<void> {
+async function closeYellowSession(fullDisconnect: boolean = true): Promise<void> {
   if (yellowContext.yellow && yellowContext.appSessionId) {
     try {
       const env = getYellowConfig();
@@ -541,17 +541,25 @@ async function closeYellowSession(): Promise<void> {
     }
   }
 
-  if (yellowContext.client) {
-    await yellowContext.client.close();
+  // Reset session tracking
+  yellowContext.appSessionId = null;
+  yellowContext.sessionInitialAmount = 0;
+  yellowContext.sessionSpent = 0;
+
+  // Only disconnect if requested (e.g., on app shutdown)
+  if (fullDisconnect) {
+    if (yellowContext.client) {
+      await yellowContext.client.close();
+    }
+    await stopSpawnedMcpServer(yellowContext.transport);
+    yellowContext.yellow = null;
+    yellowContext.client = null;
+    yellowContext.transport = null;
+    yellowContext.connected = false;
+    
+    // Clear wallet state
+    state.yellowWallets = null;
   }
-  await stopSpawnedMcpServer(yellowContext.transport);
-  yellowContext.yellow = null;
-  yellowContext.client = null;
-  yellowContext.transport = null;
-  yellowContext.connected = false;
-  
-  // Clear wallet state
-  state.yellowWallets = null;
 }
 
 // ============================================================================
@@ -619,6 +627,7 @@ interface DemoState {
   isRunning: boolean;
   yellowConnected: boolean;
   mcpConnected: boolean;
+  loggedIn: boolean;
   decisionConfirmed: boolean;
   riskAssessment: {
     approved: boolean;
@@ -655,6 +664,7 @@ const state: DemoState = {
   isRunning: false,
   yellowConnected: false,
   mcpConnected: false,
+  loggedIn: true,
   decisionConfirmed: false,
   riskAssessment: null,
   pnl: {
@@ -1297,17 +1307,39 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (url.pathname === '/api/logout' && req.method === 'POST') {
-    // Close Yellow session and settle funds to merchant
-    await closeYellowSession();
+    // Close Yellow session and settle funds to merchant (but stay connected)
+    await closeYellowSession(false);
     
-    // Reinitialize Yellow with new session
-    await initializeYellow();
+    // Mark as logged out
+    state.loggedIn = false;
+    
+    // Wait a moment for settlement to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Update wallet balances to show merchant received funds
+    await updateYellowWalletState();
     
     // Reset UI state but keep balances
     const currentBalance = state.usdcBalance;
     resetState();
     state.usdcBalance = currentBalance;
+    state.loggedIn = false; // Keep logged out after reset
     updatePortfolio();
+    
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  if (url.pathname === '/api/login' && req.method === 'POST') {
+    // Create new Yellow session from agent's off-chain balance
+    await initializeYellow();
+    
+    // Mark as logged in
+    state.loggedIn = true;
+    
+    // Update wallet balances
+    await updateYellowWalletState();
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));
