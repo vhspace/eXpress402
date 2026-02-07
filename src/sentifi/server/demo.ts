@@ -1271,6 +1271,11 @@ async function main() {
   // Try to initialize Yellow MCP for live sentiment data
   console.log(chalk.dim('Initializing Yellow MCP connection...'));
   const yellowConnected = await initializeYellow();
+  
+  // Update data mode based on Yellow connection
+  state.dataMode = yellowConnected ? 'live' : 'fallback';
+  state.yellowConnected = yellowConnected;
+  state.mcpConnected = Boolean(yellowContext.client);
 
   const PORT = parseInt(process.env.SENTIFI_PORT || '3456');
   const HOST = process.env.SENTIFI_HOST || '127.0.0.1';
