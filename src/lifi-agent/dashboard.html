@@ -789,6 +789,80 @@
     .exec-hash { font-size: 0.55rem; color: var(--text-muted); margin-top: 5px; }
     .exec-note { font-size: 0.5rem; color: var(--accent-amber); margin-top: 8px; border-top: 1px solid var(--border-dim); padding-top: 8px; }
 
+    /* Error Modal */
+    .error-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(3, 5, 8, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .error-modal.hidden {
+      display: none;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .error-content {
+      background: var(--bg-panel);
+      border: 3px solid var(--accent-red);
+      padding: 30px 40px;
+      max-width: 500px;
+      box-shadow: 0 0 40px rgba(255, 51, 102, 0.5);
+      animation: scaleIn 0.3s ease;
+    }
+
+    @keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    .error-icon {
+      font-size: 3rem;
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    .error-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent-red);
+      text-align: center;
+      margin-bottom: 15px;
+      letter-spacing: 0.1em;
+    }
+
+    .error-message {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-align: center;
+      line-height: 1.6;
+      margin-bottom: 25px;
+    }
+
+    .error-close {
+      width: 100%;
+      padding: 12px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: var(--accent-red);
+      border: none;
+      color: var(--bg-void);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .error-close:hover {
+      background: #ff5577;
+      box-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
+    }
+
     /* Empty/Loading states */
     .empty-state {
       text-align: center;
@@ -1113,6 +1187,16 @@
     </div>
   </div>
 
+  <!-- Error Modal -->
+  <div class="error-modal hidden" id="errorModal">
+    <div class="error-content">
+      <div class="error-icon">⚠️</div>
+      <div class="error-title" id="errorTitle">ERROR</div>
+      <div class="error-message" id="errorMessage">An error occurred</div>
+      <button class="error-close" onclick="closeErrorModal()">CLOSE</button>
+    </div>
+  </div>
+
   <!-- Yellow Network Status Bar -->
   <div class="status-bar hidden" id="statusBar">
     <div class="status-bar-progress">
@@ -1166,14 +1250,32 @@
       btn.classList.add('loading');
       btn.disabled = true;
 
-      await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: selectedSymbol })
-      });
+      try {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: selectedSymbol })
+        });
 
-      // Wait for completion
-      await waitForIdle();
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (data.budgetDepleted) {
+            showErrorModal('RESEARCH BUDGET DEPLETED', data.message);
+          } else {
+            showErrorModal('ERROR', data.error || 'Analysis failed');
+          }
+          btn.classList.remove('loading');
+          btn.disabled = false;
+          return;
+        }
+
+        // Wait for completion
+        await waitForIdle();
+      } catch (error) {
+        showErrorModal('ERROR', error.message || 'Analysis failed');
+      }
+
       btn.classList.remove('loading');
       btn.disabled = false;
     }
@@ -1206,6 +1308,17 @@
       document.getElementById('decisionConfirm').style.display = 'none';
       selectedAction = null;
       updateDecisionButtons();
+    }
+
+    // Error modal functions
+    function showErrorModal(title, message) {
+      document.getElementById('errorTitle').textContent = title;
+      document.getElementById('errorMessage').textContent = message;
+      document.getElementById('errorModal').classList.remove('hidden');
+    }
+
+    function closeErrorModal() {
+      document.getElementById('errorModal').classList.add('hidden');
     }
 
     // Deposit functions
@@ -1307,7 +1420,15 @@
       const hasDecision = state.decision && state.decision.action !== 'HOLD';
       const decisionConfirmed = state.decisionConfirmed;
 
-      document.getElementById('analyzeBtn').disabled = !hasBalance || state.isRunning;
+      // Check Yellow session balance for research
+      let hasYellowBalance = true;
+      if (state.yellowWallets && state.yellowConnected) {
+        // Assume 0.1 cost per query (default)
+        const minRequired = 0.1;
+        hasYellowBalance = state.yellowWallets.sessionRemaining >= minRequired;
+      }
+
+      document.getElementById('analyzeBtn').disabled = !hasBalance || !hasYellowBalance || state.isRunning;
       document.getElementById('quoteBtn').disabled = !hasDecision || !decisionConfirmed || state.isRunning;
       document.getElementById('executeBtn').disabled = !state.quote || state.isRunning;
 
