@@ -239,10 +239,12 @@ async function initializeYellow(): Promise<boolean> {
     yellowContext.participants = participants;
     const agentSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
     const merchantSigner = createECDSAMessageSigner(env.merchantPrivateKey as `0x${string}`);
+    // Session amount: sandbox uses 11.0 test tokens, production uses 0.1 real USDC
+    const sessionAmount = env.mode === 'development' ? '11.0' : '0.1';
     const allocations = participants.map((participant, i) => ({
       participant,
       asset: env.assetSymbol,
-      amount: i === 0 ? '11.0' : '0.0',
+      amount: i === 0 ? sessionAmount : '0.0',
     }));
     yellowContext.sessionInitialAmount = Number(allocations[0]?.amount ?? 0);
 
@@ -346,6 +348,7 @@ async function updateYellowWalletState() {
     sessionSpent: yellowContext.sessionSpent,
     sessionRemaining,
     assetSymbol: yellowContext.assetSymbol || 'ytest.usd',
+    pricePerCall: getToolPriceUsd('market_rumors'),
   };
   
   // Debug log wallet balance update
@@ -645,6 +648,7 @@ interface DemoState {
     sessionSpent: number;
     sessionRemaining: number;
     assetSymbol: string;
+    pricePerCall: number;
   } | null;
 }
 
