@@ -1012,6 +1012,21 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return;
     }
 
+    // Check if Yellow session has enough balance for research
+    const pricePerCall = getToolPriceUsd('market_rumors');
+    if (yellowContext.connected && state.yellowWallets) {
+      const sessionRemaining = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
+      if (sessionRemaining < pricePerCall) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          error: 'Research budget depleted',
+          message: `Session balance too low. Need ${pricePerCall} ${state.yellowWallets.assetSymbol}, have ${sessionRemaining.toFixed(2)} ${state.yellowWallets.assetSymbol}`,
+          budgetDepleted: true
+        }));
+        return;
+      }
+    }
+
     state.isRunning = true;
     resetState();
     state.usdcBalance = parseFloat(body.match(/"usdcBalance":\s*(\d+)/)?.[1] || String(state.usdcBalance)) || state.usdcBalance;
