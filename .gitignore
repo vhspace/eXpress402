@@ -3,6 +3,7 @@ node_modules/
 .devcontainer/hackmoney-tools/node_modules/.package-lock.json
 .env
 build/
+.local/
 
 # Attic directory (old development files)
 attic/

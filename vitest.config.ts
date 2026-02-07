@@ -6,6 +6,8 @@ export default defineConfig({
     environment: 'node',
     timeout: 60000, // 60 seconds for e2e tests
     setupFiles: ['./tests/setup.ts'],
+    include: ['tests/**/*.test.ts'],
+    exclude: ['**/node_modules/**', '**/build/**', '**/attic/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
