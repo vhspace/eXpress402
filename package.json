@@ -8,7 +8,7 @@
     "web:dev": "next dev",
     "web:build": "next build",
     "web:start": "next start",
-    "build": "tsc",
+    "build": "tsc && next build",
     "start": "node build/index.js",
     "demo": "tsx scripts/ensure-redis.ts && tsx src/agentkit-demo.ts",
     "demo:client": "tsx src/client-demo.ts",
