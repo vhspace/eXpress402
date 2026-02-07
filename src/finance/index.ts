@@ -1,6 +1,6 @@
 import { fetchLatestStooqPrice } from './stooq.js';
 import { fetchRedditRumors } from './reddit.js';
-import { fetchTavilyRumors, fetchTavilyTwitter } from './tavily.js';
+import { fetchTavilyRumors } from './tavily.js';
 
 export async function getStockPrice(symbol: string) {
   const row = await fetchLatestStooqPrice(symbol);
@@ -17,21 +17,18 @@ export async function getStockPrice(symbol: string) {
 }
 
 export async function getMarketRumors(symbol: string) {
-  const query = `${symbol} stock rumor`;
-  const [redditResult, tavilyResult, twitterResult] = await Promise.allSettled([
+  const query = `${symbol} cryptocurrency price news analysis`;
+  const [redditResult, tavilyResult] = await Promise.allSettled([
     fetchRedditRumors(symbol),
     fetchTavilyRumors(query),
-    fetchTavilyTwitter(symbol),
   ]);
 
   const reddit = redditResult.status === 'fulfilled' ? redditResult.value : [];
   const tavily = tavilyResult.status === 'fulfilled' ? tavilyResult.value : [];
-  const twitter = twitterResult.status === 'fulfilled' ? twitterResult.value : [];
 
   return {
     symbol,
     reddit,
     tavily,
-    twitter,
   };
 }

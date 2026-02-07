@@ -115,7 +115,7 @@ function generateMockRumors(symbol: string): any {
     });
   }
   
-  return { symbol, reddit, tavily, twitter: [] };
+  return { symbol, reddit, tavily };
 }
 
 const MOCK_RUMORS: Record<string, any> = {
@@ -401,9 +401,8 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
     // Log detailed response data with freshness indicators
     const redditCount = data.reddit?.length || 0;
     const tavilyCount = data.tavily?.length || 0;
-    const twitterCount = data.twitter?.length || 0;
     
-    debugLog('HTTP', `✓ LIVE DATA from Yellow MCP: ${redditCount} Reddit, ${tavilyCount} Tavily, ${twitterCount} Twitter`);
+    debugLog('HTTP', `✓ LIVE DATA from Yellow MCP: ${redditCount} Reddit, ${tavilyCount} Financial News`);
     
     // Show sample Reddit posts with age
     if (data.reddit && data.reddit.length > 0) {
@@ -415,24 +414,14 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
       debugLog('HTTP', `Reddit sample (${hoursAgo}h ago): "${sample.title?.substring(0, 50)}..."`);
     }
     
-    // Show sample Tavily articles with age
+    // Show sample Tavily financial articles with age
     if (data.tavily && data.tavily.length > 0) {
       const sample = data.tavily[0];
       const publishedDate = sample.published_date ? new Date(sample.published_date) : null;
       const hoursAgo = publishedDate 
         ? ((Date.now() - publishedDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
         : '?';
-      debugLog('HTTP', `Tavily sample (${hoursAgo}h ago): "${sample.title?.substring(0, 50)}..."`);
-    }
-    
-    // Show sample Twitter posts with age
-    if (data.twitter && data.twitter.length > 0) {
-      const sample = data.twitter[0];
-      const publishedDate = sample.published_date ? new Date(sample.published_date) : null;
-      const hoursAgo = publishedDate 
-        ? ((Date.now() - publishedDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
-        : '?';
-      debugLog('HTTP', `Twitter sample (${hoursAgo}h ago): "${sample.title?.substring(0, 50)}..."`);
+      debugLog('HTTP', `Financial News sample (${hoursAgo}h ago): "${sample.title?.substring(0, 50)}..."`);
     }
     
     debugLog('SESSION', `✓ Yellow Network payment processed`);
@@ -443,9 +432,9 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
     // Update wallet state after payment
     updateYellowWalletState();
 
-    console.log(chalk.green(`✓ LIVE data received: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} news articles, ${data.twitter?.length || 0} Twitter posts`));
+    console.log(chalk.green(`✓ LIVE data received: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} financial news articles`));
     log(
-      `✓ Live data: ${data.reddit?.length || 0} Reddit, ${data.tavily?.length || 0} news, ${data.twitter?.length || 0} Twitter`,
+      `✓ Live data: ${data.reddit?.length || 0} Reddit, ${data.tavily?.length || 0} financial news`,
     );
     return { data, isLive: true };
   } catch (error) {
@@ -864,19 +853,8 @@ function convertToSentimentItems(rumors: any): RawSentimentItem[] {
       title: article.title || '',
       content: article.content || '',
       url: article.url || '#',
-      timestamp: new Date(),
+      timestamp: article.published_date ? new Date(article.published_date) : new Date(),
       engagement: Math.floor((article.score || 0.5) * 100),
-    });
-  }
-
-  for (const tweet of rumors.twitter ?? []) {
-    items.push({
-      source: 'twitter',
-      title: tweet.title || '',
-      content: tweet.content || '',
-      url: tweet.url || '#',
-      timestamp: tweet.published_date ? new Date(tweet.published_date) : new Date(),
-      engagement: Math.floor((tweet.score || 0.5) * 100),
     });
   }
 
