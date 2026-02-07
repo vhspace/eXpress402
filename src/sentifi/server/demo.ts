@@ -306,17 +306,35 @@ function getToolPriceUsd(toolName: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function updateYellowWalletState() {
-  if (!yellowContext.connected || !yellowContext.agentAddress || !yellowContext.merchantAddress) {
+async function updateYellowWalletState() {
+  if (!yellowContext.connected || !yellowContext.agentAddress || !yellowContext.merchantAddress || !yellowContext.yellow) {
     state.yellowWallets = null;
     return;
   }
 
   const sessionRemaining = Math.max(0, yellowContext.sessionInitialAmount - yellowContext.sessionSpent);
   
+  // Query off-chain wallet balances
+  let agentBalance = 0;
+  let merchantBalance = 0;
+  
+  try {
+    const agentBalances = await yellowContext.yellow.getLedgerBalances(yellowContext.agentAddress);
+    const agentAsset = agentBalances.find((b: any) => b.asset === yellowContext.assetSymbol);
+    agentBalance = agentAsset ? parseFloat(agentAsset.amount) : 0;
+    
+    const merchantBalances = await yellowContext.yellow.getLedgerBalances(yellowContext.merchantAddress);
+    const merchantAsset = merchantBalances.find((b: any) => b.asset === yellowContext.assetSymbol);
+    merchantBalance = merchantAsset ? parseFloat(merchantAsset.amount) : 0;
+  } catch (error) {
+    console.error('Failed to fetch wallet balances:', error);
+  }
+  
   state.yellowWallets = {
     agentAddress: yellowContext.agentAddress,
     merchantAddress: yellowContext.merchantAddress,
+    agentBalance,
+    merchantBalance,
     sessionInitial: yellowContext.sessionInitialAmount,
     sessionSpent: yellowContext.sessionSpent,
     sessionRemaining,
@@ -324,7 +342,9 @@ function updateYellowWalletState() {
   };
   
   // Debug log wallet balance update
-  debugLog('WALLET', `Balance updated: ${sessionRemaining.toFixed(2)} ${yellowContext.assetSymbol} remaining (spent: ${yellowContext.sessionSpent.toFixed(2)})`);
+  debugLog('WALLET', `Session: ${sessionRemaining.toFixed(2)} ${yellowContext.assetSymbol} remaining (spent: ${yellowContext.sessionSpent.toFixed(2)})`);
+  debugLog('WALLET', `AI Agent balance: ${agentBalance.toFixed(2)} ${yellowContext.assetSymbol}`);
+  debugLog('WALLET', `MCP Merchant balance: ${merchantBalance.toFixed(2)} ${yellowContext.assetSymbol}`);
 }
 
 async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: boolean }> {
@@ -592,6 +612,8 @@ interface DemoState {
   yellowWallets: {
     agentAddress: string;
     merchantAddress: string;
+    agentBalance: number;
+    merchantBalance: number;
     sessionInitial: number;
     sessionSpent: number;
     sessionRemaining: number;
