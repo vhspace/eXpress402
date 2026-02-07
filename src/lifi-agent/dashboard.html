@@ -1497,7 +1497,7 @@
       const btn = document.getElementById('logoutBtn');
       btn.disabled = true;
       
-      showAuthLoading('LOGGING OUT', 'Closing Yellow Network session and settling funds to merchant...');
+      showAuthLoading('LOGGING OUT', 'Closing Yellow Network session and settling funds to Market Research MCP...');
       
       try {
         await fetch('/api/logout', { method: 'POST' });
