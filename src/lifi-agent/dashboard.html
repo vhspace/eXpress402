@@ -386,10 +386,17 @@
 
     .amount-input {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 4px;
       justify-content: center;
       margin-bottom: 12px;
+    }
+
+    .amount-input-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .amount-input label {
@@ -1169,9 +1176,12 @@
               <button class="decision-opt" data-action="SWAP_BEARISH" onclick="selectDecision('SWAP_BEARISH')">↘ SELL</button>
             </div>
             <div class="amount-input" id="amountInput">
-              <label>Amount:</label>
-              <input type="number" id="tradeAmount" min="1" max="1000" step="10" value="50">
-              <span>USDC</span>
+              <div class="amount-input-row">
+                <label>Amount:</label>
+                <input type="number" id="tradeAmount" min="1" max="1000" step="10" value="50" required>
+                <span>USDC</span>
+              </div>
+              <small style="color: var(--text-muted); font-size: 0.65rem;">(min: 1 USDC)</small>
             </div>
             <button class="validate-btn" onclick="validateDecision()">✓ VALIDATE DECISION</button>
           </div>
@@ -1535,7 +1545,16 @@
     async function validateDecision() {
       if (!selectedAction) return;
 
-      const amount = document.getElementById('tradeAmount').value;
+      const amount = parseFloat(document.getElementById('tradeAmount').value);
+
+      // Validate amount for SWAP actions
+      if ((selectedAction === 'SWAP_BULLISH' || selectedAction === 'SWAP_BEARISH') && amount <= 0) {
+        showErrorModal(
+          'Invalid Trade Amount',
+          'Trade amount must be greater than 0 USDC. Please enter a valid amount to execute the trade.'
+        );
+        return;
+      }
 
       await fetch('/api/confirm-decision', {
         method: 'POST',
