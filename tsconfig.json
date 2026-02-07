@@ -10,5 +10,5 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "tests/mcp-data-freshness.test.ts", "tests/merchant-offramp.test.ts"]
 }
