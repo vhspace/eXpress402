@@ -60,42 +60,68 @@ const YELLOW_APPLICATION = 'eXpress402-sentifi';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Fallback mock data
+// Fallback mock data generator (randomized for variety)
+function generateMockRumors(symbol: string): any {
+  const bullishTitles = [
+    `${symbol} looking bullish! Breaking out 🚀`,
+    `${symbol} fundamentals stronger than ever`,
+    `Major accumulation detected for ${symbol}`,
+    `${symbol} to new ATH? Analysts say yes`,
+    `Institutional interest in ${symbol} surging`,
+    `${symbol} technical breakout confirmed`,
+  ];
+  
+  const bearishTitles = [
+    `${symbol} facing resistance at key level`,
+    `Concerns about ${symbol} short-term outlook`,
+    `${symbol} showing signs of weakness`,
+    `Analysts cautious on ${symbol}`,
+    `${symbol} technical indicators turning bearish`,
+  ];
+  
+  const neutralTitles = [
+    `${symbol} consolidating, awaiting direction`,
+    `${symbol} market analysis for this week`,
+    `What's next for ${symbol}? Community discussion`,
+    `${symbol} price prediction discussion`,
+    `${symbol} technical analysis update`,
+  ];
+  
+  // Randomize sentiment mix
+  const rand = Math.random();
+  const allTitles = rand > 0.6 ? bullishTitles : rand > 0.3 ? neutralTitles : bearishTitles;
+  
+  // Generate 3-5 reddit posts with random scores and timestamps
+  const numPosts = 3 + Math.floor(Math.random() * 3);
+  const reddit = [];
+  for (let i = 0; i < numPosts; i++) {
+    const titleIndex = Math.floor(Math.random() * allTitles.length);
+    reddit.push({
+      title: allTitles[titleIndex],
+      url: '#',
+      score: 50 + Math.floor(Math.random() * 400),
+      createdUtc: Date.now() / 1000 - Math.floor(Math.random() * 10800), // Random within last 3 hours
+    });
+  }
+  
+  // Generate 2-3 tavily articles
+  const numArticles = 2 + Math.floor(Math.random() * 2);
+  const tavily = [];
+  for (let i = 0; i < numArticles; i++) {
+    tavily.push({
+      title: `${symbol} Market Analysis ${new Date().toISOString().split('T')[0]}`,
+      content: `Analysis of ${symbol} market conditions...`,
+      score: 0.7 + Math.random() * 0.25,
+    });
+  }
+  
+  return { symbol, reddit, tavily };
+}
+
 const MOCK_RUMORS: Record<string, any> = {
-  ETH: {
-    symbol: 'ETH',
-    reddit: [
-      { title: 'ETH looking bullish! Breaking out 🚀', url: '#', score: 245, createdUtc: Date.now() / 1000 - 3600 },
-      { title: 'Ethereum upgrade coming - expect volatility', url: '#', score: 89, createdUtc: Date.now() / 1000 - 7200 },
-      { title: 'Buy the dip? ETH fundamentals strong', url: '#', score: 156, createdUtc: Date.now() / 1000 - 1800 },
-    ],
-    tavily: [
-      { title: 'Ethereum Price Surges on Institutional Interest', url: '#', content: 'Major institutions accumulating ETH...', score: 0.92 },
-      { title: 'Analyst Upgrades ETH Price Target', url: '#', content: 'Strong on-chain metrics cited...', score: 0.85 },
-    ],
-  },
-  BTC: {
-    symbol: 'BTC',
-    reddit: [
-      { title: 'Bitcoin to $100k? Analysts say yes 🚀', url: '#', score: 512, createdUtc: Date.now() / 1000 - 1800 },
-      { title: 'BTC halving impact analysis', url: '#', score: 234, createdUtc: Date.now() / 1000 - 3600 },
-      { title: 'Selling pressure decreasing on BTC', url: '#', score: 178, createdUtc: Date.now() / 1000 - 5400 },
-    ],
-    tavily: [
-      { title: 'Bitcoin ETF Inflows Hit Record High', url: '#', content: 'Institutional demand surging...', score: 0.95 },
-      { title: 'BTC Mining Difficulty Reaches ATH', url: '#', content: 'Network security stronger than ever...', score: 0.88 },
-    ],
-  },
-  SOL: {
-    symbol: 'SOL',
-    reddit: [
-      { title: 'Solana TPS crushing it lately', url: '#', score: 189, createdUtc: Date.now() / 1000 - 2400 },
-      { title: 'SOL ecosystem growing fast 🔥', url: '#', score: 145, createdUtc: Date.now() / 1000 - 4800 },
-    ],
-    tavily: [
-      { title: 'Solana DeFi TVL Doubles in Q4', url: '#', content: 'Ecosystem expansion accelerating...', score: 0.89 },
-    ],
-  },
+  ETH: generateMockRumors('ETH'),
+  BTC: generateMockRumors('BTC'),
+  SOL: generateMockRumors('SOL'),
 };
 
 // ============================================================================
@@ -135,6 +161,10 @@ async function initializeYellow(): Promise<boolean> {
     const env = getYellowConfig();
 
     if (!env.agentPrivateKey || !env.merchantAddress) {
+      console.log(chalk.yellow('⚠️  Yellow credentials not configured'));
+      console.log(chalk.yellow(`   Agent key: ${env.agentPrivateKey ? 'Set' : 'Missing'}`));
+      console.log(chalk.yellow(`   Merchant address: ${env.merchantAddress ? 'Set' : 'Missing'}`));
+      console.log(chalk.yellow('   → Will use mock market data'));
       log('⚠️ Yellow credentials not configured - using fallback data');
       return false;
     }
@@ -143,9 +173,12 @@ async function initializeYellow(): Promise<boolean> {
     yellowContext.merchantAddress = env.merchantAddress as `0x${string}`;
     yellowContext.assetSymbol = env.assetSymbol;
     yellowContext.sessionSpent = 0;
+    console.log(chalk.cyan(`🔑 Agent wallet: ${yellowContext.agentAddress}`));
+    console.log(chalk.cyan(`💼 Merchant wallet: ${yellowContext.merchantAddress}`));
     log(`🔑 Agent address: ${yellowContext.agentAddress}`);
 
     // Connect to Yellow Network and authenticate
+    console.log(chalk.dim('   Connecting to Yellow Network...'));
     yellowContext.yellow = new YellowRpcClient({
       url: env.clearnodeUrl,
       privateKey: env.agentPrivateKey,
@@ -158,10 +191,12 @@ async function initializeYellow(): Promise<boolean> {
       scope: 'transfer',
       application: YELLOW_APPLICATION,
     });
+    console.log(chalk.green('✓ Connected to Yellow Network'));
     log('✓ Connected to Yellow Network');
 
     // Spawn MCP server via npm run dev
     // Use -c (not -lc) to avoid login shell loading old Node via bash_profile
+    console.log(chalk.dim('   Starting MCP server...'));
     const transport = new StdioClientTransport({
       command: 'bash',
       args: ['-c', 'npm run dev'],
@@ -174,9 +209,11 @@ async function initializeYellow(): Promise<boolean> {
 
     yellowContext.client = new Client({ name: 'sentifi-agent', version: '0.1.0' });
     await yellowContext.client.connect(transport);
+    console.log(chalk.green('✓ MCP Server connected'));
     log('✓ Connected to MCP Server');
 
     // Create Yellow app session for payment tracking
+    console.log(chalk.dim('   Creating Yellow payment session...'));
     const participants: `0x${string}`[] = [yellowContext.agentAddress, yellowContext.merchantAddress];
     yellowContext.participants = participants;
     const signer = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
@@ -208,10 +245,15 @@ async function initializeYellow(): Promise<boolean> {
       (response.appSession as { appSessionId?: string } | undefined)?.appSessionId ?? null;
 
     if (!yellowContext.appSessionId) {
+      console.log(chalk.red(`❌ Failed to create Yellow session`));
+      console.log(chalk.red(`   Response: ${JSON.stringify(response)}`));
       log(`⚠️ Failed to create Yellow session: ${JSON.stringify(response)}`);
       return false;
     }
 
+    console.log(chalk.green(`✓ Yellow session created: ${yellowContext.appSessionId.slice(0, 20)}...`));
+    console.log(chalk.green(`   Initial balance: ${yellowContext.sessionInitialAmount} ${yellowContext.assetSymbol}`));
+    console.log(chalk.green('✓ Ready to use LIVE market data via Yellow MCP\n'));
     log(`✓ Yellow session: ${yellowContext.appSessionId.slice(0, 20)}...`);
     yellowContext.connected = true;
     
@@ -220,6 +262,8 @@ async function initializeYellow(): Promise<boolean> {
     
     return true;
   } catch (error) {
+    console.log(chalk.red(`❌ Yellow initialization failed: ${error instanceof Error ? error.message : String(error)}`));
+    console.log(chalk.yellow('   → Will use mock market data\n'));
     log(`⚠️ Yellow init failed: ${error instanceof Error ? error.message : String(error)}`);
     await stopSpawnedMcpServer(yellowContext.transport);
     yellowContext.transport = null;
@@ -253,48 +297,73 @@ function updateYellowWalletState() {
 }
 
 async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: boolean }> {
-  // Call market_rumors via MCP with Yellow payment
-  if (yellowContext.connected && yellowContext.client && yellowContext.appSessionId && yellowContext.agentAddress) {
-    try {
-      log(`📡 Fetching market_rumors for ${symbol} via Yellow MCP...`);
-
-      const result = await yellowContext.client.callTool({
-        name: 'market_rumors',
-        arguments: { symbol },
-        _meta: {
-          'x402/yellow': {
-            appSessionId: yellowContext.appSessionId,
-            payer: yellowContext.agentAddress,
-          },
-        },
-      } as any);
-
-      const { text, isError } = getToolText(result);
-      if (!text) {
-        throw new Error('Empty response from market_rumors');
-      }
-      if (isError) {
-        throw new Error(text);
-      }
-
-      const data = parseJsonFromToolText<any>('market_rumors', text);
-      yellowContext.sessionSpent += getToolPriceUsd('market_rumors');
-      
-      // Update wallet state after payment
-      updateYellowWalletState();
-
-      log(
-        `✓ Live data: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} news articles`,
-      );
-      return { data, isLive: true };
-    } catch (error) {
-      log(`⚠️ MCP call failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  // Check Yellow Network connection status
+  if (!yellowContext.connected) {
+    console.log(chalk.yellow('⚠️  Yellow Network not connected'));
+    log('📋 Using mock market data (Yellow Network not connected)');
+    return { data: generateMockRumors(symbol), isLive: false };
+  }
+  
+  if (!yellowContext.client) {
+    console.log(chalk.yellow('⚠️  MCP client not initialized'));
+    log('📋 Using mock market data (MCP client not available)');
+    return { data: generateMockRumors(symbol), isLive: false };
+  }
+  
+  if (!yellowContext.appSessionId) {
+    console.log(chalk.yellow('⚠️  No Yellow session ID'));
+    log('📋 Using mock market data (No active Yellow session)');
+    return { data: generateMockRumors(symbol), isLive: false };
+  }
+  
+  if (!yellowContext.agentAddress) {
+    console.log(chalk.yellow('⚠️  No agent wallet address'));
+    log('📋 Using mock market data (No wallet configured)');
+    return { data: generateMockRumors(symbol), isLive: false };
   }
 
-  // Fallback to mock data
-  log(`📋 Using fallback data for ${symbol}`);
-  return { data: MOCK_RUMORS[symbol] || MOCK_RUMORS.ETH, isLive: false };
+  // All conditions met, try to call MCP with Yellow payment
+  try {
+    console.log(chalk.cyan(`📡 Fetching LIVE market_rumors for ${symbol} via Yellow MCP...`));
+    log(`📡 Fetching market_rumors for ${symbol} via Yellow MCP...`);
+
+    const result = await yellowContext.client.callTool({
+      name: 'market_rumors',
+      arguments: { symbol },
+      _meta: {
+        'x402/yellow': {
+          appSessionId: yellowContext.appSessionId,
+          payer: yellowContext.agentAddress,
+        },
+      },
+    } as any);
+
+    const { text, isError } = getToolText(result);
+    if (!text) {
+      throw new Error('Empty response from market_rumors');
+    }
+    if (isError) {
+      throw new Error(text);
+    }
+
+    const data = parseJsonFromToolText<any>('market_rumors', text);
+    yellowContext.sessionSpent += getToolPriceUsd('market_rumors');
+    
+    // Update wallet state after payment
+    updateYellowWalletState();
+
+    console.log(chalk.green(`✓ LIVE data received: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} news articles`));
+    log(
+      `✓ Live data: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} news articles`,
+    );
+    return { data, isLive: true };
+  } catch (error) {
+    console.log(chalk.red(`❌ MCP call failed: ${error instanceof Error ? error.message : String(error)}`));
+    log(`⚠️ MCP call failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.log(chalk.yellow('📋 Falling back to mock market data'));
+    log('📋 Using mock market data (API call failed)');
+    return { data: generateMockRumors(symbol), isLive: false };
+  }
 }
 
 async function closeYellowSession(): Promise<void> {
