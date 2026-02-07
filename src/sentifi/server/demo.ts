@@ -179,6 +179,7 @@ async function initializeYellow(): Promise<boolean> {
 
     // Connect to Yellow Network and authenticate
     console.log(chalk.dim('   Connecting to Yellow Network...'));
+    debugLog('SESSION', `Connecting to Yellow Network: ${env.clearnodeUrl}`);
     yellowContext.yellow = new YellowRpcClient({
       url: env.clearnodeUrl,
       privateKey: env.agentPrivateKey,
@@ -186,11 +187,14 @@ async function initializeYellow(): Promise<boolean> {
       debug: env.debug,
     });
     await yellowContext.yellow.connect();
+    debugLog('SESSION', `✓ WebSocket connection established to Yellow clearnode`);
+    
     await yellowContext.yellow.authenticate({
       allowances: [{ asset: env.assetSymbol, amount: '1000' }],
       scope: 'transfer',
       application: YELLOW_APPLICATION,
     });
+    debugLog('SESSION', `✓ Authenticated with Yellow Network (app: ${YELLOW_APPLICATION})`);
     console.log(chalk.green('✓ Connected to Yellow Network'));
     log('✓ Connected to Yellow Network');
 
@@ -258,8 +262,10 @@ async function initializeYellow(): Promise<boolean> {
     yellowContext.connected = true;
     
     // Debug log session initialization
-    debugLog('SESSION', `Session created: ${yellowContext.appSessionId.slice(0, 20)}...`);
+    debugLog('SESSION', `✓ Yellow Network session created via RPC`);
+    debugLog('SESSION', `Session ID: ${yellowContext.appSessionId}`);
     debugLog('SESSION', `Initial balance: ${yellowContext.sessionInitialAmount.toFixed(2)} ${yellowContext.assetSymbol}`);
+    debugLog('SESSION', `Protocol: NitroRPC v0.4, Quorum: 1`);
     debugLog('WALLET', `Agent: ${yellowContext.agentAddress}`);
     debugLog('WALLET', `Merchant: ${yellowContext.merchantAddress}`);
     
@@ -310,24 +316,28 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
   if (!yellowContext.connected) {
     console.log(chalk.yellow('⚠️  Yellow Network not connected'));
     log('📋 Using mock market data (Yellow Network not connected)');
+    debugLog('HTTP', `⚠️ MOCK DATA - Yellow Network not connected`);
     return { data: generateMockRumors(symbol), isLive: false };
   }
   
   if (!yellowContext.client) {
     console.log(chalk.yellow('⚠️  MCP client not initialized'));
     log('📋 Using mock market data (MCP client not available)');
+    debugLog('HTTP', `⚠️ MOCK DATA - MCP client not available`);
     return { data: generateMockRumors(symbol), isLive: false };
   }
   
   if (!yellowContext.appSessionId) {
     console.log(chalk.yellow('⚠️  No Yellow session ID'));
     log('📋 Using mock market data (No active Yellow session)');
+    debugLog('SESSION', `⚠️ MOCK DATA - No active Yellow Network session`);
     return { data: generateMockRumors(symbol), isLive: false };
   }
   
   if (!yellowContext.agentAddress) {
     console.log(chalk.yellow('⚠️  No agent wallet address'));
     log('📋 Using mock market data (No wallet configured)');
+    debugLog('WALLET', `⚠️ MOCK DATA - No wallet configured`);
     return { data: generateMockRumors(symbol), isLive: false };
   }
 
@@ -340,7 +350,10 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
     const balanceBefore = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
     
     debugLog('HTTP', `Calling MCP tool: market_rumors(symbol=${symbol})`);
+    debugLog('SESSION', `Using Yellow session: ${yellowContext.appSessionId.slice(0, 20)}...`);
+    debugLog('SESSION', `Payer wallet: ${yellowContext.agentAddress}`);
     debugLog('SESSION', `Pre-call balance: ${balanceBefore.toFixed(2)} ${yellowContext.assetSymbol}`);
+    debugLog('HTTP', `Request via Yellow Network payment channel`);
 
     const result = await yellowContext.client.callTool({
       name: 'market_rumors',
@@ -352,6 +365,8 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
         },
       },
     } as any);
+    
+    debugLog('HTTP', `✓ Response received from Yellow MCP server`);
 
     const { text, isError } = getToolText(result);
     if (!text) {
@@ -363,13 +378,15 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
 
     const data = parseJsonFromToolText<any>('market_rumors', text);
     
-    // Deduct payment
+    // Deduct payment via Yellow Network session
     yellowContext.sessionSpent += toolPrice;
     const balanceAfter = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
     
     debugLog('HTTP', `MCP response: ${data.reddit?.length || 0} Reddit, ${data.tavily?.length || 0} Tavily`);
+    debugLog('SESSION', `✓ Yellow Network payment processed`);
     debugLog('SESSION', `Payment deducted: ${toolPrice.toFixed(2)} ${yellowContext.assetSymbol}`);
     debugLog('SESSION', `Post-call balance: ${balanceAfter.toFixed(2)} ${yellowContext.assetSymbol}`);
+    debugLog('SESSION', `Transaction recorded in off-chain session: ${yellowContext.appSessionId.slice(0, 20)}...`);
     
     // Update wallet state after payment
     updateYellowWalletState();
@@ -395,6 +412,9 @@ async function closeYellowSession(): Promise<void> {
       const env = getYellowConfig();
 
       const asset = yellowContext.assetSymbol ?? env.assetSymbol;
+      
+      debugLog('SESSION', `Closing Yellow Network session: ${yellowContext.appSessionId.slice(0, 20)}...`);
+      
       let remaining: number;
       try {
         remaining = await getSessionAssetBalance({
@@ -402,6 +422,7 @@ async function closeYellowSession(): Promise<void> {
           sessionId: yellowContext.appSessionId,
           assetSymbol: asset,
         });
+        debugLog('SESSION', `✓ Queried final balance from Yellow Network: ${remaining.toFixed(2)} ${asset}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         log(`⚠️ Failed to query session balance, falling back: ${message}`);
@@ -426,14 +447,18 @@ async function closeYellowSession(): Promise<void> {
         initialAmount: yellowContext.sessionInitialAmount,
         remainingAmount: remaining,
       });
+      
+      debugLog('SESSION', `Final settlement: Agent refund ${remaining.toFixed(2)} ${asset}, Merchant payment ${yellowContext.sessionSpent.toFixed(2)} ${asset}`);
 
       await yellowContext.yellow.closeAppSession({
         appSessionId: yellowContext.appSessionId,
         allocations,
       });
+      debugLog('SESSION', `✓ Yellow Network session closed and settled`);
       log('✓ Yellow session closed');
     } catch (error) {
       log(`⚠️ Failed to close session: ${error instanceof Error ? error.message : String(error)}`);
+      debugLog('SESSION', `⚠️ Session close failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
