@@ -1260,6 +1260,10 @@
     let state = null;
     let selectedSymbol = 'ETH';
     let prevLogCount = 0;
+    let userScrollingLogs = false;
+    let userScrollingDebug = false;
+    let scrollTimeout = null;
+    let debugScrollTimeout = null;
 
     // Symbol selection
     document.querySelectorAll('.symbol-btn').forEach(btn => {
@@ -1700,6 +1704,11 @@
       }
       prevLogCount = state.logs.length;
 
+      // Don't auto-scroll if user is actively scrolling
+      if (userScrollingLogs) {
+        return;
+      }
+
       // Save current scroll position and check if at bottom
       const scrollTop = container.scrollTop;
       const scrollHeight = container.scrollHeight;
@@ -1747,6 +1756,11 @@
         return; // No changes, skip update
       }
       prevDebugLogCount = state.debugLogs.length;
+
+      // Don't auto-scroll if user is actively scrolling
+      if (userScrollingDebug) {
+        return;
+      }
 
       // Save current scroll position and check if at bottom
       const scrollTop = container.scrollTop;
@@ -1837,6 +1851,33 @@
         progressFill.classList.add('low');
       }
     }
+
+    // Add scroll listeners to detect user interaction
+    function setupScrollListeners() {
+      const logsContainer = document.getElementById('logsContainer');
+      const debugLogsContainer = document.getElementById('debugLogsContainer');
+
+      // System Logs scroll detection
+      logsContainer.addEventListener('scroll', () => {
+        userScrollingLogs = true;
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          userScrollingLogs = false;
+        }, 2000); // Resume auto-scroll after 2s of no scrolling
+      });
+
+      // Debug Logs scroll detection
+      debugLogsContainer.addEventListener('scroll', () => {
+        userScrollingDebug = true;
+        clearTimeout(debugScrollTimeout);
+        debugScrollTimeout = setTimeout(() => {
+          userScrollingDebug = false;
+        }, 2000);
+      });
+    }
+
+    // Initialize
+    setupScrollListeners();
 
     // Poll every 500ms
     setInterval(fetchState, 500);
