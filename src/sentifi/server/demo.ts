@@ -294,7 +294,8 @@ async function initializeYellow(): Promise<boolean> {
     debugLog('WALLET', `Agent: ${yellowContext.agentAddress}`);
     debugLog('WALLET', `Merchant: ${yellowContext.merchantAddress}`);
     
-    // Update state with wallet info
+    // Update state with wallet info and mark as logged in
+    state.loggedIn = true;
     updateYellowWalletState();
     
     return true;
