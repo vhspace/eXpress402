@@ -238,7 +238,7 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
     if (remaining < Number(pricePerCall)) {
       console.error(
         `[requirePayment] Insufficient session balance: ${remaining} < ${pricePerCall}`,
-
+      );
       // Attempt to close depleted session
       try {
         await attemptCloseAppSession(yellowMeta.appSessionId, payer, remaining);

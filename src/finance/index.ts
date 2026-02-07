@@ -18,7 +18,13 @@ export async function getStockPrice(symbol: string) {
 
 export async function getMarketRumors(symbol: string) {
   const query = `${symbol} stock rumor`;
-  const [reddit, tavily] = await Promise.all([fetchRedditRumors(symbol), fetchTavilyRumors(query)]);
+  const [redditResult, tavilyResult] = await Promise.allSettled([
+    fetchRedditRumors(symbol),
+    fetchTavilyRumors(query),
+  ]);
+
+  const reddit = redditResult.status === 'fulfilled' ? redditResult.value : [];
+  const tavily = tavilyResult.status === 'fulfilled' ? tavilyResult.value : [];
 
   return {
     symbol,

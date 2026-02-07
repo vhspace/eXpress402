@@ -18,10 +18,11 @@ const TEST_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae78
 const testWallet = privateKeyToAccount(TEST_PRIVATE_KEY);
 
 // Skip if not using Upstash format
-const isUpstashFormat =
-  process.env.KV_URL?.startsWith('http') ||
-  process.env.UPSTASH_REDIS_REST_URL ||
-  process.env.KV_REST_API_URL?.startsWith('http');
+const isUpstashFormat = [
+  process.env.KV_URL?.startsWith('http') ?? false,
+  Boolean(process.env.UPSTASH_REDIS_REST_URL),
+  process.env.KV_REST_API_URL?.startsWith('http') ?? false,
+].some(Boolean);
 const describeOrSkip = isUpstashFormat ? describe : describe.skip;
 
 describeOrSkip('SIWx + Yellow Session E2E', () => {

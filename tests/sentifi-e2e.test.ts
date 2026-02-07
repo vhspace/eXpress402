@@ -11,68 +11,67 @@ import {
   createSignalAggregator,
   createSentimentMomentumStrategy,
   registerStrategy,
-  getStrategy,
   createRiskManager,
   createSimulatedExecutor,
   createPredictionTracker,
 } from '../src/sentifi/index.js';
-import type { RawSentimentItem, Holding, TradeIntent } from '../src/sentifi/types.js';
+import type { RawSentimentItem, Holding } from '../src/sentifi/types.js';
 import type { RiskConfig } from '../src/sentifi/risk/types.js';
 
 // Mock market data
 const mockBullishData: RawSentimentItem[] = [
   {
-    id: '1',
     source: 'reddit',
     title: 'ETH breaking out! Bullish momentum building!',
     content: 'Strong fundamentals, institutional buying, moon soon!',
+    url: '#',
     timestamp: new Date(),
-    engagement: { upvotes: 500, comments: 100 },
+    engagement: 600,
   },
   {
-    id: '2',
     source: 'reddit',
     title: 'Massive gains incoming for Ethereum',
     content: 'Technical analysis shows bullish pattern, buy now!',
+    url: '#',
     timestamp: new Date(),
-    engagement: { upvotes: 300, comments: 50 },
+    engagement: 350,
   },
   {
-    id: '3',
     source: 'tavily',
     title: 'Ethereum ETF approval likely, analysts bullish',
     content: 'Multiple sources confirm positive outlook for ETH.',
+    url: '#',
     timestamp: new Date(),
-    engagement: { shares: 200 },
+    engagement: 200,
   },
 ];
 
 const mockBearishData: RawSentimentItem[] = [
   {
-    id: '1',
     source: 'reddit',
     title: 'ETH crashing! Bear market confirmed!',
     content: 'Sell everything, dump incoming, massive losses expected.',
+    url: '#',
     timestamp: new Date(),
-    engagement: { upvotes: 400, comments: 150 },
+    engagement: 550,
   },
   {
-    id: '2',
     source: 'news',
     title: 'Crypto markets in freefall, bearish outlook',
     content: 'Analysts warn of further declines, fear spreading.',
+    url: '#',
     timestamp: new Date(),
-    engagement: { shares: 100 },
+    engagement: 100,
   },
 ];
 
 const mockNeutralData: RawSentimentItem[] = [
   {
-    id: '1',
     source: 'reddit',
     title: 'ETH trading sideways, waiting for direction',
+    url: '#',
     timestamp: new Date(),
-    engagement: { upvotes: 50, comments: 10 },
+    engagement: 60,
   },
 ];
 
@@ -81,16 +80,20 @@ const mockPortfolio: Holding[] = [
     chainId: 42161,
     chainName: 'Arbitrum',
     token: 'USDC',
+    tokenAddress: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
     address: '0xaf88d065e77c8cc2239327c5edb3a432268e5831',
     balance: 500,
+    decimals: 6,
     valueUsd: 500,
   },
   {
     chainId: 42161,
     chainName: 'Arbitrum',
     token: 'ETH',
+    tokenAddress: '0x0000000000000000000000000000000000000000',
     address: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
     balance: 0.1,
+    decimals: 18,
     valueUsd: 250,
   },
 ];
@@ -100,9 +103,10 @@ const riskConfig: RiskConfig = {
   maxPositionPercent: 25,
   minConfidenceToTrade: 0.5,
   confidenceScaling: true,
-  maxDailyLossPercent: 10,
+  dailyLossLimitPercent: 10,
   maxDrawdownPercent: 15,
   maxTradesPerHour: 5,
+  maxOpenPositions: 3,
 };
 
 describe('Sentifi E2E Pipeline', () => {
@@ -120,7 +124,7 @@ describe('Sentifi E2E Pipeline', () => {
     tracker = createPredictionTracker();
 
     // Register strategy
-    registerStrategy(createSentimentMomentumStrategy());
+    registerStrategy('sentiment-momentum', createSentimentMomentumStrategy);
   });
 
   describe('Full Pipeline: Data → Analysis → Decision → Execution', () => {
@@ -151,7 +155,9 @@ describe('Sentifi E2E Pipeline', () => {
           maxPositionPercent: 25,
           sentimentWeight: 0.6,
           momentumWeight: 0.4,
+          targetAllocations: { ETH: 0.5, USDC: 0.5 },
         },
+        availableChains: [42161],
         defaultChainId: 42161,
       });
 
@@ -216,7 +222,7 @@ describe('Sentifi E2E Pipeline', () => {
           confidence: 0.8,
           reason: 'Test',
           signals: [],
-          urgency: 'normal',
+          urgency: 'medium',
           maxSlippage: 0.5,
         },
         currentPrice: 2500,

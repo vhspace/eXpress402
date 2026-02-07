@@ -6,7 +6,8 @@
  * Integrates Yellow MCP for real sentiment data via market_rumors tool.
  */
 
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+loadEnv({ override: true });
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -21,7 +22,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import {
   createAppSessionMessage,
-  createCloseAppSessionMessage,
   createECDSAMessageSigner,
 } from '@erc7824/nitrolite/dist/rpc/api.js';
 import { RPCProtocolVersion } from '@erc7824/nitrolite/dist/rpc/types/index.js';
@@ -46,6 +46,16 @@ import type {
   Holding,
   AgentPhase,
 } from '../types.js';
+
+import {
+  computeSessionCloseAllocations,
+  getSessionAssetBalance,
+  getToolText,
+  parseJsonFromToolText,
+  stopSpawnedMcpServer,
+} from './yellow-mcp.js';
+
+const YELLOW_APPLICATION = 'eXpress402-sentifi';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -102,6 +112,7 @@ interface YellowMcpContext {
   participants: `0x${string}`[];
   sessionInitialAmount: number;
   sessionSpent: number;
+  transport: StdioClientTransport | null;
   connected: boolean;
 }
 
@@ -115,6 +126,7 @@ const yellowContext: YellowMcpContext = {
   participants: [],
   sessionInitialAmount: 0,
   sessionSpent: 0,
+  transport: null,
   connected: false,
 };
 
@@ -144,6 +156,7 @@ async function initializeYellow(): Promise<boolean> {
     await yellowContext.yellow.authenticate({
       allowances: [{ asset: env.assetSymbol, amount: '1000' }],
       scope: 'transfer',
+      application: YELLOW_APPLICATION,
     });
     log('✓ Connected to Yellow Network');
 
@@ -157,6 +170,7 @@ async function initializeYellow(): Promise<boolean> {
       ) as Record<string, string>,
       stderr: 'pipe',
     });
+    yellowContext.transport = transport;
 
     yellowContext.client = new Client({ name: 'sentifi-agent', version: '0.1.0' });
     await yellowContext.client.connect(transport);
@@ -175,7 +189,7 @@ async function initializeYellow(): Promise<boolean> {
 
     const message = await createAppSessionMessage(signer, {
       definition: {
-        application: 'eXpress402-sentifi',
+        application: YELLOW_APPLICATION,
         protocol: RPCProtocolVersion.NitroRPC_0_4,
         participants,
         weights: participants.map(() => 1),
@@ -203,26 +217,9 @@ async function initializeYellow(): Promise<boolean> {
     return true;
   } catch (error) {
     log(`⚠️ Yellow init failed: ${error instanceof Error ? error.message : String(error)}`);
+    await stopSpawnedMcpServer(yellowContext.transport);
+    yellowContext.transport = null;
     return false;
-  }
-}
-
-function getToolText(result: unknown): { text: string; isError: boolean } {
-  const r = result as {
-    content?: Array<{ type?: string; text?: string }>;
-    isError?: boolean;
-  };
-
-  const text = r.content?.find(entry => entry?.type === 'text')?.text ?? r.content?.[0]?.text ?? '';
-  return { text, isError: r.isError === true };
-}
-
-function parseJsonFromToolText<T>(toolName: string, text: string): T {
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    const snippet = text.slice(0, 200).replace(/\s+/g, ' ').trim();
-    throw new Error(`${toolName} returned non-JSON text: ${snippet || '(empty)'}`);
   }
 }
 
@@ -279,33 +276,44 @@ async function closeYellowSession(): Promise<void> {
   if (yellowContext.yellow && yellowContext.appSessionId) {
     try {
       const env = getYellowConfig();
-      const signer = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
 
-      const agent = yellowContext.agentAddress;
-      const merchant = yellowContext.merchantAddress;
       const asset = yellowContext.assetSymbol ?? env.assetSymbol;
+      let remaining: number;
+      try {
+        remaining = await getSessionAssetBalance({
+          yellow: yellowContext.yellow,
+          sessionId: yellowContext.appSessionId,
+          assetSymbol: asset,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log(`⚠️ Failed to query session balance, falling back: ${message}`);
+        const initial = Number.isFinite(yellowContext.sessionInitialAmount)
+          ? yellowContext.sessionInitialAmount
+          : 0;
+        remaining = Math.max(0, initial - Math.max(0, yellowContext.sessionSpent));
+      }
 
-      const initial = Number.isFinite(yellowContext.sessionInitialAmount)
-        ? yellowContext.sessionInitialAmount
-        : 0;
-      const spent = Math.max(0, yellowContext.sessionSpent);
-      const merchantAmount = Math.min(initial, spent);
-      const agentAmount = Math.max(0, initial - merchantAmount);
+      // Keep local tracking aligned with what Yellow reports.
+      if (Number.isFinite(remaining)) {
+        const initial = Number.isFinite(yellowContext.sessionInitialAmount)
+          ? yellowContext.sessionInitialAmount
+          : 0;
+        yellowContext.sessionSpent = Math.max(0, initial - remaining);
+      }
 
-      const allocations =
-        agent && merchant
-          ? [
-              { participant: agent, asset, amount: agentAmount.toFixed(6) },
-              { participant: merchant, asset, amount: merchantAmount.toFixed(6) },
-            ]
-          : [];
-
-      const closeMessage = await createCloseAppSessionMessage(signer, {
-        app_session_id: yellowContext.appSessionId as `0x${string}`,
-        allocations,
+      const allocations = computeSessionCloseAllocations({
+        agentAddress: yellowContext.agentAddress,
+        merchantAddress: yellowContext.merchantAddress,
+        assetSymbol: asset,
+        initialAmount: yellowContext.sessionInitialAmount,
+        remainingAmount: remaining,
       });
 
-      await yellowContext.yellow.sendRawMessage(closeMessage);
+      await yellowContext.yellow.closeAppSession({
+        appSessionId: yellowContext.appSessionId,
+        allocations,
+      });
       log('✓ Yellow session closed');
     } catch (error) {
       log(`⚠️ Failed to close session: ${error instanceof Error ? error.message : String(error)}`);
@@ -315,8 +323,10 @@ async function closeYellowSession(): Promise<void> {
   if (yellowContext.client) {
     await yellowContext.client.close();
   }
+  await stopSpawnedMcpServer(yellowContext.transport);
   yellowContext.yellow = null;
   yellowContext.client = null;
+  yellowContext.transport = null;
   yellowContext.connected = false;
 }
 

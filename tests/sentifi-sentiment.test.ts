@@ -24,18 +24,18 @@ describe('SentimentAnalyzer', () => {
       const analyzer = createSentimentAnalyzer();
       const items: RawSentimentItem[] = [
         {
-          id: '1',
           source: 'reddit',
           title: 'ETH is bullish! Moon incoming! Buy now!',
+          url: '#',
           timestamp: new Date(),
-          engagement: { upvotes: 100, comments: 50 },
+          engagement: 150,
         },
         {
-          id: '2',
           source: 'reddit',
           title: 'Massive gains expected, very bullish signal',
+          url: '#',
           timestamp: new Date(),
-          engagement: { upvotes: 200, comments: 100 },
+          engagement: 300,
         },
       ];
 
@@ -50,18 +50,18 @@ describe('SentimentAnalyzer', () => {
       const analyzer = createSentimentAnalyzer();
       const items: RawSentimentItem[] = [
         {
-          id: '1',
           source: 'reddit',
           title: 'ETH is crashing! Sell everything! Bear market!',
+          url: '#',
           timestamp: new Date(),
-          engagement: { upvotes: 100, comments: 50 },
+          engagement: 150,
         },
         {
-          id: '2',
           source: 'news',
           title: 'Market dump, bearish outlook, expect losses',
+          url: '#',
           timestamp: new Date(),
-          engagement: { shares: 50 },
+          engagement: 50,
         },
       ];
 
@@ -75,11 +75,11 @@ describe('SentimentAnalyzer', () => {
       const analyzer = createSentimentAnalyzer({ negationEnabled: true });
       const items: RawSentimentItem[] = [
         {
-          id: '1',
           source: 'reddit',
           title: 'ETH is not bullish right now, avoid buying',
+          url: '#',
           timestamp: new Date(),
-          engagement: { upvotes: 50 },
+          engagement: 50,
         },
       ];
 
@@ -96,21 +96,21 @@ describe('SentimentAnalyzer', () => {
 
       const recentItems: RawSentimentItem[] = [
         {
-          id: '1',
           source: 'reddit',
           title: 'Bullish moon rocket gains!',
+          url: '#',
           timestamp: now,
-          engagement: { upvotes: 100 },
+          engagement: 100,
         },
       ];
 
       const oldItems: RawSentimentItem[] = [
         {
-          id: '1',
           source: 'reddit',
           title: 'Bullish moon rocket gains!',
+          url: '#',
           timestamp: oldDate,
-          engagement: { upvotes: 100 },
+          engagement: 100,
         },
       ];
 
@@ -124,18 +124,18 @@ describe('SentimentAnalyzer', () => {
       const analyzer = createSentimentAnalyzer();
       const items: RawSentimentItem[] = [
         {
-          id: '1',
           source: 'reddit',
           title: 'Bullish on ETH!',
+          url: '#',
           timestamp: new Date(),
-          engagement: { upvotes: 100 },
+          engagement: 100,
         },
         {
-          id: '2',
           source: 'tavily',
           title: 'Positive news for Ethereum',
+          url: '#',
           timestamp: new Date(),
-          engagement: { shares: 50 },
+          engagement: 50,
         },
       ];
 
@@ -150,20 +150,20 @@ describe('SentimentAnalyzer', () => {
 
       const fewItems: RawSentimentItem[] = [
         {
-          id: '1',
           source: 'reddit',
           title: 'Bullish!',
+          url: '#',
           timestamp: new Date(),
-          engagement: { upvotes: 10 },
+          engagement: 10,
         },
       ];
 
       const manyItems: RawSentimentItem[] = Array.from({ length: 10 }, (_, i) => ({
-        id: String(i),
         source: 'reddit' as const,
-        title: 'Bullish signal!',
+        title: `Bullish signal ${i}!`,
+        url: '#',
         timestamp: new Date(),
-        engagement: { upvotes: 100 },
+        engagement: 100,
       }));
 
       const fewResult = analyzer.analyze(fewItems);
@@ -179,11 +179,11 @@ describe('SentimentAnalyzer', () => {
 
       // Very bullish items
       const veryBullish: RawSentimentItem[] = Array.from({ length: 5 }, (_, i) => ({
-        id: String(i),
         source: 'reddit' as const,
-        title: 'MOON! BULLISH! GAINS! PUMP! BUY!',
+        title: `MOON! BULLISH! GAINS! PUMP! BUY! ${i}`,
+        url: '#',
         timestamp: new Date(),
-        engagement: { upvotes: 1000 },
+        engagement: 1000,
       }));
 
       const result = analyzer.analyze(veryBullish);

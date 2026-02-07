@@ -15,37 +15,42 @@ const mockPortfolio: Holding[] = [
     chainId: 42161,
     chainName: 'Arbitrum',
     token: 'USDC',
+    tokenAddress: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
     address: '0xaf88d065e77c8cc2239327c5edb3a432268e5831',
     balance: 500,
+    decimals: 6,
     valueUsd: 500,
   },
   {
     chainId: 42161,
     chainName: 'Arbitrum',
     token: 'ETH',
+    tokenAddress: '0x0000000000000000000000000000000000000000',
     address: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
     balance: 0.1,
+    decimals: 18,
     valueUsd: 250,
   },
 ];
 
 function createMockSignal(overrides: Partial<AggregatedSignal> = {}): AggregatedSignal {
   return {
+    symbol: 'ETH',
+    sentiment: {
+      score: 0,
+      confidence: 0.8,
+      label: 'neutral',
+      components: {
+        reddit: { score: 0, weight: 0.6, sampleSize: 0 },
+        news: { score: 0, weight: 0.4, sampleSize: 0 },
+      },
+      recencyFactor: 1,
+      negationAdjustment: 0,
+      timestamp: new Date(),
+    },
     overallScore: 0,
     overallConfidence: 0.8,
     recommendation: 'hold',
-    components: {
-      sentiment: {
-        score: 0,
-        weight: 0.6,
-        confidence: 0.8,
-      },
-      momentum: {
-        score: 0,
-        weight: 0.4,
-        confidence: 0.7,
-      },
-    },
     timestamp: new Date(),
     ...overrides,
   };
@@ -57,6 +62,7 @@ function createContext(signal: AggregatedSignal): StrategyContext {
     portfolio: mockPortfolio,
     totalValueUsd: 750,
     config: DEFAULT_STRATEGY_CONFIG,
+    availableChains: [42161],
     defaultChainId: 42161,
   };
 }
