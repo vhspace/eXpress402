@@ -770,6 +770,17 @@
     .log-message.info { color: var(--accent-cyan); }
     .log-message.warning { color: var(--accent-amber); }
 
+    .debug-category {
+      font-size: 0.6rem;
+      padding: 2px 6px;
+      border-radius: 2px;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+    .debug-category.session { background: rgba(255, 170, 0, 0.15); color: var(--accent-amber); }
+    .debug-category.http { background: rgba(15, 244, 234, 0.15); color: var(--accent-cyan); }
+    .debug-category.wallet { background: rgba(170, 85, 255, 0.15); color: var(--accent-purple); }
+
     /* Execution Overlay */
     .execution-overlay {
       position: fixed;
@@ -1020,6 +1031,10 @@
           <span>Yellow:</span>
           <span id="yellowStatus">--</span>
         </div>
+        <div class="badge" id="debugBadge" style="cursor: pointer;" onclick="toggleDebugLogs()">
+          <span id="debugToggleIcon">👁️</span>
+          <span id="debugToggleText">DEBUG</span>
+        </div>
       </div>
     </header>
 
@@ -1177,6 +1192,17 @@
           <div class="logs-container" id="logsContainer"></div>
         </div>
       </div>
+
+      <!-- Debug Logs -->
+      <div class="card logs-card" id="debugLogsCard" style="display: none;">
+        <div class="card-header">
+          <span class="card-title">DEBUG LOGS</span>
+          <span class="card-badge live"><span class="badge-dot"></span>SESSION • HTTP • WALLET</span>
+        </div>
+        <div class="card-body">
+          <div class="logs-container" id="debugLogsContainer"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Execution Overlay -->
@@ -1321,6 +1347,30 @@
       document.getElementById('errorModal').classList.add('hidden');
     }
 
+    // Debug logs toggle
+    async function toggleDebugLogs() {
+      await fetch('/api/toggle-debug', { method: 'POST' });
+      // State will update on next poll
+    }
+
+    function updateDebugBadge() {
+      const badge = document.getElementById('debugBadge');
+      const icon = document.getElementById('debugToggleIcon');
+      const text = document.getElementById('debugToggleText');
+      
+      if (state.debugLogsEnabled) {
+        badge.style.borderColor = 'var(--accent-green)';
+        badge.style.color = 'var(--accent-green)';
+        icon.textContent = '👁️';
+        text.textContent = 'DEBUG ON';
+      } else {
+        badge.style.borderColor = 'var(--text-muted)';
+        badge.style.color = 'var(--text-muted)';
+        icon.textContent = '🙈';
+        text.textContent = 'DEBUG OFF';
+      }
+    }
+
     // Deposit functions
     function showDepositForm() {
       document.getElementById('depositPrompt').style.display = 'none';
@@ -1415,6 +1465,9 @@
       // Yellow status
       document.getElementById('yellowStatus').textContent = state.yellowConnected ? '✓' : '--';
 
+      // Debug badge
+      updateDebugBadge();
+
       // Buttons - based on flow state
       const hasBalance = state.usdcBalance > 0;
       const hasDecision = state.decision && state.decision.action !== 'HOLD';
@@ -1438,6 +1491,7 @@
       updatePortfolio();
       updateQuote();
       updateLogs();
+      updateDebugLogs();
       updateExecution();
       updateYellowStatusBar();
     }
@@ -1650,6 +1704,43 @@
             <span class="log-message ${msgClass}">${parts ? parts[2] : log}</span>
           </div>
         `;
+      }).join('');
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    let prevDebugLogCount = 0;
+    function updateDebugLogs() {
+      const card = document.getElementById('debugLogsCard');
+      
+      // Show/hide based on feature flag
+      if (state.debugLogsEnabled) {
+        card.style.display = 'block';
+      } else {
+        card.style.display = 'none';
+        return;
+      }
+
+      if (!state.debugLogs) return;
+      const container = document.getElementById('debugLogsContainer');
+      const isNew = state.debugLogs.length > prevDebugLogCount;
+      prevDebugLogCount = state.debugLogs.length;
+
+      container.innerHTML = state.debugLogs.map((log, i) => {
+        // Parse log format: [timestamp] emoji [CATEGORY] message
+        const parts = log.match(/\[([^\]]+)\]\s+(.)\s+\[([^\]]+)\]\s+(.*)/);
+        if (parts) {
+          const [, time, emoji, category, message] = parts;
+          const categoryClass = category.toLowerCase();
+          return `
+            <div class="log-entry ${i === state.debugLogs.length - 1 && isNew ? 'new' : ''}">
+              <span class="log-time">${time}</span>
+              <span class="debug-category ${categoryClass}">${emoji} ${category}</span>
+              <span class="log-message">${message}</span>
+            </div>
+          `;
+        }
+        return `<div class="log-entry">${log}</div>`;
       }).join('');
 
       container.scrollTop = container.scrollHeight;

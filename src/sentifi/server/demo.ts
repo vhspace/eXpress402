@@ -257,6 +257,12 @@ async function initializeYellow(): Promise<boolean> {
     log(`✓ Yellow session: ${yellowContext.appSessionId.slice(0, 20)}...`);
     yellowContext.connected = true;
     
+    // Debug log session initialization
+    debugLog('SESSION', `Session created: ${yellowContext.appSessionId.slice(0, 20)}...`);
+    debugLog('SESSION', `Initial balance: ${yellowContext.sessionInitialAmount.toFixed(2)} ${yellowContext.assetSymbol}`);
+    debugLog('WALLET', `Agent: ${yellowContext.agentAddress}`);
+    debugLog('WALLET', `Merchant: ${yellowContext.merchantAddress}`);
+    
     // Update state with wallet info
     updateYellowWalletState();
     
@@ -294,6 +300,9 @@ function updateYellowWalletState() {
     sessionRemaining,
     assetSymbol: yellowContext.assetSymbol || 'ytest.usd',
   };
+  
+  // Debug log wallet balance update
+  debugLog('WALLET', `Balance updated: ${sessionRemaining.toFixed(2)} ${yellowContext.assetSymbol} remaining (spent: ${yellowContext.sessionSpent.toFixed(2)})`);
 }
 
 async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: boolean }> {
@@ -326,6 +335,12 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
   try {
     console.log(chalk.cyan(`📡 Fetching LIVE market_rumors for ${symbol} via Yellow MCP...`));
     log(`📡 Fetching market_rumors for ${symbol} via Yellow MCP...`);
+    
+    const toolPrice = getToolPriceUsd('market_rumors');
+    const balanceBefore = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
+    
+    debugLog('HTTP', `Calling MCP tool: market_rumors(symbol=${symbol})`);
+    debugLog('SESSION', `Pre-call balance: ${balanceBefore.toFixed(2)} ${yellowContext.assetSymbol}`);
 
     const result = await yellowContext.client.callTool({
       name: 'market_rumors',
@@ -347,7 +362,14 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
     }
 
     const data = parseJsonFromToolText<any>('market_rumors', text);
-    yellowContext.sessionSpent += getToolPriceUsd('market_rumors');
+    
+    // Deduct payment
+    yellowContext.sessionSpent += toolPrice;
+    const balanceAfter = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
+    
+    debugLog('HTTP', `MCP response: ${data.reddit?.length || 0} Reddit, ${data.tavily?.length || 0} Tavily`);
+    debugLog('SESSION', `Payment deducted: ${toolPrice.toFixed(2)} ${yellowContext.assetSymbol}`);
+    debugLog('SESSION', `Post-call balance: ${balanceAfter.toFixed(2)} ${yellowContext.assetSymbol}`);
     
     // Update wallet state after payment
     updateYellowWalletState();
@@ -360,6 +382,7 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
   } catch (error) {
     console.log(chalk.red(`❌ MCP call failed: ${error instanceof Error ? error.message : String(error)}`));
     log(`⚠️ MCP call failed: ${error instanceof Error ? error.message : String(error)}`);
+    debugLog('HTTP', `MCP call failed: ${error instanceof Error ? error.message : String(error)}`);
     console.log(chalk.yellow('📋 Falling back to mock market data'));
     log('📋 Using mock market data (API call failed)');
     return { data: generateMockRumors(symbol), isLive: false };
@@ -484,6 +507,8 @@ interface DemoState {
   } | null;
   execution: { status: string; txHash: string; explorerUrl?: string } | null;
   logs: string[];
+  debugLogs: string[];
+  debugLogsEnabled: boolean;
   portfolio: Holding[];
   usdcBalance: number;
   dataMode: 'live' | 'fallback';
@@ -516,6 +541,8 @@ const state: DemoState = {
   quote: null,
   execution: null,
   logs: [],
+  debugLogs: [],
+  debugLogsEnabled: true, // Feature flag - default ON
   portfolio: [],
   usdcBalance: 0,
   dataMode: 'fallback',
@@ -577,6 +604,24 @@ function log(message: string) {
   state.logs.push(`[${timestamp}] ${message}`);
   if (state.logs.length > 50) state.logs.shift();
   console.log(chalk.dim(`[${timestamp}]`), message);
+}
+
+function debugLog(category: 'SESSION' | 'HTTP' | 'WALLET', message: string) {
+  if (!state.debugLogsEnabled) return;
+  
+  const timestamp = new Date().toLocaleTimeString();
+  const prefix = {
+    SESSION: '💰',
+    HTTP: '🌐',
+    WALLET: '💼',
+  }[category];
+  
+  const formattedMessage = `[${timestamp}] ${prefix} [${category}] ${message}`;
+  state.debugLogs.push(formattedMessage);
+  if (state.debugLogs.length > 100) state.debugLogs.shift();
+  
+  // Also log to console in dim style
+  console.log(chalk.dim(`[DEBUG] ${formattedMessage}`));
 }
 
 function resetState() {
@@ -1151,6 +1196,14 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     updatePortfolio();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  if (url.pathname === '/api/toggle-debug' && req.method === 'POST') {
+    state.debugLogsEnabled = !state.debugLogsEnabled;
+    debugLog('SESSION', `Debug logs ${state.debugLogsEnabled ? 'enabled' : 'disabled'}`);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, enabled: state.debugLogsEnabled }));
     return;
   }
 
