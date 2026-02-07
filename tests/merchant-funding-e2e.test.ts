@@ -9,6 +9,7 @@ const describeIfEnabled = shouldRun ? describe : describe.skip;
 
 describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
   let yellow: YellowRpcClient;
+  let merchantYellow: YellowRpcClient; // Separate client for merchant's unified balance
   let mcpClient: Client;
   let mcpTransport: StdioClientTransport;
   let agentAddress: string;
@@ -48,16 +49,33 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
       application: 'merchant-funding-test',
     });
 
-    // Get initial balances BEFORE session
-    const agentBalances = await yellow.getLedgerBalances(agentAddress);
+    // Initialize merchant's Yellow client to query THEIR unified balance
+    merchantYellow = new YellowRpcClient({
+      url: env.clearnodeUrl,
+      privateKey: env.merchantPrivateKey, // Authenticate AS merchant
+      authDomain: 'clearnet-sandbox.yellow.com',
+      debug: false,
+    });
+    
+    await merchantYellow.connect();
+    await merchantYellow.authenticate({
+      allowances: [{ asset: env.assetSymbol, amount: '1000' }],
+      scope: 'transfer',
+      application: 'merchant-funding-test',
+    });
+
+    // Get initial UNIFIED balances BEFORE session
+    // Agent queries their own unified balance
+    const agentBalances = await yellow.getLedgerBalances(); // No accountId - gets OWN balance
     const agentAsset = agentBalances.find((b: any) => b.asset === env.assetSymbol);
     initialAgentBalance = agentAsset ? parseFloat(agentAsset.amount) : 0;
 
-    const merchantBalances = await yellow.getLedgerBalances(merchantAddress);
+    // Merchant queries their own unified balance
+    const merchantBalances = await merchantYellow.getLedgerBalances(); // Merchant's OWN balance
     const merchantAsset = merchantBalances.find((b: any) => b.asset === env.assetSymbol);
     initialMerchantBalance = merchantAsset ? parseFloat(merchantAsset.amount) : 0;
 
-    console.log('\n💰 Initial Off-Chain Balances:');
+    console.log('\n💰 Initial Unified Balances (Off-Chain):');
     console.log(`  Agent: ${initialAgentBalance.toFixed(2)} ${env.assetSymbol}`);
     console.log(`  Merchant: ${initialMerchantBalance.toFixed(2)} ${env.assetSymbol}`);
 
@@ -211,14 +229,15 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
     console.log('\n⏳ Waiting for settlement (3 seconds)...');
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Check final balances
-    console.log('\n💰 Checking final off-chain balances...');
+    // Check final UNIFIED balances
+    console.log('\n💰 Checking final unified balances...');
     
-    const finalAgentBalances = await yellow.getLedgerBalances(agentAddress);
+    // Each party queries their own unified balance
+    const finalAgentBalances = await yellow.getLedgerBalances(); // Agent's OWN balance
     const finalAgentAsset = finalAgentBalances.find((b: any) => b.asset === env.assetSymbol);
     const finalAgentBalance = finalAgentAsset ? parseFloat(finalAgentAsset.amount) : 0;
 
-    const finalMerchantBalances = await yellow.getLedgerBalances(merchantAddress);
+    const finalMerchantBalances = await merchantYellow.getLedgerBalances(); // Merchant's OWN balance
     const finalMerchantAsset = finalMerchantBalances.find((b: any) => b.asset === env.assetSymbol);
     const finalMerchantBalance = finalMerchantAsset ? parseFloat(finalMerchantAsset.amount) : 0;
 
