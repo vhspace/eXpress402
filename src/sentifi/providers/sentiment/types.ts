@@ -27,6 +27,17 @@ export interface TavilyResult {
   content: string;
   score: number;
   published_date?: string;
+  source?: string;
+}
+
+/** Twitter post from Tavily */
+export interface TwitterPost {
+  title: string;
+  url: string;
+  content: string;
+  score: number;
+  published_date?: string;
+  source: 'twitter';
 }
 
 /** Convert Reddit post to raw sentiment item */
@@ -49,7 +60,7 @@ export function redditToRaw(post: RedditPost): RawSentimentItem {
 /** Convert Tavily result to raw sentiment item */
 export function tavilyToRaw(result: TavilyResult): RawSentimentItem {
   return {
-    source: 'tavily',
+    source: result.source === 'twitter' ? 'twitter' : 'tavily',
     title: result.title,
     content: result.content,
     url: result.url,
@@ -57,6 +68,23 @@ export function tavilyToRaw(result: TavilyResult): RawSentimentItem {
     engagement: Math.round(result.score * 100), // Normalize score to engagement-like metric
     metadata: {
       relevanceScore: result.score,
+      platform: result.source || 'tavily',
+    },
+  };
+}
+
+/** Convert Twitter post to raw sentiment item */
+export function twitterToRaw(post: TwitterPost): RawSentimentItem {
+  return {
+    source: 'twitter',
+    title: post.title,
+    content: post.content,
+    url: post.url,
+    timestamp: post.published_date ? new Date(post.published_date) : new Date(),
+    engagement: Math.round(post.score * 100),
+    metadata: {
+      relevanceScore: post.score,
+      platform: 'twitter',
     },
   };
 }
@@ -66,6 +94,7 @@ export interface AggregatedSentimentData {
   symbol: string;
   reddit: RawSentimentItem[];
   tavily: RawSentimentItem[];
+  twitter: RawSentimentItem[];
   combined: RawSentimentItem[];
   fetchedAt: Date;
   sources: {
