@@ -9,11 +9,13 @@ export type RedditPost = {
 };
 
 export async function fetchRedditRumors(query: string, limit = 5): Promise<RedditPost[]> {
-  const url = new URL(`${REDDIT_BASE_URL}/r/stocks/search.json`);
+  // Search across multiple crypto-focused subreddits for better recency
+  const subreddits = 'CryptoCurrency+ethereum+ethtrader+stocks';
+  const url = new URL(`${REDDIT_BASE_URL}/r/${subreddits}/search.json`);
   url.searchParams.set('q', query);
   url.searchParams.set('restrict_sr', '1');
   url.searchParams.set('sort', 'new');
-  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('limit', String(limit * 2)); // Fetch more to filter by recency
   url.searchParams.set('raw_json', '1');
 
   const response = await fetch(url.toString(), {
@@ -33,7 +35,10 @@ export async function fetchRedditRumors(query: string, limit = 5): Promise<Reddi
   };
 
   const children = data.data?.children ?? [];
-  return children
+  const now = Date.now();
+  const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
+  
+  const posts = children
     .map(child => child.data ?? {})
     .map(post => ({
       title: typeof post.title === 'string' ? post.title : '',
@@ -42,5 +47,23 @@ export async function fetchRedditRumors(query: string, limit = 5): Promise<Reddi
       createdUtc: Number(post.created_utc ?? 0),
       subreddit: typeof post.subreddit === 'string' ? post.subreddit : '',
     }))
-    .filter(post => Boolean(post.title));
+    .filter(post => Boolean(post.title))
+    // Filter to only posts from last 24 hours
+    .filter(post => {
+      const postTime = post.createdUtc * 1000;
+      return postTime > twentyFourHoursAgo;
+    })
+    .slice(0, limit); // Return only requested limit after filtering
+
+  // Log freshness of Reddit results
+  console.error('[Reddit] Fetched results (last 24h only):');
+  posts.forEach((post, i) => {
+    const createdDate = post.createdUtc ? new Date(post.createdUtc * 1000) : null;
+    const hoursAgo = createdDate 
+      ? ((Date.now() - createdDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
+      : 'unknown';
+    console.error(`  [${i + 1}] ${hoursAgo}h ago (r/${post.subreddit}): ${post.title.substring(0, 50)}...`);
+  });
+
+  return posts;
 }

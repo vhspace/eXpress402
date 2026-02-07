@@ -22,6 +22,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import {
   createAppSessionMessage,
+  createCloseAppSessionMessage,
   createECDSAMessageSigner,
 } from '@erc7824/nitrolite/dist/rpc/api.js';
 import { RPCProtocolVersion } from '@erc7824/nitrolite/dist/rpc/types/index.js';
@@ -60,42 +61,68 @@ const YELLOW_APPLICATION = 'eXpress402-sentifi';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Fallback mock data
+// Fallback mock data generator (randomized for variety)
+function generateMockRumors(symbol: string): any {
+  const bullishTitles = [
+    `${symbol} looking bullish! Breaking out 🚀`,
+    `${symbol} fundamentals stronger than ever`,
+    `Major accumulation detected for ${symbol}`,
+    `${symbol} to new ATH? Analysts say yes`,
+    `Institutional interest in ${symbol} surging`,
+    `${symbol} technical breakout confirmed`,
+  ];
+  
+  const bearishTitles = [
+    `${symbol} facing resistance at key level`,
+    `Concerns about ${symbol} short-term outlook`,
+    `${symbol} showing signs of weakness`,
+    `Analysts cautious on ${symbol}`,
+    `${symbol} technical indicators turning bearish`,
+  ];
+  
+  const neutralTitles = [
+    `${symbol} consolidating, awaiting direction`,
+    `${symbol} market analysis for this week`,
+    `What's next for ${symbol}? Community discussion`,
+    `${symbol} price prediction discussion`,
+    `${symbol} technical analysis update`,
+  ];
+  
+  // Randomize sentiment mix
+  const rand = Math.random();
+  const allTitles = rand > 0.6 ? bullishTitles : rand > 0.3 ? neutralTitles : bearishTitles;
+  
+  // Generate 3-5 reddit posts with random scores and timestamps
+  const numPosts = 3 + Math.floor(Math.random() * 3);
+  const reddit = [];
+  for (let i = 0; i < numPosts; i++) {
+    const titleIndex = Math.floor(Math.random() * allTitles.length);
+    reddit.push({
+      title: allTitles[titleIndex],
+      url: '#',
+      score: 50 + Math.floor(Math.random() * 400),
+      createdUtc: Date.now() / 1000 - Math.floor(Math.random() * 10800), // Random within last 3 hours
+    });
+  }
+  
+  // Generate 2-3 tavily articles
+  const numArticles = 2 + Math.floor(Math.random() * 2);
+  const tavily = [];
+  for (let i = 0; i < numArticles; i++) {
+    tavily.push({
+      title: `${symbol} Market Analysis ${new Date().toISOString().split('T')[0]}`,
+      content: `Analysis of ${symbol} market conditions...`,
+      score: 0.7 + Math.random() * 0.25,
+    });
+  }
+  
+  return { symbol, reddit, tavily };
+}
+
 const MOCK_RUMORS: Record<string, any> = {
-  ETH: {
-    symbol: 'ETH',
-    reddit: [
-      { title: 'ETH looking bullish! Breaking out 🚀', url: '#', score: 245, createdUtc: Date.now() / 1000 - 3600 },
-      { title: 'Ethereum upgrade coming - expect volatility', url: '#', score: 89, createdUtc: Date.now() / 1000 - 7200 },
-      { title: 'Buy the dip? ETH fundamentals strong', url: '#', score: 156, createdUtc: Date.now() / 1000 - 1800 },
-    ],
-    tavily: [
-      { title: 'Ethereum Price Surges on Institutional Interest', url: '#', content: 'Major institutions accumulating ETH...', score: 0.92 },
-      { title: 'Analyst Upgrades ETH Price Target', url: '#', content: 'Strong on-chain metrics cited...', score: 0.85 },
-    ],
-  },
-  BTC: {
-    symbol: 'BTC',
-    reddit: [
-      { title: 'Bitcoin to $100k? Analysts say yes 🚀', url: '#', score: 512, createdUtc: Date.now() / 1000 - 1800 },
-      { title: 'BTC halving impact analysis', url: '#', score: 234, createdUtc: Date.now() / 1000 - 3600 },
-      { title: 'Selling pressure decreasing on BTC', url: '#', score: 178, createdUtc: Date.now() / 1000 - 5400 },
-    ],
-    tavily: [
-      { title: 'Bitcoin ETF Inflows Hit Record High', url: '#', content: 'Institutional demand surging...', score: 0.95 },
-      { title: 'BTC Mining Difficulty Reaches ATH', url: '#', content: 'Network security stronger than ever...', score: 0.88 },
-    ],
-  },
-  SOL: {
-    symbol: 'SOL',
-    reddit: [
-      { title: 'Solana TPS crushing it lately', url: '#', score: 189, createdUtc: Date.now() / 1000 - 2400 },
-      { title: 'SOL ecosystem growing fast 🔥', url: '#', score: 145, createdUtc: Date.now() / 1000 - 4800 },
-    ],
-    tavily: [
-      { title: 'Solana DeFi TVL Doubles in Q4', url: '#', content: 'Ecosystem expansion accelerating...', score: 0.89 },
-    ],
-  },
+  ETH: generateMockRumors('ETH'),
+  BTC: generateMockRumors('BTC'),
+  SOL: generateMockRumors('SOL'),
 };
 
 // ============================================================================
@@ -135,6 +162,10 @@ async function initializeYellow(): Promise<boolean> {
     const env = getYellowConfig();
 
     if (!env.agentPrivateKey || !env.merchantAddress) {
+      console.log(chalk.yellow('⚠️  Yellow credentials not configured'));
+      console.log(chalk.yellow(`   Agent key: ${env.agentPrivateKey ? 'Set' : 'Missing'}`));
+      console.log(chalk.yellow(`   Merchant address: ${env.merchantAddress ? 'Set' : 'Missing'}`));
+      console.log(chalk.yellow('   → Will use mock market data'));
       log('⚠️ Yellow credentials not configured - using fallback data');
       return false;
     }
@@ -143,9 +174,13 @@ async function initializeYellow(): Promise<boolean> {
     yellowContext.merchantAddress = env.merchantAddress as `0x${string}`;
     yellowContext.assetSymbol = env.assetSymbol;
     yellowContext.sessionSpent = 0;
+    console.log(chalk.cyan(`🔑 Agent wallet: ${yellowContext.agentAddress}`));
+    console.log(chalk.cyan(`💼 Merchant wallet: ${yellowContext.merchantAddress}`));
     log(`🔑 Agent address: ${yellowContext.agentAddress}`);
 
     // Connect to Yellow Network and authenticate
+    console.log(chalk.dim('   Connecting to Yellow Network...'));
+    debugLog('SESSION', `Connecting to Yellow Network: ${env.clearnodeUrl}`);
     yellowContext.yellow = new YellowRpcClient({
       url: env.clearnodeUrl,
       privateKey: env.agentPrivateKey,
@@ -153,15 +188,20 @@ async function initializeYellow(): Promise<boolean> {
       debug: env.debug,
     });
     await yellowContext.yellow.connect();
+    debugLog('SESSION', `✓ WebSocket connection established to Yellow clearnode`);
+    
     await yellowContext.yellow.authenticate({
       allowances: [{ asset: env.assetSymbol, amount: '1000' }],
       scope: 'transfer',
       application: YELLOW_APPLICATION,
     });
+    debugLog('SESSION', `✓ Authenticated with Yellow Network (app: ${YELLOW_APPLICATION})`);
+    console.log(chalk.green('✓ Connected to Yellow Network'));
     log('✓ Connected to Yellow Network');
 
     // Spawn MCP server via npm run dev
     // Use -c (not -lc) to avoid login shell loading old Node via bash_profile
+    console.log(chalk.dim('   Starting MCP server...'));
     const transport = new StdioClientTransport({
       command: 'bash',
       args: ['-c', 'npm run dev'],
@@ -174,52 +214,94 @@ async function initializeYellow(): Promise<boolean> {
 
     yellowContext.client = new Client({ name: 'sentifi-agent', version: '0.1.0' });
     await yellowContext.client.connect(transport);
+    
+    // Capture MCP server stderr for debug logging
+    if ((transport as any)._process?.stderr) {
+      (transport as any)._process.stderr.on('data', (data: Buffer) => {
+        const output = data.toString().trim();
+        if (output.includes('[MCP]')) {
+          // Extract the MCP log message and add to debug logs
+          const lines = output.split('\n').filter(line => line.includes('[MCP]'));
+          lines.forEach(line => {
+            const mcpMessage = line.replace(/^\[MCP\]\s*/, '');
+            debugLog('HTTP', `MCP Server: ${mcpMessage}`);
+          });
+        }
+      });
+    }
+    
+    console.log(chalk.green('✓ MCP Server connected'));
     log('✓ Connected to MCP Server');
 
-    // Create Yellow app session for payment tracking
+    // Create Yellow app session for payment tracking with QUORUM 2
+    console.log(chalk.dim('   Creating Yellow payment session (Quorum 2)...'));
     const participants: `0x${string}`[] = [yellowContext.agentAddress, yellowContext.merchantAddress];
     yellowContext.participants = participants;
-    const signer = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
+    const agentSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
+    const merchantSigner = createECDSAMessageSigner(env.merchantPrivateKey as `0x${string}`);
+    // Session amount: sandbox uses 11.0 test tokens, production uses 0.1 real USDC
+    const sessionAmount = env.mode === 'development' ? '11.0' : '0.1';
     const allocations = participants.map((participant, i) => ({
       participant,
       asset: env.assetSymbol,
-      amount: i === 0 ? '1.0' : '0.0',
+      amount: i === 0 ? sessionAmount : '0.0',
     }));
     yellowContext.sessionInitialAmount = Number(allocations[0]?.amount ?? 0);
 
-    const message = await createAppSessionMessage(signer, {
+    const sessionParams = {
       definition: {
         application: YELLOW_APPLICATION,
         protocol: RPCProtocolVersion.NitroRPC_0_4,
         participants,
         weights: participants.map(() => 1),
-        quorum: 1,
+        quorum: 2, // BOTH agent and merchant must sign
         challenge: 0,
         nonce: Date.now(),
       },
       allocations,
       session_data: JSON.stringify({ ttlSeconds: 3600 }),
-    });
+    };
 
-    const response = (await yellowContext.yellow.sendRawMessage(message)) as Record<string, unknown>;
+    const agentSessionMessage = await createAppSessionMessage(agentSigner, sessionParams);
+    const sessionParsed = JSON.parse(agentSessionMessage);
+    const merchantSessionSig = await merchantSigner(sessionParsed.req);
+    sessionParsed.sig.push(merchantSessionSig);
+
+    const response = (await yellowContext.yellow.sendRawMessage(JSON.stringify(sessionParsed))) as Record<string, unknown>;
     yellowContext.appSessionId =
       (response.appSessionId as string | undefined) ??
       (response.app_session_id as string | undefined) ??
       (response.appSession as { appSessionId?: string } | undefined)?.appSessionId ?? null;
 
     if (!yellowContext.appSessionId) {
+      console.log(chalk.red(`❌ Failed to create Yellow session`));
+      console.log(chalk.red(`   Response: ${JSON.stringify(response)}`));
       log(`⚠️ Failed to create Yellow session: ${JSON.stringify(response)}`);
       return false;
     }
 
+    console.log(chalk.green(`✓ Yellow session created: ${yellowContext.appSessionId.slice(0, 20)}...`));
+    console.log(chalk.green(`   Initial balance: ${yellowContext.sessionInitialAmount} ${yellowContext.assetSymbol}`));
+    console.log(chalk.green('✓ Ready to use LIVE market data via Yellow MCP\n'));
     log(`✓ Yellow session: ${yellowContext.appSessionId.slice(0, 20)}...`);
     yellowContext.connected = true;
     
-    // Update state with wallet info
+    // Debug log session initialization
+    debugLog('SESSION', `✓ Yellow Network session created via RPC`);
+    debugLog('SESSION', `Session ID: ${yellowContext.appSessionId}`);
+    debugLog('SESSION', `Initial balance: ${yellowContext.sessionInitialAmount.toFixed(2)} ${yellowContext.assetSymbol}`);
+    debugLog('SESSION', `Protocol: NitroRPC v0.4, Quorum: 1`);
+    debugLog('WALLET', `Agent: ${yellowContext.agentAddress}`);
+    debugLog('WALLET', `Merchant: ${yellowContext.merchantAddress}`);
+    
+    // Update state with wallet info and mark as logged in
+    state.loggedIn = true;
     updateYellowWalletState();
     
     return true;
   } catch (error) {
+    console.log(chalk.red(`❌ Yellow initialization failed: ${error instanceof Error ? error.message : String(error)}`));
+    console.log(chalk.yellow('   → Will use mock market data\n'));
     log(`⚠️ Yellow init failed: ${error instanceof Error ? error.message : String(error)}`);
     await stopSpawnedMcpServer(yellowContext.transport);
     yellowContext.transport = null;
@@ -234,98 +316,209 @@ function getToolPriceUsd(toolName: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function updateYellowWalletState() {
-  if (!yellowContext.connected || !yellowContext.agentAddress || !yellowContext.merchantAddress) {
+async function updateYellowWalletState() {
+  if (!yellowContext.connected || !yellowContext.agentAddress || !yellowContext.merchantAddress || !yellowContext.yellow) {
     state.yellowWallets = null;
     return;
   }
-
+  
   const sessionRemaining = Math.max(0, yellowContext.sessionInitialAmount - yellowContext.sessionSpent);
+  
+  // Query UNIFIED off-chain balances
+  let agentBalance = 0;
+  let merchantBalance = 0;
+  
+  try {
+    // Agent queries their OWN unified balance
+    const agentBalances = await yellowContext.yellow.getLedgerBalances(); // No accountId!
+    const agentAsset = agentBalances.find((b: any) => b.asset === yellowContext.assetSymbol);
+    agentBalance = agentAsset ? parseFloat(agentAsset.amount) : 0;
+    
+    // Merchant queries their OWN unified balance (need separate client)
+    const env = getYellowConfig();
+    if (env.merchantPrivateKey) {
+      const merchantYellow = new YellowRpcClient({
+        url: env.clearnodeUrl,
+        privateKey: env.merchantPrivateKey,
+        authDomain: env.authDomain,
+        debug: false,
+      });
+      
+      await merchantYellow.connect();
+      await merchantYellow.authenticate({
+        allowances: [{ asset: env.assetSymbol, amount: '1000' }],
+        scope: 'transfer',
+      });
+      
+      const merchantBalances = await merchantYellow.getLedgerBalances(); // Merchant's OWN balance
+      const merchantAsset = merchantBalances.find((b: any) => b.asset === yellowContext.assetSymbol);
+      merchantBalance = merchantAsset ? parseFloat(merchantAsset.amount) : 0;
+    }
+  } catch (error) {
+    console.error('Failed to fetch unified balances:', error);
+  }
   
   state.yellowWallets = {
     agentAddress: yellowContext.agentAddress,
     merchantAddress: yellowContext.merchantAddress,
+    agentBalance,
+    merchantBalance,
     sessionInitial: yellowContext.sessionInitialAmount,
     sessionSpent: yellowContext.sessionSpent,
     sessionRemaining,
     assetSymbol: yellowContext.assetSymbol || 'ytest.usd',
+    pricePerCall: getToolPriceUsd('market_rumors'),
   };
+  
+  // Debug log wallet balance update
+  debugLog('WALLET', `Session: ${sessionRemaining.toFixed(2)} ${yellowContext.assetSymbol} remaining (spent: ${yellowContext.sessionSpent.toFixed(2)})`);
+  debugLog('WALLET', `AI Agent balance: ${agentBalance.toFixed(2)} ${yellowContext.assetSymbol}`);
+  debugLog('WALLET', `MCP Merchant balance: ${merchantBalance.toFixed(2)} ${yellowContext.assetSymbol}`);
 }
 
 async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: boolean }> {
-  // Call market_rumors via MCP with Yellow payment
-  if (yellowContext.connected && yellowContext.client && yellowContext.appSessionId && yellowContext.agentAddress) {
-    try {
-      log(`📡 Fetching market_rumors for ${symbol} via Yellow MCP...`);
-
-      const result = await yellowContext.client.callTool({
-        name: 'market_rumors',
-        arguments: { symbol },
-        _meta: {
-          'x402/yellow': {
-            appSessionId: yellowContext.appSessionId,
-            payer: yellowContext.agentAddress,
-          },
-        },
-      } as any);
-
-      const { text, isError } = getToolText(result);
-      if (!text) {
-        throw new Error('Empty response from market_rumors');
-      }
-      if (isError) {
-        throw new Error(text);
-      }
-
-      const data = parseJsonFromToolText<any>('market_rumors', text);
-      yellowContext.sessionSpent += getToolPriceUsd('market_rumors');
-      
-      // Update wallet state after payment
-      updateYellowWalletState();
-
-      log(
-        `✓ Live data: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} news articles`,
-      );
-      return { data, isLive: true };
-    } catch (error) {
-      log(`⚠️ MCP call failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  // Check Yellow Network connection status
+  if (!yellowContext.connected) {
+    console.log(chalk.yellow('⚠️  Yellow Network not connected'));
+    log('📋 Using MOCK market data (Yellow Network not connected)');
+    debugLog('HTTP', `⚠️ ⚠️ ⚠️ MOCK DATA - Yellow Network not connected ⚠️ ⚠️ ⚠️`);
+    return { data: generateMockRumors(symbol), isLive: false };
+  }
+  
+  if (!yellowContext.client) {
+    console.log(chalk.yellow('⚠️  MCP client not initialized'));
+    log('📋 Using MOCK market data (MCP client not available)');
+    debugLog('HTTP', `⚠️ ⚠️ ⚠️ MOCK DATA - MCP client not available ⚠️ ⚠️ ⚠️`);
+    return { data: generateMockRumors(symbol), isLive: false };
+  }
+  
+  if (!yellowContext.appSessionId) {
+    console.log(chalk.yellow('⚠️  No Yellow session ID'));
+    log('📋 Using MOCK market data (No active Yellow session)');
+    debugLog('SESSION', `⚠️ ⚠️ ⚠️ MOCK DATA - No active Yellow Network session ⚠️ ⚠️ ⚠️`);
+    return { data: generateMockRumors(symbol), isLive: false };
+  }
+  
+  if (!yellowContext.agentAddress) {
+    console.log(chalk.yellow('⚠️  No agent wallet address'));
+    log('📋 Using MOCK market data (No wallet configured)');
+    debugLog('WALLET', `⚠️ ⚠️ ⚠️ MOCK DATA - No wallet configured ⚠️ ⚠️ ⚠️`);
+    return { data: generateMockRumors(symbol), isLive: false };
   }
 
-  // Fallback to mock data
-  log(`📋 Using fallback data for ${symbol}`);
-  return { data: MOCK_RUMORS[symbol] || MOCK_RUMORS.ETH, isLive: false };
+  // All conditions met, try to call MCP with Yellow payment
+  try {
+    console.log(chalk.cyan(`📡 Fetching LIVE market_rumors for ${symbol} via Yellow MCP...`));
+    log(`📡 Fetching market_rumors for ${symbol} via Yellow MCP...`);
+    
+    const toolPrice = getToolPriceUsd('market_rumors');
+    const balanceBefore = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
+    
+    debugLog('HTTP', `Calling MCP tool: market_rumors(symbol=${symbol})`);
+    debugLog('SESSION', `Using Yellow session: ${yellowContext.appSessionId.slice(0, 20)}...`);
+    debugLog('SESSION', `Payer wallet: ${yellowContext.agentAddress}`);
+    debugLog('SESSION', `Pre-call balance: ${balanceBefore.toFixed(2)} ${yellowContext.assetSymbol}`);
+    debugLog('HTTP', `Request via Yellow Network payment channel`);
+
+    const result = await yellowContext.client.callTool({
+      name: 'market_rumors',
+      arguments: { symbol },
+      _meta: {
+        'x402/yellow': {
+          appSessionId: yellowContext.appSessionId,
+          payer: yellowContext.agentAddress,
+        },
+      },
+    } as any);
+    
+    debugLog('HTTP', `✓ Response received from Yellow MCP server`);
+
+    const { text, isError } = getToolText(result);
+    if (!text) {
+      throw new Error('Empty response from market_rumors');
+    }
+    if (isError) {
+      throw new Error(text);
+    }
+
+    const data = parseJsonFromToolText<any>('market_rumors', text);
+    
+    // Deduct payment via Yellow Network session (local tracking)
+    yellowContext.sessionSpent += toolPrice;
+    const balanceAfter = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
+    
+    console.log(chalk.magenta(`💸 Session payment: ${toolPrice.toFixed(2)} ${yellowContext.assetSymbol} (total spent: ${yellowContext.sessionSpent.toFixed(2)})`));
+    debugLog('SESSION', `Payment deducted: ${toolPrice.toFixed(2)} ${yellowContext.assetSymbol} (total spent: ${yellowContext.sessionSpent.toFixed(2)})`);
+    
+    // Log detailed response data with freshness indicators
+    const redditCount = data.reddit?.length || 0;
+    const tavilyCount = data.tavily?.length || 0;
+    
+    debugLog('HTTP', `✓ LIVE DATA from Yellow MCP: ${redditCount} Reddit, ${tavilyCount} Financial News`);
+    
+    // Show sample Reddit posts with age
+    if (data.reddit && data.reddit.length > 0) {
+      const sample = data.reddit[0];
+      const createdDate = sample.createdUtc ? new Date(sample.createdUtc * 1000) : null;
+      const hoursAgo = createdDate 
+        ? ((Date.now() - createdDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
+        : '?';
+      debugLog('HTTP', `Reddit sample (${hoursAgo}h ago): "${sample.title?.substring(0, 50)}..."`);
+    }
+    
+    // Show sample Tavily financial articles with age
+    if (data.tavily && data.tavily.length > 0) {
+      const sample = data.tavily[0];
+      const publishedDate = sample.published_date ? new Date(sample.published_date) : null;
+      const hoursAgo = publishedDate 
+        ? ((Date.now() - publishedDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
+        : '?';
+      debugLog('HTTP', `Financial News sample (${hoursAgo}h ago): "${sample.title?.substring(0, 50)}..."`);
+    }
+    
+    debugLog('SESSION', `✓ Yellow Network payment processed`);
+    debugLog('SESSION', `Payment deducted: ${toolPrice.toFixed(2)} ${yellowContext.assetSymbol}`);
+    debugLog('SESSION', `Post-call balance: ${balanceAfter.toFixed(2)} ${yellowContext.assetSymbol}`);
+    debugLog('SESSION', `Transaction recorded in off-chain session: ${yellowContext.appSessionId.slice(0, 20)}...`);
+    
+    // Update wallet state after payment
+    updateYellowWalletState();
+
+    console.log(chalk.green(`✓ LIVE data received: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} financial news articles`));
+    log(
+      `✓ Live data: ${data.reddit?.length || 0} Reddit, ${data.tavily?.length || 0} financial news`,
+    );
+    return { data, isLive: true };
+  } catch (error) {
+    console.log(chalk.red(`❌ MCP call failed: ${error instanceof Error ? error.message : String(error)}`));
+    log(`⚠️ MCP call failed: ${error instanceof Error ? error.message : String(error)}`);
+    debugLog('HTTP', `⚠️ ⚠️ ⚠️ MOCK DATA - MCP call failed: ${error instanceof Error ? error.message : String(error)} ⚠️ ⚠️ ⚠️`);
+    console.log(chalk.yellow('📋 Falling back to MOCK market data'));
+    log('📋 Using MOCK market data (API call failed)');
+    return { data: generateMockRumors(symbol), isLive: false };
+  }
 }
 
-async function closeYellowSession(): Promise<void> {
+async function closeYellowSession(fullDisconnect: boolean = true): Promise<void> {
   if (yellowContext.yellow && yellowContext.appSessionId) {
     try {
       const env = getYellowConfig();
 
       const asset = yellowContext.assetSymbol ?? env.assetSymbol;
-      let remaining: number;
-      try {
-        remaining = await getSessionAssetBalance({
-          yellow: yellowContext.yellow,
-          sessionId: yellowContext.appSessionId,
-          assetSymbol: asset,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        log(`⚠️ Failed to query session balance, falling back: ${message}`);
-        const initial = Number.isFinite(yellowContext.sessionInitialAmount)
-          ? yellowContext.sessionInitialAmount
-          : 0;
-        remaining = Math.max(0, initial - Math.max(0, yellowContext.sessionSpent));
-      }
-
-      // Keep local tracking aligned with what Yellow reports.
-      if (Number.isFinite(remaining)) {
-        const initial = Number.isFinite(yellowContext.sessionInitialAmount)
-          ? yellowContext.sessionInitialAmount
-          : 0;
-        yellowContext.sessionSpent = Math.max(0, initial - remaining);
-      }
+      
+      debugLog('SESSION', `Closing Yellow Network session: ${yellowContext.appSessionId.slice(0, 20)}...`);
+      
+      // Use LOCAL tracking instead of querying Yellow
+      // Yellow Network doesn't track per-call deductions in real-time
+      // The MCP server uses a local cache, so we calculate from our tracking
+      const initial = Number.isFinite(yellowContext.sessionInitialAmount)
+        ? yellowContext.sessionInitialAmount
+        : 0;
+      const spent = Number.isFinite(yellowContext.sessionSpent) ? yellowContext.sessionSpent : 0;
+      const remaining = Math.max(0, initial - spent);
+      
+      debugLog('SESSION', `Using local tracking: initial=${initial.toFixed(2)}, spent=${spent.toFixed(2)}, remaining=${remaining.toFixed(2)} ${asset}`);
+      console.log(chalk.cyan(`Local session tracking: ${spent.toFixed(2)} ${asset} spent from ${initial.toFixed(2)} ${asset}`));
 
       const allocations = computeSessionCloseAllocations({
         agentAddress: yellowContext.agentAddress,
@@ -334,28 +527,64 @@ async function closeYellowSession(): Promise<void> {
         initialAmount: yellowContext.sessionInitialAmount,
         remainingAmount: remaining,
       });
+      
+      debugLog('SESSION', `Final settlement: Agent refund ${remaining.toFixed(2)} ${asset}, Merchant payment ${yellowContext.sessionSpent.toFixed(2)} ${asset}`);
+      debugLog('SESSION', `Allocations: ${JSON.stringify(allocations)}`);
+      console.log(chalk.cyan(`Session close allocations: ${JSON.stringify(allocations, null, 2)}`))
 
-      await yellowContext.yellow.closeAppSession({
-        appSessionId: yellowContext.appSessionId,
+      // Close with QUORUM 2 (both agent and merchant sign)
+      const agentCloseSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
+      const merchantCloseSigner = createECDSAMessageSigner(env.merchantPrivateKey as `0x${string}`);
+
+      const agentCloseMessage = await createCloseAppSessionMessage(agentCloseSigner, {
+        app_session_id: yellowContext.appSessionId as `0x${string}`,
         allocations,
       });
-      log('✓ Yellow session closed');
+
+      const closeParsed = JSON.parse(agentCloseMessage);
+      const merchantCloseSig = await merchantCloseSigner(closeParsed.req);
+      closeParsed.sig.push(merchantCloseSig);
+
+      const closeResponse = await yellowContext.yellow.sendRawMessage(JSON.stringify(closeParsed));
+      
+      console.log(chalk.cyan(`Close response: ${JSON.stringify(closeResponse, null, 2)}`));
+      debugLog('SESSION', `✓ Yellow Network session closed with Quorum 2`);
+      debugLog('SESSION', `Close response: ${JSON.stringify(closeResponse)}`);
+      log('✓ Yellow session closed (Quorum 2)');
+      
+      // Verify the close was successful
+      if (closeResponse && typeof closeResponse === 'object') {
+        const success = (closeResponse as any).result?.success ?? (closeResponse as any).success ?? true;
+        if (!success) {
+          console.error(chalk.red('⚠️  Session close may have failed!'));
+          debugLog('SESSION', `⚠️  Close response indicates failure`);
+        }
+      }
     } catch (error) {
       log(`⚠️ Failed to close session: ${error instanceof Error ? error.message : String(error)}`);
+      debugLog('SESSION', `⚠️ Session close failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  if (yellowContext.client) {
-    await yellowContext.client.close();
+  // Reset session tracking
+  yellowContext.appSessionId = null;
+  yellowContext.sessionInitialAmount = 0;
+  yellowContext.sessionSpent = 0;
+
+  // Only disconnect if requested (e.g., on app shutdown)
+  if (fullDisconnect) {
+    if (yellowContext.client) {
+      await yellowContext.client.close();
+    }
+    await stopSpawnedMcpServer(yellowContext.transport);
+    yellowContext.yellow = null;
+    yellowContext.client = null;
+    yellowContext.transport = null;
+    yellowContext.connected = false;
+    
+    // Clear wallet state
+    state.yellowWallets = null;
   }
-  await stopSpawnedMcpServer(yellowContext.transport);
-  yellowContext.yellow = null;
-  yellowContext.client = null;
-  yellowContext.transport = null;
-  yellowContext.connected = false;
-  
-  // Clear wallet state
-  state.yellowWallets = null;
 }
 
 // ============================================================================
@@ -415,12 +644,15 @@ interface DemoState {
   } | null;
   execution: { status: string; txHash: string; explorerUrl?: string } | null;
   logs: string[];
+  debugLogs: string[];
+  debugLogsEnabled: boolean;
   portfolio: Holding[];
   usdcBalance: number;
   dataMode: 'live' | 'fallback';
   isRunning: boolean;
   yellowConnected: boolean;
   mcpConnected: boolean;
+  loggedIn: boolean;
   decisionConfirmed: boolean;
   riskAssessment: {
     approved: boolean;
@@ -432,10 +664,13 @@ interface DemoState {
   yellowWallets: {
     agentAddress: string;
     merchantAddress: string;
+    agentBalance: number;
+    merchantBalance: number;
     sessionInitial: number;
     sessionSpent: number;
     sessionRemaining: number;
     assetSymbol: string;
+    pricePerCall: number;
   } | null;
 }
 
@@ -447,12 +682,15 @@ const state: DemoState = {
   quote: null,
   execution: null,
   logs: [],
+  debugLogs: [],
+  debugLogsEnabled: false, // Feature flag - default OFF (click DEBUG badge to enable)
   portfolio: [],
   usdcBalance: 0,
   dataMode: 'fallback',
   isRunning: false,
   yellowConnected: false,
   mcpConnected: false,
+  loggedIn: true,
   decisionConfirmed: false,
   riskAssessment: null,
   pnl: {
@@ -508,6 +746,24 @@ function log(message: string) {
   state.logs.push(`[${timestamp}] ${message}`);
   if (state.logs.length > 50) state.logs.shift();
   console.log(chalk.dim(`[${timestamp}]`), message);
+}
+
+function debugLog(category: 'SESSION' | 'HTTP' | 'WALLET', message: string) {
+  if (!state.debugLogsEnabled) return;
+  
+  const timestamp = new Date().toLocaleTimeString();
+  const prefix = {
+    SESSION: '💰',
+    HTTP: '🌐',
+    WALLET: '💼',
+  }[category];
+  
+  const formattedMessage = `[${timestamp}] ${prefix} [${category}] ${message}`;
+  state.debugLogs.push(formattedMessage);
+  if (state.debugLogs.length > 100) state.debugLogs.shift();
+  
+  // Also log to console in dim style
+  console.log(chalk.dim(`[DEBUG] ${formattedMessage}`));
 }
 
 function resetState() {
@@ -673,7 +929,7 @@ function convertToSentimentItems(rumors: any): RawSentimentItem[] {
       title: article.title || '',
       content: article.content || '',
       url: article.url || '#',
-      timestamp: new Date(),
+      timestamp: article.published_date ? new Date(article.published_date) : new Date(),
       engagement: Math.floor((article.score || 0.5) * 100),
     });
   }
@@ -709,6 +965,7 @@ async function analyzeWithNewArchitecture(symbol: string, rumors: any, isLive: b
     type: item.source,
     title: item.title,
     score: item.engagement,
+    url: item.url,
   }));
 
   state.sentiment = {
@@ -794,20 +1051,32 @@ async function makeDecision(signal: AggregatedSignal) {
   return intent;
 }
 
+// Map common symbols to their tradeable equivalents on Arbitrum
+function getTradeableToken(symbol: string): string {
+  const tokenMap: Record<string, string> = {
+    'ETH': 'WETH',   // Wrapped Ether
+    'BTC': 'WBTC',   // Wrapped Bitcoin
+    // Add more mappings as needed
+  };
+  return tokenMap[symbol.toUpperCase()] || symbol;
+}
+
 function confirmDecision(action?: string, amount?: string) {
   if (!state.decision) return;
 
   if (action) {
     const symbol = state.symbol || 'ETH';
+    const tradeableToken = getTradeableToken(symbol);
+    
     if (action === 'SWAP_BULLISH') {
       state.decision.action = 'SWAP_BULLISH';
       state.decision.reason = `User confirmed: swap to ${symbol}`;
       state.decision.fromToken = 'USDC';
-      state.decision.toToken = symbol === 'ETH' ? 'WETH' : symbol;
+      state.decision.toToken = tradeableToken;
     } else if (action === 'SWAP_BEARISH') {
       state.decision.action = 'SWAP_BEARISH';
       state.decision.reason = `User confirmed: exit to stables`;
-      state.decision.fromToken = symbol === 'ETH' ? 'WETH' : symbol;
+      state.decision.fromToken = tradeableToken;
       state.decision.toToken = 'USDC';
     } else {
       state.decision.action = 'HOLD';
@@ -1012,6 +1281,21 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return;
     }
 
+    // Check if Yellow session has enough balance for research
+    const pricePerCall = getToolPriceUsd('market_rumors');
+    if (yellowContext.connected && state.yellowWallets) {
+      const sessionRemaining = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
+      if (sessionRemaining < pricePerCall) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          error: 'Research budget depleted',
+          message: `Session balance too low. Need ${pricePerCall} ${state.yellowWallets.assetSymbol}, have ${sessionRemaining.toFixed(2)} ${state.yellowWallets.assetSymbol}`,
+          budgetDepleted: true
+        }));
+        return;
+      }
+    }
+
     state.isRunning = true;
     resetState();
     state.usdcBalance = parseFloat(body.match(/"usdcBalance":\s*(\d+)/)?.[1] || String(state.usdcBalance)) || state.usdcBalance;
@@ -1060,13 +1344,55 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  if (url.pathname === '/api/reset' && req.method === 'POST') {
+  if (url.pathname === '/api/logout' && req.method === 'POST') {
+    // Close Yellow session and settle funds to merchant (but stay connected)
+    console.log(chalk.yellow('\n🔒 Logout requested - closing session...'));
+    await closeYellowSession(false);
+    
+    // Mark as logged out
+    state.loggedIn = false;
+    
+    // Wait longer for settlement to complete (Yellow Network processing time)
+    console.log(chalk.yellow('⏳ Waiting 5 seconds for settlement...'));
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // Update wallet balances to show merchant received funds
+    console.log(chalk.yellow('💰 Querying final balances...'));
+    await updateYellowWalletState();
+    console.log(chalk.green('✓ Logout complete'));
+    
+    // Reset UI state but keep balances
     const currentBalance = state.usdcBalance;
     resetState();
     state.usdcBalance = currentBalance;
+    state.loggedIn = false; // Keep logged out after reset
     updatePortfolio();
+    
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  if (url.pathname === '/api/login' && req.method === 'POST') {
+    // Create new Yellow session from agent's off-chain balance
+    await initializeYellow();
+    
+    // Mark as logged in
+    state.loggedIn = true;
+    
+    // Update wallet balances
+    await updateYellowWalletState();
+    
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  if (url.pathname === '/api/toggle-debug' && req.method === 'POST') {
+    state.debugLogsEnabled = !state.debugLogsEnabled;
+    debugLog('SESSION', `Debug logs ${state.debugLogsEnabled ? 'enabled' : 'disabled'}`);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, enabled: state.debugLogsEnabled }));
     return;
   }
 
@@ -1109,6 +1435,11 @@ async function main() {
   // Try to initialize Yellow MCP for live sentiment data
   console.log(chalk.dim('Initializing Yellow MCP connection...'));
   const yellowConnected = await initializeYellow();
+  
+  // Update data mode based on Yellow connection
+  state.dataMode = yellowConnected ? 'live' : 'fallback';
+  state.yellowConnected = yellowConnected;
+  state.mcpConnected = Boolean(yellowContext.client);
 
   const PORT = parseInt(process.env.SENTIFI_PORT || '3456');
   const HOST = process.env.SENTIFI_HOST || '127.0.0.1';

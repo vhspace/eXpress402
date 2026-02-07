@@ -3,6 +3,8 @@ export type TavilyResult = {
   url: string;
   content: string;
   score: number;
+  published_date?: string;
+  source?: string; // Added to distinguish Twitter/X from news
 };
 
 export async function fetchTavilyRumors(query: string, maxResults = 5): Promise<TavilyResult[]> {
@@ -19,8 +21,9 @@ export async function fetchTavilyRumors(query: string, maxResults = 5): Promise<
     },
     body: JSON.stringify({
       query,
-      topic: 'finance',
-      search_depth: 'basic',
+      topic: 'finance', // Use finance topic for better financial/crypto data
+      search_depth: 'advanced', // Use advanced for better quality and recency
+      time_range: 'day', // Only results from the last 24 hours (correct parameter)
       max_results: maxResults,
       include_answer: false,
       include_raw_content: false,
@@ -31,14 +34,38 @@ export async function fetchTavilyRumors(query: string, maxResults = 5): Promise<
     throw new Error(`Tavily request failed: ${response.status}`);
   }
 
-  const data = (await response.json()) as {
-    results?: Array<{ title: string; url: string; content: string; score: number }>;
+  const rawData = await response.json();
+  
+  // Log the raw response to see what fields are actually returned
+  console.error('[Tavily] Raw API response structure:', JSON.stringify(rawData, null, 2).substring(0, 500));
+  
+  const data = rawData as {
+    results?: Array<{ 
+      title: string; 
+      url: string; 
+      content: string; 
+      score: number;
+      published_date?: string;
+    }>;
   };
 
-  return (data.results ?? []).map(result => ({
+  const results = (data.results ?? []).map(result => ({
     title: result.title,
     url: result.url,
     content: result.content,
     score: result.score,
+    published_date: result.published_date,
   }));
+
+  // Log the freshness of results
+  console.error('[Tavily] Fetched results (requested last 24h only):');
+  results.forEach((r, i) => {
+    const publishedDate = r.published_date ? new Date(r.published_date) : null;
+    const hoursAgo = publishedDate 
+      ? ((Date.now() - publishedDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
+      : 'NO DATE';
+    console.error(`  [${i + 1}] ${hoursAgo}h ago: ${r.title.substring(0, 60)}...`);
+  });
+
+  return results;
 }

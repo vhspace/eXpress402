@@ -27,7 +27,7 @@ allocations: [
    ```bash
    npm run agent-onramp -- 2 base
    ```
-   
+
 2. Visit Yellow Apps UI: https://apps.yellow.com
 
 3. Connect agent wallet

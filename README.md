@@ -25,30 +25,7 @@ Web3 agents need market data, but traditional per-call blockchain transactions c
 
 ## Architecture: SIWx + Yellow Network
 
-```mermaid
-sequenceDiagram
-    participant Agent as AI Agent
-    participant Server as MCP Server
-    participant Redis as Redis/Vercel KV
-    participant Yellow as Yellow Network
-
-    Note over Agent,Yellow: First Request - Authenticate and Pay
-    Agent->>Server: GET /stock_price
-    Server->>Agent: 402 Payment Required + SIWx challenge + Yellow info
-    Agent->>Agent: Sign SIWx message (prove wallet)
-    Agent->>Yellow: Create payment session (pay once)
-    Yellow-->>Agent: session ID
-    Agent->>Server: Request + SIGN-IN-WITH-X header + Yellow session
-    Server->>Server: Verify SIWx signature
-    Server->>Redis: Store wallet to session mapping
-    Server->>Agent: 200 OK + stock data
-
-    Note over Agent,Yellow: Subsequent Requests - Reuse Session
-    Agent->>Server: GET /market_rumors + SIGN-IN-WITH-X header
-    Server->>Redis: Lookup session (sub-millisecond)
-    Redis-->>Server: Found session ID
-    Server->>Agent: 200 OK + market data (no payment needed!)
-```
+![Yellow Network x402/SIWx Flow](assets/yellow-x402-siwx-flow.png)
 
 **Key Innovation: Pay Once, Call Many Times**
 
@@ -56,6 +33,10 @@ sequenceDiagram
 - Subsequent calls: Verify signature + Reuse session + No payment
 - Sub-millisecond session lookup (Redis/Vercel KV)
 - Standards-compliant (x402 v2 + CAIP-122 SIWx)
+
+**Result**: 100 API calls for the cost of 1 transaction - **96% cost reduction**
+
+See [detailed flow diagrams](docs/HACKATHON-FLOWS.md) for complete technical architecture.
 
 ## Features
 
@@ -199,67 +180,15 @@ Sentifi is an autonomous AI trading agent that combines real-time market sentime
 
 ### Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                    SENTIFI: AI Cross-Chain Trading Agent                     │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌──────────┐  │
-│   │   MONITOR   │────▶│   ANALYZE   │────▶│   DECIDE    │────▶│ EXECUTE  │  │
-│   └─────────────┘     └─────────────┘     └─────────────┘     └──────────┘  │
-│         │                   │                   │                   │        │
-│         ▼                   ▼                   ▼                   ▼        │
-│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌──────────┐  │
-│   │ Reddit API  │     │  Sentiment  │     │  Strategy   │     │  LI.FI   │  │
-│   │ News/Tavily │     │  Scoring    │     │  Engine     │     │  SDK     │  │
-│   │ Stock Price │     │  Negation   │     │  Risk Mgmt  │     │  Swap    │  │
-│   └─────────────┘     └─────────────┘     └─────────────┘     └──────────┘  │
-│                                                                              │
-│   ┌──────────────────────────────────────────────────────────────────────┐  │
-│   │                      YELLOW NETWORK LAYER                            │  │
-│   │  • Prepaid MCP sessions for bulk market data queries                 │  │
-│   │  • Off-chain settlement (no per-call fees)                           │  │
-│   │  • Sub-millisecond data access                                       │  │
-│   └──────────────────────────────────────────────────────────────────────┘  │
-│                                                                              │
-│   ┌──────────────────────────────────────────────────────────────────────┐  │
-│   │                       LI.FI EXECUTION LAYER                          │  │
-│   │  • DEX aggregation across 30+ exchanges                              │  │
-│   │  • Cross-chain swaps (Arbitrum, Optimism, Base, Polygon)             │  │
-│   │  • Optimal routing with gas estimation                               │  │
-│   └──────────────────────────────────────────────────────────────────────┘  │
-│                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+![Sentifi Li.fi Trading Agent Flow](assets/sentifi-lifi-trading-flow.png)
 
-### Agent Decision Flow
+**Autonomous Decision Loop**: 
+1. **MONITOR** - Fetch sentiment data via eXpress402 MCP (prepaid Yellow sessions)
+2. **DECIDE** - Analyze signals and determine strategy (bullish/bearish/neutral/rebalance)
+3. **EXECUTE** - Route trades through Li.fi SDK across 30+ DEXs for best prices
+4. **RECORD** - Track P&L and update portfolio state
 
-```mermaid
-flowchart TD
-    A[Start] --> B[Fetch Market Sentiment]
-    B --> C{Analyze Signals}
-    C --> D[Score: -100 to +100]
-    D --> E{Decision Engine}
-
-    E -->|Score > 40| F[BULLISH: Buy Signal]
-    E -->|Score < -40| G[BEARISH: Sell Signal]
-    E -->|-40 ≤ Score ≤ 40| H[NEUTRAL: Hold]
-
-    F --> I[Risk Assessment]
-    G --> I
-    I --> J{Approved?}
-
-    J -->|Yes| K[Get LI.FI Quote]
-    J -->|No| L[Skip Trade]
-
-    K --> M[Execute Swap]
-    M --> N[Record P&L]
-    N --> O[Update Dashboard]
-    O --> B
-
-    H --> B
-    L --> B
-```
+See [detailed flow diagrams](docs/HACKATHON-FLOWS.md) for complete technical architecture.
 
 ### Features
 
@@ -474,6 +403,7 @@ All logs exported with timestamps and structured data.
 
 ## Documentation
 
+- [Hackathon Flow Diagrams](docs/HACKATHON-FLOWS.md) - Visual architecture overview for judges
 - [x402 Yellow Extension](docs/x402-yellow-extension.md) - Payment protocol details
 - [Setup Guide](docs/) - Complete environment and deployment instructions
 - [API Reference](docs/) - Tool specifications and examples

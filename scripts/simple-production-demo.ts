@@ -1,6 +1,6 @@
 /**
  * Simple Production Demo - Real USDC on Base
- * 
+ *
  * Complete automated flow showing agent → merchant payment with real money.
  * All steps run automatically with blockchain evidence.
  */
@@ -67,11 +67,8 @@ async function main() {
     console.log('\n═══════════════════════════════════════════════════════════════');
     console.log('STEP 1: Starting Balances');
     console.log('═══════════════════════════════════════════════════════════════');
-    
-    runCommand(
-      'npx tsx scripts/check-base-balance.ts',
-      'Checking agent wallet balance on Base',
-    );
+
+    runCommand('npx tsx scripts/check-base-balance.ts', 'Checking agent wallet balance on Base');
 
     // Step 2: Run agentkit demo with production config
     console.log('\n═══════════════════════════════════════════════════════════════');
@@ -102,20 +99,14 @@ async function main() {
     console.log('  - Withdraw from custody to wallet');
     console.log('  - Generate Basescan transaction links\n');
 
-    runCommand(
-      `npx tsx src/merchant-offramp.ts ${MERCHANT} base`,
-      'Merchant offramp to wallet',
-    );
+    runCommand(`npx tsx src/merchant-offramp.ts ${MERCHANT} base`, 'Merchant offramp to wallet');
 
     // Step 4: Verify final state
     console.log('\n═══════════════════════════════════════════════════════════════');
     console.log('STEP 4: Final Verification');
     console.log('═══════════════════════════════════════════════════════════════');
 
-    runCommand(
-      'npx tsx scripts/check-base-balance.ts',
-      'Checking final balances',
-    );
+    runCommand('npx tsx scripts/check-base-balance.ts', 'Checking final balances');
 
     // Success summary
     console.log('\n╔═══════════════════════════════════════════════════════════════╗');
@@ -139,7 +130,6 @@ async function main() {
     console.log('  ✓ Quorum 2 settlement (merchant + agent signatures)');
     console.log('  ✓ Unified balance → wallet offramp');
     console.log('  ✓ Real blockchain integration\n');
-
   } catch (error) {
     console.error('\n❌ Demo failed:', error);
     console.log('\n💡 TROUBLESHOOTING:');
