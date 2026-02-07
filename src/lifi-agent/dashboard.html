@@ -843,6 +843,65 @@
     .debug-category.http { background: rgba(15, 244, 234, 0.15); color: var(--accent-cyan); }
     .debug-category.wallet { background: rgba(170, 85, 255, 0.15); color: var(--accent-purple); }
 
+    /* Auth Loading Overlay */
+    .auth-loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+      animation: fadeIn 0.3s ease;
+    }
+
+    .auth-loading-content {
+      text-align: center;
+      padding: 40px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--accent-cyan);
+      box-shadow: 0 0 30px rgba(15, 244, 234, 0.3);
+      min-width: 300px;
+    }
+
+    .auth-loading-spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(15, 244, 234, 0.2);
+      border-top-color: var(--accent-cyan);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    .auth-loading-text {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+
+    .auth-loading-subtext {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
     /* Execution Overlay */
     .execution-overlay {
       position: fixed;
@@ -1279,6 +1338,15 @@
       </div>
     </div>
 
+    <!-- Auth Loading Overlay -->
+    <div class="auth-loading-overlay" id="authLoadingOverlay" style="display: none;">
+      <div class="auth-loading-content">
+        <div class="auth-loading-spinner"></div>
+        <div class="auth-loading-text" id="authLoadingText">PROCESSING...</div>
+        <div class="auth-loading-subtext" id="authLoadingSubtext">Please wait</div>
+      </div>
+    </div>
+
     <!-- Execution Overlay -->
     <div class="execution-overlay" id="executionOverlay" style="display: none;">
       <div class="exec-title">⚡ SWAP EXECUTED</div>
@@ -1415,10 +1483,21 @@
       btn.classList.remove('loading');
     }
 
+    function showAuthLoading(text, subtext) {
+      document.getElementById('authLoadingText').textContent = text;
+      document.getElementById('authLoadingSubtext').textContent = subtext;
+      document.getElementById('authLoadingOverlay').style.display = 'flex';
+    }
+
+    function hideAuthLoading() {
+      document.getElementById('authLoadingOverlay').style.display = 'none';
+    }
+
     async function logout() {
       const btn = document.getElementById('logoutBtn');
       btn.disabled = true;
-      btn.textContent = 'CLOSING SESSION...';
+      
+      showAuthLoading('LOGGING OUT', 'Closing Yellow Network session and settling funds to merchant...');
       
       try {
         await fetch('/api/logout', { method: 'POST' });
@@ -1429,10 +1508,11 @@
         selectedAction = null;
         updateDecisionButtons();
         
-        // Wait for merchant balance to update
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Wait for merchant balance to update (server waits 5 seconds for settlement)
+        await new Promise(resolve => setTimeout(resolve, 6000));
         
       } finally {
+        hideAuthLoading();
         btn.disabled = false;
         // Button text will be updated by updateUI based on state.loggedIn
       }
@@ -1441,7 +1521,8 @@
     async function login() {
       const btn = document.getElementById('logoutBtn');
       btn.disabled = true;
-      btn.textContent = 'CREATING SESSION...';
+      
+      showAuthLoading('LOGGING IN', 'Creating new Yellow Network session with Quorum 2 governance...');
       
       try {
         await fetch('/api/login', { method: 'POST' });
@@ -1450,6 +1531,7 @@
         await new Promise(resolve => setTimeout(resolve, 2000));
         
       } finally {
+        hideAuthLoading();
         btn.disabled = false;
         // Button text will be updated by updateUI based on state.loggedIn
       }
