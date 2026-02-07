@@ -33,7 +33,7 @@ export async function fetchRedditRumors(query: string, limit = 5): Promise<Reddi
   };
 
   const children = data.data?.children ?? [];
-  return children
+  const posts = children
     .map(child => child.data ?? {})
     .map(post => ({
       title: typeof post.title === 'string' ? post.title : '',
@@ -43,4 +43,16 @@ export async function fetchRedditRumors(query: string, limit = 5): Promise<Reddi
       subreddit: typeof post.subreddit === 'string' ? post.subreddit : '',
     }))
     .filter(post => Boolean(post.title));
+
+  // Log freshness of Reddit results
+  console.error('[Reddit] Fetched results:');
+  posts.forEach((post, i) => {
+    const createdDate = post.createdUtc ? new Date(post.createdUtc * 1000) : null;
+    const hoursAgo = createdDate 
+      ? ((Date.now() - createdDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
+      : 'unknown';
+    console.error(`  [${i + 1}] ${hoursAgo}h ago: ${post.title.substring(0, 60)}...`);
+  });
+
+  return posts;
 }
