@@ -474,6 +474,7 @@ All logs exported with timestamps and structured data.
 
 ## Documentation
 
+- [Hackathon Flow Diagrams](docs/HACKATHON-FLOWS.md) - Visual architecture overview for judges
 - [x402 Yellow Extension](docs/x402-yellow-extension.md) - Payment protocol details
 - [Setup Guide](docs/) - Complete environment and deployment instructions
 - [API Reference](docs/) - Tool specifications and examples
