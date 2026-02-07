@@ -214,6 +214,10 @@ async function initializeYellow(): Promise<boolean> {
 
     log(`✓ Yellow session: ${yellowContext.appSessionId.slice(0, 20)}...`);
     yellowContext.connected = true;
+    
+    // Update state with wallet info
+    updateYellowWalletState();
+    
     return true;
   } catch (error) {
     log(`⚠️ Yellow init failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -228,6 +232,24 @@ function getToolPriceUsd(toolName: string): number {
   const raw = env.toolPrices?.[toolName] ?? env.pricePerCall;
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function updateYellowWalletState() {
+  if (!yellowContext.connected || !yellowContext.agentAddress || !yellowContext.merchantAddress) {
+    state.yellowWallets = null;
+    return;
+  }
+
+  const sessionRemaining = Math.max(0, yellowContext.sessionInitialAmount - yellowContext.sessionSpent);
+  
+  state.yellowWallets = {
+    agentAddress: yellowContext.agentAddress,
+    merchantAddress: yellowContext.merchantAddress,
+    sessionInitial: yellowContext.sessionInitialAmount,
+    sessionSpent: yellowContext.sessionSpent,
+    sessionRemaining,
+    assetSymbol: yellowContext.assetSymbol || 'ytest.usd',
+  };
 }
 
 async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: boolean }> {
@@ -257,6 +279,9 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
 
       const data = parseJsonFromToolText<any>('market_rumors', text);
       yellowContext.sessionSpent += getToolPriceUsd('market_rumors');
+      
+      // Update wallet state after payment
+      updateYellowWalletState();
 
       log(
         `✓ Live data: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} news articles`,
@@ -328,6 +353,9 @@ async function closeYellowSession(): Promise<void> {
   yellowContext.client = null;
   yellowContext.transport = null;
   yellowContext.connected = false;
+  
+  // Clear wallet state
+  state.yellowWallets = null;
 }
 
 // ============================================================================
@@ -401,6 +429,14 @@ interface DemoState {
   } | null;
   pnl: PnLState;
   useLifiQuotes: boolean;
+  yellowWallets: {
+    agentAddress: string;
+    merchantAddress: string;
+    sessionInitial: number;
+    sessionSpent: number;
+    sessionRemaining: number;
+    assetSymbol: string;
+  } | null;
 }
 
 const state: DemoState = {
@@ -430,6 +466,7 @@ const state: DemoState = {
     tokenHoldings: {},
   },
   useLifiQuotes: true, // Use real LI.FI quotes
+  yellowWallets: null,
 };
 
 // Initialize Sentifi components

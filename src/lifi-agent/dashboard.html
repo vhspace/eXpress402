@@ -32,7 +32,7 @@
       min-height: 100vh;
     }
 
-    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; padding-bottom: 80px; }
 
     /* Header */
     .header {
@@ -799,11 +799,116 @@
 
     .empty-state .icon { font-size: 2rem; margin-bottom: 10px; }
 
+    /* Status Bar */
+    .status-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(135deg, var(--bg-panel), var(--bg-elevated));
+      border-top: 2px solid var(--accent-cyan);
+      padding: 12px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 0.65rem;
+      z-index: 50;
+      box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .status-bar.hidden {
+      display: none;
+    }
+
+    .status-bar-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+    }
+
+    .status-bar-progress {
+      width: 100%;
+      height: 4px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-dim);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .status-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-amber), #ffcc00);
+      transition: width 0.3s ease, background 0.3s ease;
+      position: relative;
+      box-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+    }
+
+    .status-bar-fill.low {
+      background: linear-gradient(90deg, var(--accent-amber), #ff8800);
+      animation: pulseGlow 2s infinite;
+    }
+
+    .status-bar-fill.critical {
+      background: linear-gradient(90deg, var(--accent-red), #ff6666);
+      animation: pulseGlow 1s infinite;
+      box-shadow: 0 0 15px rgba(255, 51, 102, 0.7);
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-label {
+      color: var(--text-secondary);
+      letter-spacing: 0.1em;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .status-address {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+      font-size: 0.6rem;
+    }
+
+    .status-balance {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .status-balance.low {
+      color: var(--accent-amber);
+      animation: pulse 2s infinite;
+    }
+
+    .status-balance.critical {
+      color: var(--accent-red);
+      animation: pulse 1s infinite;
+    }
+
+    .status-divider {
+      width: 1px;
+      height: 30px;
+      background: var(--border-dim);
+    }
+
     /* Responsive */
     @media (max-width: 1100px) {
       .main-grid { grid-template-columns: 1fr 1fr; }
       .quote-card, .logs-card { grid-column: span 2; }
       .sentiment-card, .portfolio-card { grid-row: span 1; }
+      .container { padding-bottom: 70px; }
     }
 
     @media (max-width: 700px) {
@@ -812,6 +917,15 @@
       .control-row { flex-direction: column; align-items: stretch; }
       .action-buttons { margin-left: 0; margin-top: 15px; justify-content: center; }
       .header { flex-direction: column; gap: 15px; }
+      .status-bar-content { 
+        flex-direction: column; 
+        gap: 10px; 
+      }
+      .status-divider { 
+        width: 100%; 
+        height: 1px; 
+      }
+      .container { padding-bottom: 180px; }
     }
   </style>
 </head>
@@ -999,6 +1113,39 @@
     </div>
   </div>
 
+  <!-- Yellow Network Status Bar -->
+  <div class="status-bar hidden" id="statusBar">
+    <div class="status-bar-progress">
+      <div class="status-bar-fill" id="statusBarFill" style="width: 100%;"></div>
+    </div>
+    <div class="status-bar-content">
+      <div class="status-item">
+        <span class="status-label">AGENT</span>
+        <span class="status-address" id="agentAddress">--</span>
+      </div>
+      <div class="status-divider"></div>
+      <div class="status-item">
+        <span class="status-label">MARKET RESEARCH MCP</span>
+        <span class="status-address" id="merchantAddress">--</span>
+      </div>
+      <div class="status-divider"></div>
+      <div class="status-item">
+        <span class="status-label">SESSION INITIAL</span>
+        <span class="status-balance" id="sessionInitial">0.00</span>
+      </div>
+      <div class="status-divider"></div>
+      <div class="status-item">
+        <span class="status-label">SESSION SPENT</span>
+        <span class="status-balance" id="sessionSpent">0.00</span>
+      </div>
+      <div class="status-divider"></div>
+      <div class="status-item">
+        <span class="status-label">SESSION REMAINING</span>
+        <span class="status-balance" id="sessionRemaining">0.00</span>
+      </div>
+    </div>
+  </div>
+
   <script>
     let state = null;
     let selectedSymbol = 'ETH';
@@ -1171,6 +1318,7 @@
       updateQuote();
       updateLogs();
       updateExecution();
+      updateYellowStatusBar();
     }
 
     function updateSentiment() {
@@ -1391,6 +1539,57 @@
       const overlay = document.getElementById('executionOverlay');
       overlay.style.display = 'block';
       document.getElementById('execHash').textContent = state.execution.txHash;
+    }
+
+    function updateYellowStatusBar() {
+      const statusBar = document.getElementById('statusBar');
+      
+      if (!state.yellowWallets) {
+        statusBar.classList.add('hidden');
+        return;
+      }
+
+      statusBar.classList.remove('hidden');
+      const w = state.yellowWallets;
+
+      // Format addresses (show first 6 and last 4 characters)
+      const formatAddress = (addr) => {
+        if (!addr || addr === '--') return '--';
+        return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+      };
+
+      document.getElementById('agentAddress').textContent = formatAddress(w.agentAddress);
+      document.getElementById('merchantAddress').textContent = formatAddress(w.merchantAddress);
+      
+      // Format balances
+      const formatBalance = (amount) => {
+        return `${amount.toFixed(2)} ${w.assetSymbol}`;
+      };
+
+      document.getElementById('sessionInitial').textContent = formatBalance(w.sessionInitial);
+      document.getElementById('sessionSpent').textContent = formatBalance(w.sessionSpent);
+      
+      const remainingEl = document.getElementById('sessionRemaining');
+      remainingEl.textContent = formatBalance(w.sessionRemaining);
+      
+      // Calculate percentage remaining
+      const percentRemaining = w.sessionInitial > 0 ? (w.sessionRemaining / w.sessionInitial) * 100 : 100;
+      
+      // Update progress bar
+      const progressFill = document.getElementById('statusBarFill');
+      progressFill.style.width = `${Math.max(0, Math.min(100, percentRemaining))}%`;
+      
+      // Add warning classes based on remaining balance
+      remainingEl.className = 'status-balance';
+      progressFill.className = 'status-bar-fill';
+      
+      if (w.sessionRemaining < w.sessionInitial * 0.2) {
+        remainingEl.classList.add('critical');
+        progressFill.classList.add('critical');
+      } else if (w.sessionRemaining < w.sessionInitial * 0.5) {
+        remainingEl.classList.add('low');
+        progressFill.classList.add('low');
+      }
     }
 
     // Poll every 500ms
