@@ -331,29 +331,29 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
   // Check Yellow Network connection status
   if (!yellowContext.connected) {
     console.log(chalk.yellow('⚠️  Yellow Network not connected'));
-    log('📋 Using mock market data (Yellow Network not connected)');
-    debugLog('HTTP', `⚠️ MOCK DATA - Yellow Network not connected`);
+    log('📋 Using MOCK market data (Yellow Network not connected)');
+    debugLog('HTTP', `⚠️ ⚠️ ⚠️ MOCK DATA - Yellow Network not connected ⚠️ ⚠️ ⚠️`);
     return { data: generateMockRumors(symbol), isLive: false };
   }
   
   if (!yellowContext.client) {
     console.log(chalk.yellow('⚠️  MCP client not initialized'));
-    log('📋 Using mock market data (MCP client not available)');
-    debugLog('HTTP', `⚠️ MOCK DATA - MCP client not available`);
+    log('📋 Using MOCK market data (MCP client not available)');
+    debugLog('HTTP', `⚠️ ⚠️ ⚠️ MOCK DATA - MCP client not available ⚠️ ⚠️ ⚠️`);
     return { data: generateMockRumors(symbol), isLive: false };
   }
   
   if (!yellowContext.appSessionId) {
     console.log(chalk.yellow('⚠️  No Yellow session ID'));
-    log('📋 Using mock market data (No active Yellow session)');
-    debugLog('SESSION', `⚠️ MOCK DATA - No active Yellow Network session`);
+    log('📋 Using MOCK market data (No active Yellow session)');
+    debugLog('SESSION', `⚠️ ⚠️ ⚠️ MOCK DATA - No active Yellow Network session ⚠️ ⚠️ ⚠️`);
     return { data: generateMockRumors(symbol), isLive: false };
   }
   
   if (!yellowContext.agentAddress) {
     console.log(chalk.yellow('⚠️  No agent wallet address'));
-    log('📋 Using mock market data (No wallet configured)');
-    debugLog('WALLET', `⚠️ MOCK DATA - No wallet configured`);
+    log('📋 Using MOCK market data (No wallet configured)');
+    debugLog('WALLET', `⚠️ ⚠️ ⚠️ MOCK DATA - No wallet configured ⚠️ ⚠️ ⚠️`);
     return { data: generateMockRumors(symbol), isLive: false };
   }
 
@@ -398,17 +398,32 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
     yellowContext.sessionSpent += toolPrice;
     const balanceAfter = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
     
-    // Log detailed response data
-    const redditTitles = data.reddit?.slice(0, 2).map((r: any) => r.title?.substring(0, 40) + '...') || [];
-    const tavilyTitles = data.tavily?.slice(0, 2).map((t: any) => t.title?.substring(0, 40) + '...') || [];
+    // Log detailed response data with freshness indicators
+    const redditCount = data.reddit?.length || 0;
+    const tavilyCount = data.tavily?.length || 0;
     
-    debugLog('HTTP', `Response data: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} Tavily articles`);
-    if (redditTitles.length > 0) {
-      debugLog('HTTP', `Sample Reddit: "${redditTitles[0]}"`);
+    debugLog('HTTP', `✓ LIVE DATA from Yellow MCP: ${redditCount} Reddit, ${tavilyCount} Tavily`);
+    
+    // Show sample Reddit posts with age
+    if (data.reddit && data.reddit.length > 0) {
+      const sample = data.reddit[0];
+      const createdDate = sample.createdUtc ? new Date(sample.createdUtc * 1000) : null;
+      const hoursAgo = createdDate 
+        ? ((Date.now() - createdDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
+        : '?';
+      debugLog('HTTP', `Reddit sample (${hoursAgo}h ago): "${sample.title?.substring(0, 50)}..."`);
     }
-    if (tavilyTitles.length > 0) {
-      debugLog('HTTP', `Sample Tavily: "${tavilyTitles[0]}"`);
+    
+    // Show sample Tavily articles with age
+    if (data.tavily && data.tavily.length > 0) {
+      const sample = data.tavily[0];
+      const publishedDate = sample.published_date ? new Date(sample.published_date) : null;
+      const hoursAgo = publishedDate 
+        ? ((Date.now() - publishedDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
+        : '?';
+      debugLog('HTTP', `Tavily sample (${hoursAgo}h ago): "${sample.title?.substring(0, 50)}..."`);
     }
+    
     debugLog('SESSION', `✓ Yellow Network payment processed`);
     debugLog('SESSION', `Payment deducted: ${toolPrice.toFixed(2)} ${yellowContext.assetSymbol}`);
     debugLog('SESSION', `Post-call balance: ${balanceAfter.toFixed(2)} ${yellowContext.assetSymbol}`);
@@ -425,9 +440,9 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
   } catch (error) {
     console.log(chalk.red(`❌ MCP call failed: ${error instanceof Error ? error.message : String(error)}`));
     log(`⚠️ MCP call failed: ${error instanceof Error ? error.message : String(error)}`);
-    debugLog('HTTP', `MCP call failed: ${error instanceof Error ? error.message : String(error)}`);
-    console.log(chalk.yellow('📋 Falling back to mock market data'));
-    log('📋 Using mock market data (API call failed)');
+    debugLog('HTTP', `⚠️ ⚠️ ⚠️ MOCK DATA - MCP call failed: ${error instanceof Error ? error.message : String(error)} ⚠️ ⚠️ ⚠️`);
+    console.log(chalk.yellow('📋 Falling back to MOCK market data'));
+    log('📋 Using MOCK market data (API call failed)');
     return { data: generateMockRumors(symbol), isLive: false };
   }
 }

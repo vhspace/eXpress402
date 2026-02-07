@@ -13,6 +13,12 @@ This document provides comprehensive flow diagrams explaining the key innovation
 ### Overview
 eXpress402 combines **x402 payment protocol** with **SIWx wallet authentication** and **Yellow Network off-chain channels** to enable "pay once, query many times" for AI agents.
 
+### Visual Flow Diagram
+
+![Yellow Network x402/SIWx Flow](../assets/yellow-x402-siwx-flow.png)
+
+**Key Innovation**: First request authenticates with wallet signature and creates a payment session. All subsequent requests reuse that session with sub-millisecond Redis lookup - no additional blockchain transactions needed!
+
 ### High-Level Architecture
 
 ```mermaid
@@ -182,6 +188,12 @@ sequenceDiagram
 
 ### Overview
 Sentifi is an autonomous AI agent that monitors market sentiment, makes trading decisions, and executes cross-chain swaps using Li.fi SDK. It uses Yellow Network MCP for paid market intelligence.
+
+### Visual Flow Diagram
+
+![Sentifi Li.fi Trading Agent Flow](../assets/sentifi-lifi-trading-flow.png)
+
+**Autonomous Loop**: The agent continuously monitors market sentiment via eXpress402 MCP (using prepaid Yellow sessions), decides on trading strategy, executes swaps via Li.fi SDK across 30+ DEXs, and records P&L - all without human intervention.
 
 ### High-Level Architecture
 
