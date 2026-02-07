@@ -320,23 +320,41 @@ async function updateYellowWalletState() {
     state.yellowWallets = null;
     return;
   }
-
+  
   const sessionRemaining = Math.max(0, yellowContext.sessionInitialAmount - yellowContext.sessionSpent);
   
-  // Query off-chain wallet balances
+  // Query UNIFIED off-chain balances
   let agentBalance = 0;
   let merchantBalance = 0;
   
   try {
-    const agentBalances = await yellowContext.yellow.getLedgerBalances(yellowContext.agentAddress);
+    // Agent queries their OWN unified balance
+    const agentBalances = await yellowContext.yellow.getLedgerBalances(); // No accountId!
     const agentAsset = agentBalances.find((b: any) => b.asset === yellowContext.assetSymbol);
     agentBalance = agentAsset ? parseFloat(agentAsset.amount) : 0;
     
-    const merchantBalances = await yellowContext.yellow.getLedgerBalances(yellowContext.merchantAddress);
-    const merchantAsset = merchantBalances.find((b: any) => b.asset === yellowContext.assetSymbol);
-    merchantBalance = merchantAsset ? parseFloat(merchantAsset.amount) : 0;
+    // Merchant queries their OWN unified balance (need separate client)
+    const env = getYellowConfig();
+    if (env.merchantPrivateKey) {
+      const merchantYellow = new YellowRpcClient({
+        url: env.clearnodeUrl,
+        privateKey: env.merchantPrivateKey,
+        authDomain: env.authDomain,
+        debug: false,
+      });
+      
+      await merchantYellow.connect();
+      await merchantYellow.authenticate({
+        allowances: [{ asset: env.assetSymbol, amount: '1000' }],
+        scope: 'transfer',
+      });
+      
+      const merchantBalances = await merchantYellow.getLedgerBalances(); // Merchant's OWN balance
+      const merchantAsset = merchantBalances.find((b: any) => b.asset === yellowContext.assetSymbol);
+      merchantBalance = merchantAsset ? parseFloat(merchantAsset.amount) : 0;
+    }
   } catch (error) {
-    console.error('Failed to fetch wallet balances:', error);
+    console.error('Failed to fetch unified balances:', error);
   }
   
   state.yellowWallets = {
