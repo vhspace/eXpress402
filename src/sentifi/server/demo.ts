@@ -442,9 +442,12 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
 
     const data = parseJsonFromToolText<any>('market_rumors', text);
     
-    // Deduct payment via Yellow Network session
+    // Deduct payment via Yellow Network session (local tracking)
     yellowContext.sessionSpent += toolPrice;
     const balanceAfter = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
+    
+    console.log(chalk.magenta(`💸 Session payment: ${toolPrice.toFixed(2)} ${yellowContext.assetSymbol} (total spent: ${yellowContext.sessionSpent.toFixed(2)})`));
+    debugLog('SESSION', `Payment deducted: ${toolPrice.toFixed(2)} ${yellowContext.assetSymbol} (total spent: ${yellowContext.sessionSpent.toFixed(2)})`);
     
     // Log detailed response data with freshness indicators
     const redditCount = data.reddit?.length || 0;
@@ -504,30 +507,17 @@ async function closeYellowSession(fullDisconnect: boolean = true): Promise<void>
       
       debugLog('SESSION', `Closing Yellow Network session: ${yellowContext.appSessionId.slice(0, 20)}...`);
       
-      let remaining: number;
-      try {
-        remaining = await getSessionAssetBalance({
-          yellow: yellowContext.yellow,
-          sessionId: yellowContext.appSessionId,
-          assetSymbol: asset,
-        });
-        debugLog('SESSION', `✓ Queried final balance from Yellow Network: ${remaining.toFixed(2)} ${asset}`);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        log(`⚠️ Failed to query session balance, falling back: ${message}`);
-        const initial = Number.isFinite(yellowContext.sessionInitialAmount)
-          ? yellowContext.sessionInitialAmount
-          : 0;
-        remaining = Math.max(0, initial - Math.max(0, yellowContext.sessionSpent));
-      }
-
-      // Keep local tracking aligned with what Yellow reports.
-      if (Number.isFinite(remaining)) {
-        const initial = Number.isFinite(yellowContext.sessionInitialAmount)
-          ? yellowContext.sessionInitialAmount
-          : 0;
-        yellowContext.sessionSpent = Math.max(0, initial - remaining);
-      }
+      // Use LOCAL tracking instead of querying Yellow
+      // Yellow Network doesn't track per-call deductions in real-time
+      // The MCP server uses a local cache, so we calculate from our tracking
+      const initial = Number.isFinite(yellowContext.sessionInitialAmount)
+        ? yellowContext.sessionInitialAmount
+        : 0;
+      const spent = Number.isFinite(yellowContext.sessionSpent) ? yellowContext.sessionSpent : 0;
+      const remaining = Math.max(0, initial - spent);
+      
+      debugLog('SESSION', `Using local tracking: initial=${initial.toFixed(2)}, spent=${spent.toFixed(2)}, remaining=${remaining.toFixed(2)} ${asset}`);
+      console.log(chalk.cyan(`Local session tracking: ${spent.toFixed(2)} ${asset} spent from ${initial.toFixed(2)} ${asset}`));
 
       const allocations = computeSessionCloseAllocations({
         agentAddress: yellowContext.agentAddress,
@@ -538,6 +528,8 @@ async function closeYellowSession(fullDisconnect: boolean = true): Promise<void>
       });
       
       debugLog('SESSION', `Final settlement: Agent refund ${remaining.toFixed(2)} ${asset}, Merchant payment ${yellowContext.sessionSpent.toFixed(2)} ${asset}`);
+      debugLog('SESSION', `Allocations: ${JSON.stringify(allocations)}`);
+      console.log(chalk.cyan(`Session close allocations: ${JSON.stringify(allocations, null, 2)}`))
 
       // Close with QUORUM 2 (both agent and merchant sign)
       const agentCloseSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
@@ -554,9 +546,19 @@ async function closeYellowSession(fullDisconnect: boolean = true): Promise<void>
 
       const closeResponse = await yellowContext.yellow.sendRawMessage(JSON.stringify(closeParsed));
       
+      console.log(chalk.cyan(`Close response: ${JSON.stringify(closeResponse, null, 2)}`));
       debugLog('SESSION', `✓ Yellow Network session closed with Quorum 2`);
       debugLog('SESSION', `Close response: ${JSON.stringify(closeResponse)}`);
       log('✓ Yellow session closed (Quorum 2)');
+      
+      // Verify the close was successful
+      if (closeResponse && typeof closeResponse === 'object') {
+        const success = (closeResponse as any).result?.success ?? (closeResponse as any).success ?? true;
+        if (!success) {
+          console.error(chalk.red('⚠️  Session close may have failed!'));
+          debugLog('SESSION', `⚠️  Close response indicates failure`);
+        }
+      }
     } catch (error) {
       log(`⚠️ Failed to close session: ${error instanceof Error ? error.message : String(error)}`);
       debugLog('SESSION', `⚠️ Session close failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -1343,16 +1345,20 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 
   if (url.pathname === '/api/logout' && req.method === 'POST') {
     // Close Yellow session and settle funds to merchant (but stay connected)
+    console.log(chalk.yellow('\n🔒 Logout requested - closing session...'));
     await closeYellowSession(false);
     
     // Mark as logged out
     state.loggedIn = false;
     
-    // Wait a moment for settlement to complete
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Wait longer for settlement to complete (Yellow Network processing time)
+    console.log(chalk.yellow('⏳ Waiting 5 seconds for settlement...'));
+    await new Promise(resolve => setTimeout(resolve, 5000));
     
     // Update wallet balances to show merchant received funds
+    console.log(chalk.yellow('💰 Querying final balances...'));
     await updateYellowWalletState();
+    console.log(chalk.green('✓ Logout complete'));
     
     // Reset UI state but keep balances
     const currentBalance = state.usdcBalance;
