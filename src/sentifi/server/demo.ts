@@ -874,6 +874,7 @@ async function analyzeWithNewArchitecture(symbol: string, rumors: any, isLive: b
     type: item.source,
     title: item.title,
     score: item.engagement,
+    url: item.url,
   }));
 
   state.sentiment = {

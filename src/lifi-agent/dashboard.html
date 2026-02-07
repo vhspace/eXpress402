@@ -526,6 +526,20 @@
       padding: 8px 0;
       border-bottom: 1px solid var(--border-dim);
       font-size: 0.65rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .source-item:hover {
+      background: var(--bg-elevated);
+      padding-left: 8px;
+      padding-right: 8px;
+      margin-left: -8px;
+      margin-right: -8px;
+    }
+    
+    .source-item:hover .source-text {
+      color: var(--accent-cyan);
     }
 
     .source-icon {
@@ -1524,7 +1538,7 @@
         <div class="source-count">Analyzed <strong>${s.sources.length}</strong> ${s.isLive ? 'live' : 'fallback'} sources</div>
         <div class="sources-list">
           ${s.sources.slice(0, 5).map(src => `
-            <div class="source-item">
+            <div class="source-item" onclick="window.open('${src.url}', '_blank')" title="${src.title}">
               <div class="source-icon ${src.type}">${src.type === 'reddit' ? 'R' : 'T'}</div>
               <div class="source-text">${src.title.substring(0, 50)}${src.title.length > 50 ? '...' : ''}</div>
               <div class="source-score ${src.score < 0 ? 'negative' : ''}">${src.score > 0 ? '+' : ''}${src.score.toFixed(1)}</div>
