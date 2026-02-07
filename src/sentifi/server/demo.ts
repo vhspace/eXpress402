@@ -1029,20 +1029,32 @@ async function makeDecision(signal: AggregatedSignal) {
   return intent;
 }
 
+// Map common symbols to their tradeable equivalents on Arbitrum
+function getTradeableToken(symbol: string): string {
+  const tokenMap: Record<string, string> = {
+    'ETH': 'WETH',   // Wrapped Ether
+    'BTC': 'WBTC',   // Wrapped Bitcoin
+    // Add more mappings as needed
+  };
+  return tokenMap[symbol.toUpperCase()] || symbol;
+}
+
 function confirmDecision(action?: string, amount?: string) {
   if (!state.decision) return;
 
   if (action) {
     const symbol = state.symbol || 'ETH';
+    const tradeableToken = getTradeableToken(symbol);
+    
     if (action === 'SWAP_BULLISH') {
       state.decision.action = 'SWAP_BULLISH';
       state.decision.reason = `User confirmed: swap to ${symbol}`;
       state.decision.fromToken = 'USDC';
-      state.decision.toToken = symbol === 'ETH' ? 'WETH' : symbol;
+      state.decision.toToken = tradeableToken;
     } else if (action === 'SWAP_BEARISH') {
       state.decision.action = 'SWAP_BEARISH';
       state.decision.reason = `User confirmed: exit to stables`;
-      state.decision.fromToken = symbol === 'ETH' ? 'WETH' : symbol;
+      state.decision.fromToken = tradeableToken;
       state.decision.toToken = 'USDC';
     } else {
       state.decision.action = 'HOLD';
