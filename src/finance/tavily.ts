@@ -35,7 +35,12 @@ export async function fetchTavilyRumors(query: string, maxResults = 5): Promise<
     throw new Error(`Tavily request failed: ${response.status}`);
   }
 
-  const data = (await response.json()) as {
+  const rawData = await response.json();
+  
+  // Log the raw response to see what fields are actually returned
+  console.error('[Tavily] Raw API response structure:', JSON.stringify(rawData, null, 2).substring(0, 500));
+  
+  const data = rawData as {
     results?: Array<{ 
       title: string; 
       url: string; 
@@ -54,12 +59,12 @@ export async function fetchTavilyRumors(query: string, maxResults = 5): Promise<
   }));
 
   // Log the freshness of results
-  console.error('[Tavily] Fetched results:');
+  console.error('[Tavily] Fetched results (requested last 24h only):');
   results.forEach((r, i) => {
     const publishedDate = r.published_date ? new Date(r.published_date) : null;
     const hoursAgo = publishedDate 
       ? ((Date.now() - publishedDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
-      : 'unknown';
+      : 'NO DATE';
     console.error(`  [${i + 1}] ${hoursAgo}h ago: ${r.title.substring(0, 60)}...`);
   });
 
