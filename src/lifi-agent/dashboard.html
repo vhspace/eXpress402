@@ -1112,7 +1112,7 @@
             <span class="spinner"></span>
             4. EXECUTE
           </button>
-          <button class="action-btn reset" id="resetBtn" onclick="reset()">RESET</button>
+          <button class="action-btn reset" id="logoutBtn" onclick="logout()">LOGOUT</button>
         </div>
       </div>
     </div>
@@ -1393,12 +1393,29 @@
       btn.classList.remove('loading');
     }
 
-    async function reset() {
-      await fetch('/api/reset', { method: 'POST' });
-      document.getElementById('executionOverlay').style.display = 'none';
-      document.getElementById('decisionConfirm').style.display = 'none';
-      selectedAction = null;
-      updateDecisionButtons();
+    async function logout() {
+      const btn = document.getElementById('logoutBtn');
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'CLOSING SESSION...';
+      
+      try {
+        await fetch('/api/logout', { method: 'POST' });
+        
+        // Clear UI state
+        document.getElementById('executionOverlay').style.display = 'none';
+        document.getElementById('decisionConfirm').style.display = 'none';
+        selectedAction = null;
+        updateDecisionButtons();
+        
+        // Wait a moment to show merchant balance update
+        btn.textContent = 'REOPENING...';
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
     }
 
     // Error modal functions
