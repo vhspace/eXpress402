@@ -528,6 +528,7 @@
       font-size: 0.65rem;
       cursor: pointer;
       transition: all 0.2s;
+      position: relative;
     }
     
     .source-item:hover {
@@ -540,6 +541,33 @@
     
     .source-item:hover .source-text {
       color: var(--accent-cyan);
+    }
+    
+    /* Custom tooltip */
+    .source-item[data-tooltip]:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      transform: translateX(-50%);
+      background: var(--bg-void);
+      color: var(--text-primary);
+      border: 1px solid var(--accent-cyan);
+      padding: 8px 12px;
+      font-size: 0.65rem;
+      line-height: 1.4;
+      white-space: normal;
+      max-width: 300px;
+      z-index: 1000;
+      margin-top: 5px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(15, 244, 234, 0.3);
+      pointer-events: none;
+      animation: tooltipFadeIn 0.2s ease;
+    }
+    
+    @keyframes tooltipFadeIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-5px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
 
     .source-icon {
@@ -1538,7 +1566,7 @@
         <div class="source-count">Analyzed <strong>${s.sources.length}</strong> ${s.isLive ? 'live' : 'fallback'} sources</div>
         <div class="sources-list">
           ${s.sources.slice(0, 5).map(src => `
-            <div class="source-item" onclick="window.open('${src.url}', '_blank')" title="${src.title}">
+            <div class="source-item" onclick="window.open('${src.url}', '_blank')" data-tooltip="${src.title}">
               <div class="source-icon ${src.type}">${src.type === 'reddit' ? 'R' : 'T'}</div>
               <div class="source-text">${src.title.substring(0, 50)}${src.title.length > 50 ? '...' : ''}</div>
               <div class="source-score ${src.score < 0 ? 'negative' : ''}">${src.score > 0 ? '+' : ''}${src.score.toFixed(1)}</div>
