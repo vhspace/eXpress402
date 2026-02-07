@@ -82,21 +82,21 @@ npm run merchant-offramp -- base
 
 1. Agent checks state
    └─ npm run check-production
-   
+
 2. Agent creates app session (1 USDC from unified balance)
    └─ YELLOW_ENV=production npm run demo:agentkit
-   
+
 3. Agent uses MCP tools
    - stock_price: 0.1 USDC
    - market_rumors: 0.1 USDC
-   
+
 4. Session closes (quorum 2 settlement)
    - Agent: 0.8 USDC refund
    - Merchant: 0.2 USDC payment
-   
+
 5. Merchant offramp to wallet
    └─ npm run merchant-offramp -- base
-   
+
 6. Result: Merchant has 0.2 USDC in wallet (Basescan proof)
 ```
 

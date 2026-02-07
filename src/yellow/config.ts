@@ -27,7 +27,7 @@ export function getYellowConfig() {
     assetSymbol: process.env.YELLOW_ASSET_SYMBOL ?? (mode === 'development' ? 'ytest.usd' : 'usdc'),
     network:
       process.env.YELLOW_NETWORK ?? (mode === 'development' ? 'yellow:sandbox' : 'yellow:mainnet'),
-    pricePerCall: process.env.YELLOW_PRICE_PER_CALL ?? '0.1',
+    pricePerCall: process.env.YELLOW_PRICE_PER_CALL ?? (mode === 'development' ? '1.15' : '0.001'),
     toolPrices: parseToolPrices(process.env.YELLOW_TOOL_PRICES),
     maxTimeoutSeconds: Number(process.env.YELLOW_MAX_TIMEOUT_SECONDS ?? '60'),
     merchantAddress: process.env.YELLOW_MERCHANT_ADDRESS ?? '',

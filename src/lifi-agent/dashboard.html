@@ -207,6 +207,18 @@
       color: var(--accent-red);
     }
 
+    .action-btn.login {
+      background: transparent;
+      border: 1px solid var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .action-btn.login:hover:not(:disabled) {
+      background: var(--accent-green);
+      color: var(--bg-void);
+      box-shadow: 0 0 20px rgba(0, 255, 163, 0.3);
+    }
+
     .action-btn .spinner {
       display: none;
       width: 14px;
@@ -374,10 +386,17 @@
 
     .amount-input {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 4px;
       justify-content: center;
       margin-bottom: 12px;
+    }
+
+    .amount-input-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .amount-input label {
@@ -526,6 +545,48 @@
       padding: 8px 0;
       border-bottom: 1px solid var(--border-dim);
       font-size: 0.65rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    
+    .source-item:hover {
+      background: var(--bg-elevated);
+      padding-left: 8px;
+      padding-right: 8px;
+      margin-left: -8px;
+      margin-right: -8px;
+    }
+    
+    .source-item:hover .source-text {
+      color: var(--accent-cyan);
+    }
+    
+    /* Custom tooltip */
+    .source-item[data-tooltip]:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      transform: translateX(-50%);
+      background: var(--bg-void);
+      color: var(--text-primary);
+      border: 1px solid var(--accent-cyan);
+      padding: 8px 12px;
+      font-size: 0.65rem;
+      line-height: 1.4;
+      white-space: normal;
+      max-width: 300px;
+      z-index: 1000;
+      margin-top: 5px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(15, 244, 234, 0.3);
+      pointer-events: none;
+      animation: tooltipFadeIn 0.2s ease;
+    }
+    
+    @keyframes tooltipFadeIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-5px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
 
     .source-icon {
@@ -541,6 +602,7 @@
 
     .source-icon.reddit { color: #ff4500; }
     .source-icon.tavily { color: var(--accent-purple); }
+    .source-icon.news { color: var(--accent-cyan); }
 
     .source-text { color: var(--text-secondary); flex: 1; line-height: 1.3; }
 
@@ -770,6 +832,76 @@
     .log-message.info { color: var(--accent-cyan); }
     .log-message.warning { color: var(--accent-amber); }
 
+    .debug-category {
+      font-size: 0.6rem;
+      padding: 2px 6px;
+      border-radius: 2px;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+    .debug-category.session { background: rgba(255, 170, 0, 0.15); color: var(--accent-amber); }
+    .debug-category.http { background: rgba(15, 244, 234, 0.15); color: var(--accent-cyan); }
+    .debug-category.wallet { background: rgba(170, 85, 255, 0.15); color: var(--accent-purple); }
+
+    /* Auth Loading Overlay */
+    .auth-loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+      animation: fadeIn 0.3s ease;
+    }
+
+    .auth-loading-content {
+      text-align: center;
+      padding: 40px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--accent-cyan);
+      box-shadow: 0 0 30px rgba(15, 244, 234, 0.3);
+      min-width: 300px;
+    }
+
+    .auth-loading-spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(15, 244, 234, 0.2);
+      border-top-color: var(--accent-cyan);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    .auth-loading-text {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+
+    .auth-loading-subtext {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
     /* Execution Overlay */
     .execution-overlay {
       position: fixed;
@@ -788,6 +920,80 @@
     .exec-title { font-family: 'Orbitron', sans-serif; font-size: 0.8rem; color: var(--accent-amber); }
     .exec-hash { font-size: 0.55rem; color: var(--text-muted); margin-top: 5px; }
     .exec-note { font-size: 0.5rem; color: var(--accent-amber); margin-top: 8px; border-top: 1px solid var(--border-dim); padding-top: 8px; }
+
+    /* Error Modal */
+    .error-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(3, 5, 8, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .error-modal.hidden {
+      display: none;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .error-content {
+      background: var(--bg-panel);
+      border: 3px solid var(--accent-red);
+      padding: 30px 40px;
+      max-width: 500px;
+      box-shadow: 0 0 40px rgba(255, 51, 102, 0.5);
+      animation: scaleIn 0.3s ease;
+    }
+
+    @keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    .error-icon {
+      font-size: 3rem;
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    .error-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent-red);
+      text-align: center;
+      margin-bottom: 15px;
+      letter-spacing: 0.1em;
+    }
+
+    .error-message {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-align: center;
+      line-height: 1.6;
+      margin-bottom: 25px;
+    }
+
+    .error-close {
+      width: 100%;
+      padding: 12px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: var(--accent-red);
+      border: none;
+      color: var(--bg-void);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .error-close:hover {
+      background: #ff5577;
+      box-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
+    }
 
     /* Empty/Loading states */
     .empty-state {
@@ -823,8 +1029,11 @@
     .status-bar-content {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 40px;
+      justify-content: space-between;
+      gap: 30px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
     }
 
     .status-bar-progress {
@@ -862,8 +1071,14 @@
 
     .status-item {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 4px;
+    }
+    
+    .status-item:first-child,
+    .status-item:last-child {
+      min-width: 180px;
     }
 
     .status-label {
@@ -946,6 +1161,10 @@
           <span>Yellow:</span>
           <span id="yellowStatus">--</span>
         </div>
+        <div class="badge" id="debugBadge" style="cursor: pointer;" onclick="toggleDebugLogs()">
+          <span id="debugToggleIcon">👁️</span>
+          <span id="debugToggleText">DEBUG</span>
+        </div>
       </div>
     </header>
 
@@ -971,7 +1190,7 @@
             <span class="spinner"></span>
             4. EXECUTE
           </button>
-          <button class="action-btn reset" id="resetBtn" onclick="reset()">RESET</button>
+          <button class="action-btn reset" id="logoutBtn" onclick="toggleLogin()">LOGOUT</button>
         </div>
       </div>
     </div>
@@ -1016,9 +1235,12 @@
               <button class="decision-opt" data-action="SWAP_BEARISH" onclick="selectDecision('SWAP_BEARISH')">↘ SELL</button>
             </div>
             <div class="amount-input" id="amountInput">
-              <label>Amount:</label>
-              <input type="number" id="tradeAmount" min="1" max="1000" step="10" value="50">
-              <span>USDC</span>
+              <div class="amount-input-row">
+                <label>Amount:</label>
+                <input type="number" id="tradeAmount" min="1" max="1000" step="10" value="50" required>
+                <span>USDC</span>
+              </div>
+              <small style="color: var(--text-muted); font-size: 0.65rem;">(min: 1 USDC)</small>
             </div>
             <button class="validate-btn" onclick="validateDecision()">✓ VALIDATE DECISION</button>
           </div>
@@ -1103,6 +1325,26 @@
           <div class="logs-container" id="logsContainer"></div>
         </div>
       </div>
+
+      <!-- Debug Logs -->
+      <div class="card logs-card" id="debugLogsCard" style="display: none;">
+        <div class="card-header">
+          <span class="card-title">DEBUG LOGS</span>
+          <span class="card-badge live"><span class="badge-dot"></span>SESSION • HTTP • WALLET</span>
+        </div>
+        <div class="card-body">
+          <div class="logs-container" id="debugLogsContainer"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auth Loading Overlay -->
+    <div class="auth-loading-overlay" id="authLoadingOverlay" style="display: none;">
+      <div class="auth-loading-content">
+        <div class="auth-loading-spinner"></div>
+        <div class="auth-loading-text" id="authLoadingText">PROCESSING...</div>
+        <div class="auth-loading-subtext" id="authLoadingSubtext">Please wait</div>
+      </div>
     </div>
 
     <!-- Execution Overlay -->
@@ -1113,22 +1355,32 @@
     </div>
   </div>
 
+  <!-- Error Modal -->
+  <div class="error-modal hidden" id="errorModal">
+    <div class="error-content">
+      <div class="error-icon">⚠️</div>
+      <div class="error-title" id="errorTitle">ERROR</div>
+      <div class="error-message" id="errorMessage">An error occurred</div>
+      <button class="error-close" onclick="closeErrorModal()">CLOSE</button>
+    </div>
+  </div>
+
   <!-- Yellow Network Status Bar -->
   <div class="status-bar hidden" id="statusBar">
     <div class="status-bar-progress">
       <div class="status-bar-fill" id="statusBarFill" style="width: 100%;"></div>
     </div>
     <div class="status-bar-content">
+      <!-- Left: AI Agent Off-Chain Wallet -->
       <div class="status-item">
-        <span class="status-label">AGENT</span>
+        <span class="status-label">AI AGENT</span>
         <span class="status-address" id="agentAddress">--</span>
+        <span class="status-balance" id="agentBalance">0.00</span>
       </div>
+      
       <div class="status-divider"></div>
-      <div class="status-item">
-        <span class="status-label">MARKET RESEARCH MCP</span>
-        <span class="status-address" id="merchantAddress">--</span>
-      </div>
-      <div class="status-divider"></div>
+      
+      <!-- Center: Session Info -->
       <div class="status-item">
         <span class="status-label">SESSION INITIAL</span>
         <span class="status-balance" id="sessionInitial">0.00</span>
@@ -1143,6 +1395,15 @@
         <span class="status-label">SESSION REMAINING</span>
         <span class="status-balance" id="sessionRemaining">0.00</span>
       </div>
+      
+      <div class="status-divider"></div>
+      
+      <!-- Right: MCP Merchant -->
+      <div class="status-item">
+        <span class="status-label">MARKET RESEARCH MCP</span>
+        <span class="status-address" id="merchantAddress">--</span>
+        <span class="status-balance" id="merchantBalance">0.00</span>
+      </div>
     </div>
   </div>
 
@@ -1150,6 +1411,10 @@
     let state = null;
     let selectedSymbol = 'ETH';
     let prevLogCount = 0;
+    let userScrollingLogs = false;
+    let userScrollingDebug = false;
+    let scrollTimeout = null;
+    let debugScrollTimeout = null;
 
     // Symbol selection
     document.querySelectorAll('.symbol-btn').forEach(btn => {
@@ -1166,14 +1431,32 @@
       btn.classList.add('loading');
       btn.disabled = true;
 
-      await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: selectedSymbol })
-      });
+      try {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: selectedSymbol })
+        });
 
-      // Wait for completion
-      await waitForIdle();
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (data.budgetDepleted) {
+            showErrorModal('RESEARCH BUDGET DEPLETED', data.message);
+          } else {
+            showErrorModal('ERROR', data.error || 'Analysis failed');
+          }
+          btn.classList.remove('loading');
+          btn.disabled = false;
+          return;
+        }
+
+        // Wait for completion
+        await waitForIdle();
+      } catch (error) {
+        showErrorModal('ERROR', error.message || 'Analysis failed');
+      }
+
       btn.classList.remove('loading');
       btn.disabled = false;
     }
@@ -1200,12 +1483,101 @@
       btn.classList.remove('loading');
     }
 
-    async function reset() {
-      await fetch('/api/reset', { method: 'POST' });
-      document.getElementById('executionOverlay').style.display = 'none';
-      document.getElementById('decisionConfirm').style.display = 'none';
-      selectedAction = null;
-      updateDecisionButtons();
+    function showAuthLoading(text, subtext) {
+      document.getElementById('authLoadingText').textContent = text;
+      document.getElementById('authLoadingSubtext').textContent = subtext;
+      document.getElementById('authLoadingOverlay').style.display = 'flex';
+    }
+
+    function hideAuthLoading() {
+      document.getElementById('authLoadingOverlay').style.display = 'none';
+    }
+
+    async function logout() {
+      const btn = document.getElementById('logoutBtn');
+      btn.disabled = true;
+      
+      showAuthLoading('LOGGING OUT', 'Closing Yellow Network session and settling funds to Market Research MCP...');
+      
+      try {
+        await fetch('/api/logout', { method: 'POST' });
+        
+        // Clear UI state
+        document.getElementById('executionOverlay').style.display = 'none';
+        document.getElementById('decisionConfirm').style.display = 'none';
+        selectedAction = null;
+        updateDecisionButtons();
+        
+        // Wait for merchant balance to update (server waits 5 seconds for settlement)
+        await new Promise(resolve => setTimeout(resolve, 6000));
+        
+      } finally {
+        hideAuthLoading();
+        btn.disabled = false;
+        // Button text will be updated by updateUI based on state.loggedIn
+      }
+    }
+
+    async function login() {
+      const btn = document.getElementById('logoutBtn');
+      btn.disabled = true;
+      
+      showAuthLoading('LOGGING IN', 'Creating new Yellow Network session with Quorum 2 governance...');
+      
+      try {
+        await fetch('/api/login', { method: 'POST' });
+        
+        // Wait for session to be created
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+      } finally {
+        hideAuthLoading();
+        btn.disabled = false;
+        // Button text will be updated by updateUI based on state.loggedIn
+      }
+    }
+
+    function toggleLogin() {
+      if (state.loggedIn) {
+        logout();
+      } else {
+        login();
+      }
+    }
+
+    // Error modal functions
+    function showErrorModal(title, message) {
+      document.getElementById('errorTitle').textContent = title;
+      document.getElementById('errorMessage').textContent = message;
+      document.getElementById('errorModal').classList.remove('hidden');
+    }
+
+    function closeErrorModal() {
+      document.getElementById('errorModal').classList.add('hidden');
+    }
+
+    // Debug logs toggle
+    async function toggleDebugLogs() {
+      await fetch('/api/toggle-debug', { method: 'POST' });
+      // State will update on next poll
+    }
+
+    function updateDebugBadge() {
+      const badge = document.getElementById('debugBadge');
+      const icon = document.getElementById('debugToggleIcon');
+      const text = document.getElementById('debugToggleText');
+      
+      if (state.debugLogsEnabled) {
+        badge.style.borderColor = 'var(--accent-green)';
+        badge.style.color = 'var(--accent-green)';
+        icon.textContent = '👁️';
+        text.textContent = 'DEBUG ON';
+      } else {
+        badge.style.borderColor = 'var(--text-muted)';
+        badge.style.color = 'var(--text-muted)';
+        icon.textContent = '🙈';
+        text.textContent = 'DEBUG OFF';
+      }
     }
 
     // Deposit functions
@@ -1255,7 +1627,16 @@
     async function validateDecision() {
       if (!selectedAction) return;
 
-      const amount = document.getElementById('tradeAmount').value;
+      const amount = parseFloat(document.getElementById('tradeAmount').value);
+
+      // Validate amount for SWAP actions
+      if ((selectedAction === 'SWAP_BULLISH' || selectedAction === 'SWAP_BEARISH') && amount <= 0) {
+        showErrorModal(
+          'Invalid Trade Amount',
+          'Trade amount must be greater than 0 USDC. Please enter a valid amount to execute the trade.'
+        );
+        return;
+      }
 
       await fetch('/api/confirm-decision', {
         method: 'POST',
@@ -1302,12 +1683,35 @@
       // Yellow status
       document.getElementById('yellowStatus').textContent = state.yellowConnected ? '✓' : '--';
 
+      // Debug badge
+      updateDebugBadge();
+
+      // Login/Logout button
+      const loginBtn = document.getElementById('logoutBtn');
+      if (state.loggedIn) {
+        loginBtn.textContent = 'LOGOUT';
+        loginBtn.classList.remove('login');
+        loginBtn.classList.add('reset');
+      } else {
+        loginBtn.textContent = 'LOGIN';
+        loginBtn.classList.remove('reset');
+        loginBtn.classList.add('login');
+      }
+
       // Buttons - based on flow state
       const hasBalance = state.usdcBalance > 0;
       const hasDecision = state.decision && state.decision.action !== 'HOLD';
       const decisionConfirmed = state.decisionConfirmed;
 
-      document.getElementById('analyzeBtn').disabled = !hasBalance || state.isRunning;
+      // Check Yellow session balance for research
+      let hasYellowBalance = true;
+      if (state.yellowWallets && state.yellowConnected) {
+        // MCP cost per query (from backend)
+        const minRequired = state.yellowWallets.pricePerCall || 0.001;
+        hasYellowBalance = state.yellowWallets.sessionRemaining >= minRequired;
+      }
+
+      document.getElementById('analyzeBtn').disabled = !hasBalance || !hasYellowBalance || state.isRunning || !state.loggedIn;
       document.getElementById('quoteBtn').disabled = !hasDecision || !decisionConfirmed || state.isRunning;
       document.getElementById('executeBtn').disabled = !state.quote || state.isRunning;
 
@@ -1317,6 +1721,7 @@
       updatePortfolio();
       updateQuote();
       updateLogs();
+      updateDebugLogs();
       updateExecution();
       updateYellowStatusBar();
     }
@@ -1345,8 +1750,8 @@
         <div class="source-count">Analyzed <strong>${s.sources.length}</strong> ${s.isLive ? 'live' : 'fallback'} sources</div>
         <div class="sources-list">
           ${s.sources.slice(0, 5).map(src => `
-            <div class="source-item">
-              <div class="source-icon ${src.type}">${src.type === 'reddit' ? 'R' : 'T'}</div>
+            <div class="source-item" onclick="window.open('${src.url}', '_blank')" data-tooltip="${src.title}">
+              <div class="source-icon ${src.type}">${src.type === 'reddit' ? 'R' : 'N'}</div>
               <div class="source-text">${src.title.substring(0, 50)}${src.title.length > 50 ? '...' : ''}</div>
               <div class="source-score ${src.score < 0 ? 'negative' : ''}">${src.score > 0 ? '+' : ''}${src.score.toFixed(1)}</div>
             </div>
@@ -1517,8 +1922,24 @@
     function updateLogs() {
       if (!state.logs) return;
       const container = document.getElementById('logsContainer');
+      
+      // Only update if logs actually changed
       const isNew = state.logs.length > prevLogCount;
+      if (!isNew && state.logs.length === prevLogCount) {
+        return; // No changes, skip update
+      }
       prevLogCount = state.logs.length;
+
+      // Don't auto-scroll if user is actively scrolling
+      if (userScrollingLogs) {
+        return;
+      }
+
+      // Save current scroll position and check if at bottom
+      const scrollTop = container.scrollTop;
+      const scrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
+      const isScrolledToBottom = scrollHeight - clientHeight <= scrollTop + 50;
 
       container.innerHTML = state.logs.map((log, i) => {
         const msgClass = log.includes('✓') ? 'success' : log.includes('→') ? 'info' : log.includes('⚠') ? 'warning' : '';
@@ -1531,7 +1952,72 @@
         `;
       }).join('');
 
-      container.scrollTop = container.scrollHeight;
+      // Restore scroll position or scroll to bottom
+      if (isScrolledToBottom) {
+        container.scrollTop = container.scrollHeight;
+      } else {
+        // Preserve the exact scroll position
+        container.scrollTop = scrollTop;
+      }
+    }
+
+    let prevDebugLogCount = 0;
+    function updateDebugLogs() {
+      const card = document.getElementById('debugLogsCard');
+      
+      // Show/hide based on feature flag
+      if (state.debugLogsEnabled) {
+        card.style.display = 'block';
+      } else {
+        card.style.display = 'none';
+        return;
+      }
+
+      if (!state.debugLogs) return;
+      const container = document.getElementById('debugLogsContainer');
+      
+      // Only update if logs actually changed
+      const isNew = state.debugLogs.length > prevDebugLogCount;
+      if (!isNew && state.debugLogs.length === prevDebugLogCount) {
+        return; // No changes, skip update
+      }
+      prevDebugLogCount = state.debugLogs.length;
+
+      // Don't auto-scroll if user is actively scrolling
+      if (userScrollingDebug) {
+        return;
+      }
+
+      // Save current scroll position and check if at bottom
+      const scrollTop = container.scrollTop;
+      const scrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
+      const isScrolledToBottom = scrollHeight - clientHeight <= scrollTop + 50;
+
+      container.innerHTML = state.debugLogs.map((log, i) => {
+        // Parse log format: [timestamp] emoji [CATEGORY] message
+        const parts = log.match(/\[([^\]]+)\]\s+(.)\s+\[([^\]]+)\]\s+(.*)/);
+        if (parts) {
+          const [, time, emoji, category, message] = parts;
+          const categoryClass = category.toLowerCase();
+          return `
+            <div class="log-entry ${i === state.debugLogs.length - 1 && isNew ? 'new' : ''}">
+              <span class="log-time">${time}</span>
+              <span class="debug-category ${categoryClass}">${emoji} ${category}</span>
+              <span class="log-message">${message}</span>
+            </div>
+          `;
+        }
+        return `<div class="log-entry">${log}</div>`;
+      }).join('');
+
+      // Restore scroll position or scroll to bottom
+      if (isScrolledToBottom) {
+        container.scrollTop = container.scrollHeight;
+      } else {
+        // Preserve the exact scroll position
+        container.scrollTop = scrollTop;
+      }
     }
 
     function updateExecution() {
@@ -1558,19 +2044,25 @@
         return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
       };
 
-      document.getElementById('agentAddress').textContent = formatAddress(w.agentAddress);
-      document.getElementById('merchantAddress').textContent = formatAddress(w.merchantAddress);
-      
       // Format balances
       const formatBalance = (amount) => {
         return `${amount.toFixed(2)} ${w.assetSymbol}`;
       };
 
+      // Update AI Agent (left side)
+      document.getElementById('agentAddress').textContent = formatAddress(w.agentAddress);
+      document.getElementById('agentBalance').textContent = formatBalance(w.agentBalance || 0);
+      
+      // Update Session (center)
       document.getElementById('sessionInitial').textContent = formatBalance(w.sessionInitial);
       document.getElementById('sessionSpent').textContent = formatBalance(w.sessionSpent);
       
       const remainingEl = document.getElementById('sessionRemaining');
       remainingEl.textContent = formatBalance(w.sessionRemaining);
+      
+      // Update MCP Merchant (right side)
+      document.getElementById('merchantAddress').textContent = formatAddress(w.merchantAddress);
+      document.getElementById('merchantBalance').textContent = formatBalance(w.merchantBalance || 0);
       
       // Calculate percentage remaining
       const percentRemaining = w.sessionInitial > 0 ? (w.sessionRemaining / w.sessionInitial) * 100 : 100;
@@ -1591,6 +2083,33 @@
         progressFill.classList.add('low');
       }
     }
+
+    // Add scroll listeners to detect user interaction
+    function setupScrollListeners() {
+      const logsContainer = document.getElementById('logsContainer');
+      const debugLogsContainer = document.getElementById('debugLogsContainer');
+
+      // System Logs scroll detection
+      logsContainer.addEventListener('scroll', () => {
+        userScrollingLogs = true;
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          userScrollingLogs = false;
+        }, 2000); // Resume auto-scroll after 2s of no scrolling
+      });
+
+      // Debug Logs scroll detection
+      debugLogsContainer.addEventListener('scroll', () => {
+        userScrollingDebug = true;
+        clearTimeout(debugScrollTimeout);
+        debugScrollTimeout = setTimeout(() => {
+          userScrollingDebug = false;
+        }, 2000);
+      });
+    }
+
+    // Initialize
+    setupScrollListeners();
 
     // Poll every 500ms
     setInterval(fetchState, 500);

@@ -1,6 +1,6 @@
 /**
  * Check Production State - Comprehensive diagnostic
- * 
+ *
  * Checks all aspects of production readiness:
  * - Wallet balances (on-chain)
  * - Custody balances (on-chain)
@@ -42,7 +42,7 @@ const ERC20_ABI = [
 
 async function checkWalletBalances(address: string, label: string) {
   console.log(`\n=== ${label} - Wallet (On-Chain) ===`);
-  
+
   const client = createPublicClient({
     chain: base,
     transport: http(),
@@ -51,7 +51,7 @@ async function checkWalletBalances(address: string, label: string) {
   // ETH balance
   const ethBalance = await client.getBalance({ address: address as `0x${string}` });
   console.log(`ETH: ${formatEther(ethBalance)} ETH`);
-  
+
   if (ethBalance < 1000000000000000n) {
     console.log('  ⚠️  Low ETH for gas');
   } else {
@@ -67,7 +67,7 @@ async function checkWalletBalances(address: string, label: string) {
   })) as bigint;
 
   console.log(`USDC: ${formatUnits(usdcBalance, 6)} USDC`);
-  
+
   if (usdcBalance === 0n) {
     console.log('  ⚠️  No USDC in wallet');
   } else {
@@ -79,7 +79,7 @@ async function checkWalletBalances(address: string, label: string) {
 
 async function checkCustodyBalance(address: string, label: string) {
   console.log(`\n=== ${label} - Custody (On-Chain Ledger) ===`);
-  
+
   const client = createPublicClient({
     chain: base,
     transport: http(),
@@ -94,7 +94,7 @@ async function checkCustodyBalance(address: string, label: string) {
 
   const custodyBalance = (balances as bigint[][])[0]?.[0] ?? 0n;
   console.log(`USDC in Custody: ${formatUnits(custodyBalance, 6)} USDC`);
-  
+
   if (custodyBalance === 0n) {
     console.log('  ℹ️  No custody balance (run: npm run agent-onramp -- 1 base)');
   } else {
@@ -106,7 +106,7 @@ async function checkCustodyBalance(address: string, label: string) {
 
 async function checkUnifiedBalance(privateKey: string, label: string) {
   console.log(`\n=== ${label} - Unified Balance (Off-Chain Ledger) ===`);
-  
+
   try {
     const yellowClient = new YellowRpcClient({
       url: 'wss://clearnet.yellow.com/ws',
@@ -114,9 +114,9 @@ async function checkUnifiedBalance(privateKey: string, label: string) {
     });
 
     await yellowClient.connect();
-    
+
     const balances = await yellowClient.getLedgerBalances();
-    
+
     if (balances.length === 0) {
       console.log('  ℹ️  No unified balance');
       console.log('  Need to bridge: custody → unified (via Yellow apps UI)');
@@ -148,7 +148,7 @@ async function checkUnifiedBalance(privateKey: string, label: string) {
 
 async function checkYellowNetworkConnectivity() {
   console.log('\n=== Yellow Network Connectivity ===');
-  
+
   try {
     const yellowClient = new YellowRpcClient({
       url: 'wss://clearnet.yellow.com/ws',
@@ -156,7 +156,7 @@ async function checkYellowNetworkConnectivity() {
 
     await yellowClient.connect();
     console.log('  ✓ Connected to production clearnode');
-    
+
     return true;
   } catch (error: any) {
     console.log('  ❌ Cannot connect to clearnode:', error.message);
@@ -229,7 +229,7 @@ async function main() {
   if (agentUnified < 1) {
     ready = false;
     warnings.push('❌ Agent needs unified balance (minimum 1 USDC for session)');
-    
+
     if (agentCustody > 0n) {
       warnings.push('   ℹ️  Agent has custody balance - bridge to unified via:');
       warnings.push('      https://apps.yellow.com');

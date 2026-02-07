@@ -163,7 +163,7 @@ STEP 1: Check State
 
 STEP 2: Run Demo
   → YELLOW_ENV=production npm run demo:agentkit
-  
+
   a) Agent creates app session (1 USDC from unified)
   b) Agent signs SIWx (wallet authentication)
   c) Agent calls stock_price (0.1 USDC)
@@ -173,13 +173,13 @@ STEP 2: Run Demo
 
 STEP 3: Merchant Offramp
   → npm run merchant-offramp -- base
-  
+
   a) Check merchant unified balance (0.2 USDC)
   b) Create payment channel
   c) Resize channel (move unified→channel)
   d) Close channel (settle to custody)
   e) Withdraw (custody→wallet)
-  
+
   Result: Merchant has 0.2 USDC in Base wallet
   Evidence: Basescan transaction links
 
@@ -288,7 +288,7 @@ npm run check-production
 
 # Should show:
 # ✅ Agent wallet: 1+ USDC
-# ✅ Agent unified: 1+ USDC  
+# ✅ Agent unified: 1+ USDC
 # ✅ Yellow Network: Connected
 # ✅ Status: Ready for production demo
 ```
