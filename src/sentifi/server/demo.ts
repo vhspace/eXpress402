@@ -534,9 +534,10 @@ async function closeYellowSession(fullDisconnect: boolean = true): Promise<void>
       const merchantCloseSig = await merchantCloseSigner(closeParsed.req);
       closeParsed.sig.push(merchantCloseSig);
 
-      await yellowContext.yellow.sendRawMessage(JSON.stringify(closeParsed));
+      const closeResponse = await yellowContext.yellow.sendRawMessage(JSON.stringify(closeParsed));
       
       debugLog('SESSION', `✓ Yellow Network session closed with Quorum 2`);
+      debugLog('SESSION', `Close response: ${JSON.stringify(closeResponse)}`);
       log('✓ Yellow session closed (Quorum 2)');
     } catch (error) {
       log(`⚠️ Failed to close session: ${error instanceof Error ? error.message : String(error)}`);
