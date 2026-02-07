@@ -68,8 +68,11 @@ export async function startMcpServer() {
         },
       },
       async ({ symbol }, extra) => {
+        console.error(`[MCP] Tool call received: stock_price(symbol=${symbol})`);
         const settlement = await requirePayment(extra, 'stock_price');
         const data = await getStockPrice(symbol);
+        console.error(`[MCP] Tool response: ${JSON.stringify(data).substring(0, 100)}...`);
+        console.error(`[MCP] Payment settlement: ${settlement.status}`);
         return {
           content: [{ type: 'text', text: JSON.stringify(data) }],
           _meta: {
@@ -88,8 +91,13 @@ export async function startMcpServer() {
         },
       },
       async ({ symbol }, extra) => {
+        console.error(`[MCP] Tool call received: market_rumors(symbol=${symbol})`);
         const settlement = await requirePayment(extra, 'market_rumors');
         const data = await getMarketRumors(symbol);
+        const redditCount = data.reddit?.length || 0;
+        const tavilyCount = data.tavily?.length || 0;
+        console.error(`[MCP] Tool response: ${redditCount} Reddit posts, ${tavilyCount} Tavily articles`);
+        console.error(`[MCP] Payment settlement: ${settlement.status}`);
         return {
           content: [{ type: 'text', text: JSON.stringify(data) }],
           _meta: {

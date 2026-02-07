@@ -213,6 +213,22 @@ async function initializeYellow(): Promise<boolean> {
 
     yellowContext.client = new Client({ name: 'sentifi-agent', version: '0.1.0' });
     await yellowContext.client.connect(transport);
+    
+    // Capture MCP server stderr for debug logging
+    if ((transport as any)._process?.stderr) {
+      (transport as any)._process.stderr.on('data', (data: Buffer) => {
+        const output = data.toString().trim();
+        if (output.includes('[MCP]')) {
+          // Extract the MCP log message and add to debug logs
+          const lines = output.split('\n').filter(line => line.includes('[MCP]'));
+          lines.forEach(line => {
+            const mcpMessage = line.replace(/^\[MCP\]\s*/, '');
+            debugLog('HTTP', `MCP Server: ${mcpMessage}`);
+          });
+        }
+      });
+    }
+    
     console.log(chalk.green('✓ MCP Server connected'));
     log('✓ Connected to MCP Server');
 
@@ -382,7 +398,17 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
     yellowContext.sessionSpent += toolPrice;
     const balanceAfter = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
     
-    debugLog('HTTP', `MCP response: ${data.reddit?.length || 0} Reddit, ${data.tavily?.length || 0} Tavily`);
+    // Log detailed response data
+    const redditTitles = data.reddit?.slice(0, 2).map((r: any) => r.title?.substring(0, 40) + '...') || [];
+    const tavilyTitles = data.tavily?.slice(0, 2).map((t: any) => t.title?.substring(0, 40) + '...') || [];
+    
+    debugLog('HTTP', `Response data: ${data.reddit?.length || 0} Reddit posts, ${data.tavily?.length || 0} Tavily articles`);
+    if (redditTitles.length > 0) {
+      debugLog('HTTP', `Sample Reddit: "${redditTitles[0]}"`);
+    }
+    if (tavilyTitles.length > 0) {
+      debugLog('HTTP', `Sample Tavily: "${tavilyTitles[0]}"`);
+    }
     debugLog('SESSION', `✓ Yellow Network payment processed`);
     debugLog('SESSION', `Payment deducted: ${toolPrice.toFixed(2)} ${yellowContext.assetSymbol}`);
     debugLog('SESSION', `Post-call balance: ${balanceAfter.toFixed(2)} ${yellowContext.assetSymbol}`);
