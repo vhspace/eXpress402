@@ -121,6 +121,7 @@ export class YellowRpcClient extends EventEmitter {
   >();
   private authenticated = false;
   private sessionPrivateKey?: `0x${string}`;
+  private defaultApplication = 'eXpress402-mcp';
 
   constructor(private options: NitroRpcOptions) {
     super();
@@ -131,12 +132,21 @@ export class YellowRpcClient extends EventEmitter {
       return;
     }
 
+    // Authentication state is scoped to a single websocket connection.
+    // If we reconnect, force a fresh authenticate() before any signed calls.
+    this.authenticated = false;
+    this.sessionPrivateKey = undefined;
+
     this.ws = new WebSocket(this.options.url);
     this.ws.on('message', (data: WebSocket.Data) =>
       this.handleMessage(Buffer.from(data as Uint8Array).toString()),
     );
     this.ws.on('error', error => {
       console.error('Yellow RPC socket error:', error);
+    });
+    this.ws.on('close', () => {
+      this.authenticated = false;
+      this.sessionPrivateKey = undefined;
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -217,6 +227,7 @@ export class YellowRpcClient extends EventEmitter {
       throw new Error('Missing private key for authentication');
     }
 
+    const application = options.application ?? this.defaultApplication;
     const account = privateKeyToAccount(this.options.privateKey as `0x${string}`);
     const sessionPrivateKey = options.sessionPrivateKey ?? generatePrivateKey();
     const sessionAccount = privateKeyToAccount(sessionPrivateKey);
@@ -232,7 +243,7 @@ export class YellowRpcClient extends EventEmitter {
     const authParams = {
       address: account.address,
       session_key: sessionAccount.address,
-      application: options.application ?? 'eXpress402-mcp',
+      application,
       allowances: options.allowances ?? [],
       // Yellow expects seconds since epoch (not ms).
       expires_at: BigInt(
@@ -280,6 +291,7 @@ export class YellowRpcClient extends EventEmitter {
         if (verifyResponse?.success === true) {
           this.sessionPrivateKey = sessionPrivateKey;
           this.authenticated = true;
+          this.defaultApplication = application;
           return;
         }
       } catch (error) {
@@ -299,6 +311,7 @@ export class YellowRpcClient extends EventEmitter {
         if (verifyResponse?.success === true) {
           this.sessionPrivateKey = sessionPrivateKey;
           this.authenticated = true;
+          this.defaultApplication = application;
           return;
         }
       } catch (error) {
@@ -330,6 +343,7 @@ export class YellowRpcClient extends EventEmitter {
     if (verifyResponse?.success === true) {
       this.sessionPrivateKey = undefined;
       this.authenticated = true;
+      this.defaultApplication = application;
       return;
     }
 

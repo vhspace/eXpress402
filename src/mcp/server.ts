@@ -198,7 +198,9 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
   }
 
   // Log request for debugging
-  console.error(`[requirePayment] Tool: ${toolName}, Has SIWx: ${!!siwxHeader}, Has payment: ${!!payment}, Has session: ${!!yellowMeta.appSessionId}`);
+  console.error(
+    `[requirePayment] Tool: ${toolName}, Has SIWx: ${!!siwxHeader}, Has payment: ${!!payment}, Has session: ${!!yellowMeta.appSessionId}`,
+  );
 
   if (!payment && !yellowMeta.appSessionId) {
     console.error('[requirePayment] No payment or session, throwing 402');
@@ -207,16 +209,16 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
 
   if (yellowMeta.appSessionId) {
     const payer = yellowMeta.payer ?? config.agentAddress ?? '';
-    
+
     // Check session balance from cache or query Yellow
     let remaining: number;
-    if (sessionBalanceCache && sessionBalanceCache.has(yellowMeta.appSessionId)) {
+    if (sessionBalanceCache?.has(yellowMeta.appSessionId)) {
       remaining = sessionBalanceCache.get(yellowMeta.appSessionId) ?? 0;
     } else {
       // First use of this session - query actual balance from Yellow
       try {
         remaining = await fetchSessionBalance(yellowMeta.appSessionId, config.assetSymbol);
-        
+
         // If query returns 0 for new session, it may not be indexed yet
         // Accept the session and track usage in cache
         if (remaining === 0) {
@@ -234,15 +236,16 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
     }
 
     if (remaining < Number(pricePerCall)) {
-      console.error(`[requirePayment] Insufficient session balance: ${remaining} < ${pricePerCall}`);
-      
+      console.error(
+        `[requirePayment] Insufficient session balance: ${remaining} < ${pricePerCall}`,
+      );
       // Attempt to close depleted session
       try {
         await attemptCloseAppSession(yellowMeta.appSessionId, payer, remaining);
       } catch (error) {
         console.error('[requirePayment] Failed to close depleted session:', error);
       }
-      
+
       const paymentResponse = buildSettlementResponse(
         false,
         config.network,
@@ -275,8 +278,14 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
   }
 
   // Validate payment payload
-  if (!payment || !payment.payload) {
-    const paymentResponse = buildSettlementResponse(false, config.network, undefined, undefined, 'missing_payment');
+  if (!payment?.payload) {
+    const paymentResponse = buildSettlementResponse(
+      false,
+      config.network,
+      undefined,
+      undefined,
+      'missing_payment',
+    );
     throw new McpError(402, 'Payment payload required', {
       ...paymentRequired,
       'x402/payment-response': paymentResponse,
@@ -302,7 +311,12 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
   }
 
   // Verify Yellow transfer
-  const verified = await verifyYellowTransfer(yellowClient, validation.info, config.merchantAddress, config.assetSymbol);
+  const verified = await verifyYellowTransfer(
+    yellowClient,
+    validation.info,
+    config.merchantAddress,
+    config.assetSymbol,
+  );
 
   if (!verified) {
     const paymentResponse = buildSettlementResponse(

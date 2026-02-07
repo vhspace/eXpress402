@@ -1,6 +1,9 @@
 import { YellowRpcClient } from '../src/yellow/rpc.js';
 import { describe, it, expect, beforeAll } from 'vitest';
 
+const shouldRun = process.env.RUN_YELLOW_E2E === 'true';
+const describeIfEnabled = shouldRun ? describe : describe.skip;
+
 // Test constants
 const AGENT_PRIVATE_KEY = '0x323007595978d45a651e61ba6248b65c1bba7e1bc69867cfd42a05202db6cd56';
 const MERCHANT_ADDRESS = '0x9126d073e0a5e45D907feA0b4f4857F5b7191430';
@@ -11,7 +14,7 @@ const CONFIG = {
   spendAmount: '0.1',
 };
 
-describe('Yellow Network Session Payment E2E', () => {
+describeIfEnabled('Yellow Network Session Payment E2E', () => {
   let yellow: YellowRpcClient;
   let agentAddress: string;
   let sessionId: any;
@@ -51,7 +54,7 @@ describe('Yellow Network Session Payment E2E', () => {
 
     // Check initial balance and refill if needed
     const balances = await yellow.getLedgerBalances(agentAddress);
-    initialAgentBalance = balances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
+    initialAgentBalance = balances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount ?? '0';
 
     const minBalance = Number(CONFIG.sessionAllocation) + 0.5;
     if (Number(initialAgentBalance) < minBalance) {
@@ -65,7 +68,7 @@ describe('Yellow Network Session Payment E2E', () => {
         await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for faucet
         const newBalances = await yellow.getLedgerBalances(agentAddress);
         initialAgentBalance =
-          newBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
+          newBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount ?? '0';
       }
     }
   }, 30000);
@@ -81,7 +84,7 @@ describe('Yellow Network Session Payment E2E', () => {
     const allocations = participants.map(participant => ({
       participant,
       asset: CONFIG.assetSymbol,
-      amount: allocationsRaw[participant] || '0',
+      amount: allocationsRaw[participant] ?? '0',
     }));
 
     const { createAppSessionMessage, createECDSAMessageSigner } =
@@ -105,8 +108,8 @@ describe('Yellow Network Session Payment E2E', () => {
     });
 
     const response = (await yellow.sendRawMessage(message)) as any;
-    sessionId = (response.appSessionId ||
-      response.app_session_id ||
+    sessionId = (response.appSessionId ??
+      response.app_session_id ??
       response.appSession?.appSessionId) as string;
 
     expect(sessionId).toBeDefined();
@@ -114,7 +117,7 @@ describe('Yellow Network Session Payment E2E', () => {
     // Verify session was funded
     const sessionBalances = await yellow.getLedgerBalances(sessionId);
     const sessionAmount =
-      sessionBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
+      sessionBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount ?? '0';
     expect(sessionAmount).toBe(CONFIG.sessionAllocation);
   }, 15000);
 
@@ -142,7 +145,7 @@ describe('Yellow Network Session Payment E2E', () => {
     // Check that session is now empty (funds distributed)
     const sessionBalancesAfter = await yellow.getLedgerBalances(sessionId);
     const sessionAmountAfter =
-      sessionBalancesAfter.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
+      sessionBalancesAfter.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount ?? '0';
     expect(sessionAmountAfter).toBe('0');
 
     // Verify balance update notifications were received
@@ -156,9 +159,9 @@ describe('Yellow Network Session Payment E2E', () => {
     const finalMerchantBalances = await yellow.getLedgerBalances(MERCHANT_ADDRESS);
 
     finalAgentBalance =
-      finalAgentBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
+      finalAgentBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount ?? '0';
     const finalMerchantBalance =
-      finalMerchantBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount || '0';
+      finalMerchantBalances.find((b: any) => b.asset === CONFIG.assetSymbol)?.amount ?? '0';
 
     // Agent should have initial balance minus the payment allocated to merchant
     const expectedAgentBalance = (Number(initialAgentBalance) - Number(CONFIG.spendAmount)).toFixed(
@@ -171,7 +174,7 @@ describe('Yellow Network Session Payment E2E', () => {
       `Payment distribution: Merchant allocated ${CONFIG.spendAmount}, Agent gets ${(Number(CONFIG.sessionAllocation) - Number(CONFIG.spendAmount)).toFixed(1)}`,
     );
     console.log(`Final agent balance: ${finalAgentBalance} (net: -${CONFIG.spendAmount})`);
-    console.log(`Merchant would receive: ${CONFIG.spendAmount} (allocated via session close)`);
+    console.log(`Final merchant balance: ${finalMerchantBalance}`);
 
     // The key verification: agent balance changed by exactly the payment amount
     const balanceChange = (Number(initialAgentBalance) - Number(finalAgentBalance)).toFixed(1);

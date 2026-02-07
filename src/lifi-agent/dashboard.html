@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SENTIFI // AI Trading Agent</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-void: #030508;
+      --bg-panel: #0a0f14;
+      --bg-elevated: #101820;
+      --border-dim: #1a2633;
+      --text-primary: #e8f4f2;
+      --text-secondary: #5a7a8a;
+      --text-muted: #2d4a5a;
+      --accent-cyan: #0ff4ea;
+      --accent-cyan-dim: rgba(15, 244, 234, 0.15);
+      --accent-green: #00ff88;
+      --accent-red: #ff3366;
+      --accent-amber: #ffaa00;
+      --accent-purple: #aa55ff;
+      --glow-cyan: 0 0 30px rgba(15, 244, 234, 0.3);
+      --glow-green: 0 0 20px rgba(0, 255, 136, 0.4);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-void);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 0 25px;
+      border-bottom: 1px solid var(--border-dim);
+      margin-bottom: 20px;
+    }
+
+    .logo-text {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 900;
+      color: var(--accent-cyan);
+      text-shadow: var(--glow-cyan);
+    }
+
+    .logo-sub {
+      font-size: 0.65rem;
+      color: var(--text-secondary);
+      letter-spacing: 0.2em;
+      margin-left: 12px;
+    }
+
+    .status-badges {
+      display: flex;
+      gap: 12px;
+    }
+
+    .badge {
+      padding: 6px 12px;
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      border: 1px solid var(--border-dim);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge.live { border-color: var(--accent-green); color: var(--accent-green); }
+    .badge.fallback { border-color: var(--accent-amber); color: var(--accent-amber); }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Control Panel */
+    .control-panel {
+      background: linear-gradient(135deg, var(--bg-panel), var(--bg-elevated));
+      border: 2px solid var(--accent-cyan);
+      padding: 25px;
+      margin-bottom: 25px;
+      box-shadow: var(--glow-cyan);
+    }
+
+    .control-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.7rem;
+      color: var(--accent-cyan);
+      letter-spacing: 0.2em;
+      margin-bottom: 20px;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .symbol-selector {
+      display: flex;
+      gap: 8px;
+    }
+
+    .symbol-btn {
+      padding: 12px 24px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      background: var(--bg-panel);
+      border: 2px solid var(--border-dim);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .symbol-btn:hover {
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+
+    .symbol-btn.selected {
+      background: var(--accent-cyan-dim);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      box-shadow: 0 0 15px rgba(15, 244, 234, 0.3);
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    .action-btn {
+      padding: 12px 28px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .action-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .action-btn.primary {
+      background: linear-gradient(135deg, var(--accent-cyan), #0ac);
+      color: var(--bg-void);
+    }
+
+    .action-btn.primary:hover:not(:disabled) {
+      box-shadow: 0 0 25px rgba(15, 244, 234, 0.5);
+      transform: translateY(-2px);
+    }
+
+    .action-btn.secondary {
+      background: var(--bg-elevated);
+      border: 1px solid var(--accent-purple);
+      color: var(--accent-purple);
+    }
+
+    .action-btn.secondary:hover:not(:disabled) {
+      background: rgba(170, 85, 255, 0.1);
+    }
+
+    .action-btn.success {
+      background: linear-gradient(135deg, var(--accent-green), #0a6);
+      color: var(--bg-void);
+    }
+
+    .action-btn.success:hover:not(:disabled) {
+      box-shadow: var(--glow-green);
+    }
+
+    .action-btn.reset {
+      background: transparent;
+      border: 1px solid var(--text-muted);
+      color: var(--text-muted);
+    }
+
+    .action-btn.reset:hover:not(:disabled) {
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+    }
+
+    .action-btn .spinner {
+      display: none;
+      width: 14px;
+      height: 14px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+    }
+
+    .action-btn.loading .spinner { display: inline-block; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .input-suffix {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+
+    /* Deposit Section */
+    .deposit-section {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid var(--border-dim);
+    }
+
+    .deposit-prompt {
+      text-align: center;
+    }
+
+    .prompt-text {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .deposit-trigger {
+      padding: 10px 20px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: transparent;
+      border: 2px dashed var(--accent-amber);
+      color: var(--accent-amber);
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+    }
+
+    .deposit-trigger:hover {
+      background: rgba(255, 170, 0, 0.1);
+      border-style: solid;
+    }
+
+    .deposit-form {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .deposit-form input {
+      width: 100px;
+      padding: 10px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      background: var(--bg-elevated);
+      border: 2px solid var(--accent-amber);
+      color: var(--text-primary);
+      text-align: right;
+    }
+
+    .deposit-form input:focus {
+      outline: none;
+      box-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
+    }
+
+    .deposit-actions {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .confirm-btn, .cancel-btn {
+      flex: 1;
+      padding: 10px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+
+    .confirm-btn {
+      background: var(--accent-green);
+      color: var(--bg-void);
+    }
+
+    .cancel-btn {
+      background: transparent;
+      border: 1px solid var(--text-muted);
+      color: var(--text-muted);
+    }
+
+    /* Decision Confirmation */
+    .decision-confirm {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid var(--border-dim);
+    }
+
+    .confirm-label {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      text-align: center;
+      letter-spacing: 0.1em;
+    }
+
+    .decision-options {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .decision-opt {
+      flex: 1;
+      padding: 10px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: var(--bg-elevated);
+      border: 2px solid var(--border-dim);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .decision-opt:hover {
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+
+    .decision-opt.selected {
+      border-color: var(--accent-cyan);
+      background: var(--accent-cyan-dim);
+      color: var(--accent-cyan);
+    }
+
+    .decision-opt[data-action="SWAP_BULLISH"].selected {
+      border-color: var(--accent-green);
+      background: rgba(0, 255, 136, 0.15);
+      color: var(--accent-green);
+    }
+
+    .decision-opt[data-action="SWAP_BEARISH"].selected {
+      border-color: var(--accent-red);
+      background: rgba(255, 51, 102, 0.15);
+      color: var(--accent-red);
+    }
+
+    .amount-input {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+
+    .amount-input label {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+    }
+
+    .amount-input input {
+      width: 80px;
+      padding: 8px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-dim);
+      color: var(--text-primary);
+      text-align: right;
+    }
+
+    .amount-input span {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+    }
+
+    .validate-btn {
+      width: 100%;
+      padding: 12px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: linear-gradient(135deg, var(--accent-cyan), #0ac);
+      border: none;
+      color: var(--bg-void);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .validate-btn:hover {
+      box-shadow: var(--glow-cyan);
+    }
+
+    .validate-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Main Grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: 20px;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-dim);
+    }
+
+    .card.highlight {
+      border-color: var(--accent-cyan);
+      animation: cardGlow 0.5s ease;
+    }
+
+    @keyframes cardGlow {
+      0% { box-shadow: 0 0 30px rgba(15, 244, 234, 0.5); }
+      100% { box-shadow: none; }
+    }
+
+    .card-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      color: var(--text-secondary);
+    }
+
+    .card-badge {
+      font-size: 0.5rem;
+      padding: 3px 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .card-badge.live { background: rgba(0, 255, 136, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+    .card-badge.simulated { background: rgba(255, 170, 0, 0.15); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+    .card-badge.pending { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+
+    .card-body { padding: 16px; }
+
+    /* Sentiment */
+    .sentiment-card { grid-row: span 2; }
+
+    .sentiment-display {
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .sentiment-score {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 4rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .sentiment-score.bullish { color: var(--accent-green); text-shadow: var(--glow-green); }
+    .sentiment-score.bearish { color: var(--accent-red); }
+    .sentiment-score.neutral { color: var(--accent-amber); }
+
+    .sentiment-label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 10px;
+      letter-spacing: 0.2em;
+    }
+
+    .source-count {
+      margin-top: 15px;
+      padding: 10px;
+      background: var(--bg-elevated);
+      text-align: center;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+
+    .source-count strong { color: var(--accent-cyan); }
+
+    .sources-list {
+      margin-top: 15px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .source-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-dim);
+      font-size: 0.65rem;
+    }
+
+    .source-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-elevated);
+      font-size: 0.55rem;
+      flex-shrink: 0;
+    }
+
+    .source-icon.reddit { color: #ff4500; }
+    .source-icon.tavily { color: var(--accent-purple); }
+
+    .source-text { color: var(--text-secondary); flex: 1; line-height: 1.3; }
+
+    .source-score { color: var(--accent-green); font-weight: 600; }
+    .source-score.negative { color: var(--accent-red); }
+
+    /* Decision */
+    .decision-display { text-align: center; padding: 20px 0; }
+
+    .decision-action {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .decision-action.bullish { color: var(--accent-green); }
+    .decision-action.bearish { color: var(--accent-red); }
+    .decision-action.hold { color: var(--text-muted); }
+
+    .decision-icon { font-size: 1.6rem; }
+
+    .decision-reason {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-top: 12px;
+      line-height: 1.4;
+    }
+
+    .trade-preview {
+      margin-top: 20px;
+      padding: 15px;
+      background: var(--bg-elevated);
+      border: 1px dashed var(--border-dim);
+    }
+
+    .trade-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+    }
+
+    .trade-token { text-align: center; }
+    .token-amount { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; font-weight: 700; }
+    .token-symbol { font-size: 0.6rem; color: var(--text-secondary); margin-top: 3px; }
+
+    .trade-arrow {
+      font-size: 1.2rem;
+      color: var(--accent-cyan);
+      animation: arrowPulse 1s infinite;
+    }
+
+    @keyframes arrowPulse {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(5px); }
+    }
+
+    /* Quote */
+    .quote-card { grid-column: span 2; }
+
+    .route-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 15px;
+      position: relative;
+    }
+
+    .route-diagram::before {
+      content: '';
+      position: absolute;
+      left: 80px;
+      right: 80px;
+      top: 50%;
+      height: 2px;
+      background: repeating-linear-gradient(90deg, var(--accent-cyan) 0, var(--accent-cyan) 8px, transparent 8px, transparent 16px);
+      animation: flowLine 0.8s linear infinite;
+    }
+
+    @keyframes flowLine { to { background-position: 16px 0; } }
+
+    .route-node {
+      width: 65px;
+      height: 65px;
+      background: var(--bg-elevated);
+      border: 2px solid var(--accent-cyan);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .route-node.dex { border-color: var(--accent-purple); background: rgba(170, 85, 255, 0.1); }
+
+    .node-icon { font-size: 1.2rem; }
+    .node-label { font-size: 0.45rem; color: var(--text-secondary); margin-top: 3px; }
+
+    .quote-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid var(--border-dim);
+    }
+
+    .stat-item { text-align: center; padding: 10px; background: var(--bg-elevated); }
+    .stat-value { font-family: 'Orbitron', sans-serif; font-size: 0.9rem; color: var(--accent-cyan); }
+    .stat-label { font-size: 0.5rem; color: var(--text-muted); margin-top: 3px; letter-spacing: 0.1em; }
+
+    /* Portfolio */
+    .portfolio-card { grid-row: span 2; }
+
+    .portfolio-total { text-align: center; padding: 15px 0; border-bottom: 1px solid var(--border-dim); }
+    .total-value { font-family: 'Orbitron', sans-serif; font-size: 1.6rem; font-weight: 700; }
+    .total-label { font-size: 0.55rem; color: var(--text-muted); margin-top: 3px; }
+
+    /* P&L Section */
+    .pnl-section {
+      padding: 12px;
+      margin: 8px 0;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-dim);
+    }
+    .pnl-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .pnl-label {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      letter-spacing: 0.1em;
+    }
+    .pnl-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .pnl-value.positive { color: var(--accent-green); }
+    .pnl-value.negative { color: var(--accent-red); }
+    .pnl-percent {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 2px;
+    }
+    .pnl-percent.positive { background: rgba(0, 255, 136, 0.15); color: var(--accent-green); }
+    .pnl-percent.negative { background: rgba(255, 51, 102, 0.15); color: var(--accent-red); }
+    .pnl-breakdown {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 6px;
+    }
+    .pnl-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .pnl-item-label {
+      font-size: 0.55rem;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+    }
+    .pnl-item-value {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+    .trade-count {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      text-align: right;
+    }
+
+    .holding-item {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      margin: 6px 0;
+      background: var(--bg-elevated);
+      border-left: 3px solid var(--accent-cyan);
+    }
+
+    .holding-icon {
+      width: 30px;
+      height: 30px;
+      background: var(--bg-panel);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6rem;
+      color: var(--accent-cyan);
+      margin-right: 10px;
+    }
+
+    .holding-info { flex: 1; }
+    .holding-token { font-weight: 600; font-size: 0.8rem; }
+    .holding-chain { font-size: 0.55rem; color: var(--text-muted); }
+    .holding-balance { text-align: right; }
+    .balance-amount { font-size: 0.8rem; }
+    .balance-usd { font-size: 0.6rem; color: var(--text-secondary); }
+
+    /* Logs */
+    .logs-card { grid-column: span 3; }
+
+    .logs-container { max-height: 140px; overflow-y: auto; font-size: 0.65rem; }
+
+    .log-entry {
+      padding: 4px 0;
+      border-bottom: 1px solid var(--border-dim);
+      display: flex;
+      gap: 12px;
+    }
+
+    .log-entry.new { animation: newLog 0.5s ease; }
+
+    @keyframes newLog { from { background: var(--accent-cyan-dim); } to { background: transparent; } }
+
+    .log-time { color: var(--text-muted); }
+    .log-message { color: var(--text-secondary); }
+    .log-message.success { color: var(--accent-green); }
+    .log-message.info { color: var(--accent-cyan); }
+    .log-message.warning { color: var(--accent-amber); }
+
+    /* Execution Overlay */
+    .execution-overlay {
+      position: fixed;
+      bottom: 25px;
+      right: 25px;
+      background: var(--bg-panel);
+      border: 2px solid var(--accent-amber);
+      padding: 15px 25px;
+      box-shadow: 0 0 20px rgba(255, 170, 0, 0.3);
+      animation: slideIn 0.5s ease;
+      z-index: 100;
+    }
+
+    @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    .exec-title { font-family: 'Orbitron', sans-serif; font-size: 0.8rem; color: var(--accent-amber); }
+    .exec-hash { font-size: 0.55rem; color: var(--text-muted); margin-top: 5px; }
+    .exec-note { font-size: 0.5rem; color: var(--accent-amber); margin-top: 8px; border-top: 1px solid var(--border-dim); padding-top: 8px; }
+
+    /* Empty/Loading states */
+    .empty-state {
+      text-align: center;
+      padding: 30px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .empty-state .icon { font-size: 2rem; margin-bottom: 10px; }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .main-grid { grid-template-columns: 1fr 1fr; }
+      .quote-card, .logs-card { grid-column: span 2; }
+      .sentiment-card, .portfolio-card { grid-row: span 1; }
+    }
+
+    @media (max-width: 700px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .quote-card, .logs-card { grid-column: span 1; }
+      .control-row { flex-direction: column; align-items: stretch; }
+      .action-buttons { margin-left: 0; margin-top: 15px; justify-content: center; }
+      .header { flex-direction: column; gap: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div>
+        <span class="logo-text">SENTIFI</span>
+        <span class="logo-sub">AI TRADING AGENT</span>
+      </div>
+      <div class="status-badges">
+        <div class="badge" id="modeBadge">
+          <span class="badge-dot"></span>
+          <span id="modeText">CONNECTING...</span>
+        </div>
+        <div class="badge" id="yellowBadge">
+          <span>Yellow:</span>
+          <span id="yellowStatus">--</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+      <div class="control-title">▶ AGENT CONTROLS</div>
+      <div class="control-row">
+        <div class="symbol-selector">
+          <button class="symbol-btn selected" data-symbol="ETH">ETH</button>
+          <button class="symbol-btn" data-symbol="BTC">BTC</button>
+          <button class="symbol-btn" data-symbol="SOL">SOL</button>
+        </div>
+        <div class="action-buttons">
+          <button class="action-btn primary" id="analyzeBtn" onclick="analyze()" disabled>
+            <span class="spinner"></span>
+            1. ANALYZE
+          </button>
+          <button class="action-btn secondary" id="quoteBtn" onclick="getQuote()" disabled>
+            <span class="spinner"></span>
+            3. GET QUOTE
+          </button>
+          <button class="action-btn success" id="executeBtn" onclick="execute()" disabled>
+            <span class="spinner"></span>
+            4. EXECUTE
+          </button>
+          <button class="action-btn reset" id="resetBtn" onclick="reset()">RESET</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="main-grid">
+      <!-- Sentiment -->
+      <div class="card sentiment-card" id="sentimentCard">
+        <div class="card-header">
+          <span class="card-title">MARKET SENTIMENT</span>
+          <span class="card-badge pending" id="sentimentBadge">WAITING</span>
+        </div>
+        <div class="card-body">
+          <div id="sentimentContent">
+            <div class="empty-state">
+              <div class="icon">📊</div>
+              Select a symbol and click ANALYZE
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Decision -->
+      <div class="card" id="decisionCard">
+        <div class="card-header">
+          <span class="card-title">2. TRADING DECISION</span>
+          <span class="card-badge pending" id="decisionBadge">PENDING</span>
+        </div>
+        <div class="card-body">
+          <div id="decisionContent">
+            <div class="empty-state">
+              <div class="icon">🧠</div>
+              Awaiting sentiment analysis
+            </div>
+          </div>
+          <!-- Decision Confirmation (shown after analysis) -->
+          <div class="decision-confirm" id="decisionConfirm" style="display: none;">
+            <div class="confirm-label">Confirm or modify:</div>
+            <div class="decision-options">
+              <button class="decision-opt" data-action="SWAP_BULLISH" onclick="selectDecision('SWAP_BULLISH')">↗ BUY</button>
+              <button class="decision-opt" data-action="HOLD" onclick="selectDecision('HOLD')">◼ HOLD</button>
+              <button class="decision-opt" data-action="SWAP_BEARISH" onclick="selectDecision('SWAP_BEARISH')">↘ SELL</button>
+            </div>
+            <div class="amount-input" id="amountInput">
+              <label>Amount:</label>
+              <input type="number" id="tradeAmount" min="1" max="1000" step="10" value="50">
+              <span>USDC</span>
+            </div>
+            <button class="validate-btn" onclick="validateDecision()">✓ VALIDATE DECISION</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Portfolio -->
+      <div class="card portfolio-card">
+        <div class="card-header">
+          <span class="card-title">PORTFOLIO</span>
+          <span class="card-badge simulated">SIMULATED</span>
+        </div>
+        <div class="card-body">
+          <div class="portfolio-total">
+            <div class="total-value" id="totalValue">$0.00</div>
+            <div class="total-label">TOTAL VALUE</div>
+          </div>
+
+          <!-- P&L Display -->
+          <div class="pnl-section" id="pnlSection" style="display: none;">
+            <div class="pnl-row">
+              <span class="pnl-label">P&L</span>
+              <span class="pnl-value" id="pnlTotal">$0.00</span>
+              <span class="pnl-percent" id="pnlPercent">(0.00%)</span>
+            </div>
+            <div class="pnl-breakdown">
+              <div class="pnl-item">
+                <span class="pnl-item-label">Realized</span>
+                <span class="pnl-item-value" id="pnlRealized">$0.00</span>
+              </div>
+              <div class="pnl-item">
+                <span class="pnl-item-label">Unrealized</span>
+                <span class="pnl-item-value" id="pnlUnrealized">$0.00</span>
+              </div>
+            </div>
+            <div class="trade-count" id="tradeCount">0 trades</div>
+          </div>
+
+          <div id="portfolioList"></div>
+
+          <!-- Deposit Section -->
+          <div class="deposit-section" id="depositSection">
+            <div class="deposit-prompt" id="depositPrompt">
+              <div class="prompt-text">Deposit funds to start trading</div>
+              <button class="deposit-trigger" onclick="showDepositForm()">+ ADD FUNDS</button>
+            </div>
+            <div class="deposit-form" id="depositForm" style="display: none;">
+              <input type="number" id="depositAmount" placeholder="Amount" min="0" max="10000" step="50" value="500">
+              <span class="input-suffix">USDC</span>
+              <div class="deposit-actions">
+                <button class="confirm-btn" onclick="confirmDeposit()">CONFIRM</button>
+                <button class="cancel-btn" onclick="cancelDeposit()">CANCEL</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quote -->
+      <div class="card quote-card" id="quoteCard">
+        <div class="card-header">
+          <span class="card-title">LI.FI ROUTE</span>
+          <span class="card-badge pending" id="quoteBadge">STANDBY</span>
+        </div>
+        <div class="card-body">
+          <div id="quoteContent">
+            <div class="empty-state">
+              <div class="icon">🔄</div>
+              Click GET QUOTE after analysis
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs -->
+      <div class="card logs-card">
+        <div class="card-header">
+          <span class="card-title">SYSTEM LOGS</span>
+          <span class="card-badge live"><span class="badge-dot"></span>LIVE</span>
+        </div>
+        <div class="card-body">
+          <div class="logs-container" id="logsContainer"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Execution Overlay -->
+    <div class="execution-overlay" id="executionOverlay" style="display: none;">
+      <div class="exec-title">⚡ SWAP EXECUTED</div>
+      <div class="exec-hash" id="execHash">0x...</div>
+      <div class="exec-note">Demo mode - simulated transaction</div>
+    </div>
+  </div>
+
+  <script>
+    let state = null;
+    let selectedSymbol = 'ETH';
+    let prevLogCount = 0;
+
+    // Symbol selection
+    document.querySelectorAll('.symbol-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.symbol-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedSymbol = btn.dataset.symbol;
+      });
+    });
+
+    // API calls
+    async function analyze() {
+      const btn = document.getElementById('analyzeBtn');
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: selectedSymbol })
+      });
+
+      // Wait for completion
+      await waitForIdle();
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+
+    async function getQuote() {
+      const btn = document.getElementById('quoteBtn');
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      await fetch('/api/quote', { method: 'POST' });
+
+      await waitForIdle();
+      btn.classList.remove('loading');
+    }
+
+    async function execute() {
+      const btn = document.getElementById('executeBtn');
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      await fetch('/api/execute', { method: 'POST' });
+
+      await waitForIdle();
+      btn.classList.remove('loading');
+    }
+
+    async function reset() {
+      await fetch('/api/reset', { method: 'POST' });
+      document.getElementById('executionOverlay').style.display = 'none';
+      document.getElementById('decisionConfirm').style.display = 'none';
+      selectedAction = null;
+      updateDecisionButtons();
+    }
+
+    // Deposit functions
+    function showDepositForm() {
+      document.getElementById('depositPrompt').style.display = 'none';
+      document.getElementById('depositForm').style.display = 'flex';
+      document.getElementById('depositAmount').focus();
+    }
+
+    function cancelDeposit() {
+      document.getElementById('depositForm').style.display = 'none';
+      document.getElementById('depositPrompt').style.display = 'block';
+    }
+
+    async function confirmDeposit() {
+      const amount = parseFloat(document.getElementById('depositAmount').value) || 0;
+      if (amount <= 0) return;
+
+      await fetch('/api/deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount })
+      });
+
+      document.getElementById('depositForm').style.display = 'none';
+      document.getElementById('depositPrompt').style.display = 'block';
+    }
+
+    // Decision functions
+    let selectedAction = null;
+
+    function selectDecision(action) {
+      selectedAction = action;
+      updateDecisionButtons();
+
+      // Show/hide amount input based on action
+      const amountInput = document.getElementById('amountInput');
+      amountInput.style.display = action === 'HOLD' ? 'none' : 'flex';
+    }
+
+    function updateDecisionButtons() {
+      document.querySelectorAll('.decision-opt').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.action === selectedAction);
+      });
+    }
+
+    async function validateDecision() {
+      if (!selectedAction) return;
+
+      const amount = document.getElementById('tradeAmount').value;
+
+      await fetch('/api/confirm-decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: selectedAction, amount })
+      });
+
+      document.getElementById('decisionConfirm').style.display = 'none';
+    }
+
+    async function waitForIdle() {
+      return new Promise(resolve => {
+        const check = setInterval(async () => {
+          const res = await fetch('/api/state');
+          const s = await res.json();
+          if (!s.isRunning) {
+            clearInterval(check);
+            resolve();
+          }
+        }, 500);
+      });
+    }
+
+    // Fetch and update
+    async function fetchState() {
+      try {
+        const res = await fetch('/api/state');
+        state = await res.json();
+        updateUI();
+      } catch (e) {
+        console.error('Fetch error:', e);
+      }
+    }
+
+    function updateUI() {
+      if (!state) return;
+
+      // Mode badge
+      const modeBadge = document.getElementById('modeBadge');
+      const modeText = document.getElementById('modeText');
+      modeBadge.className = `badge ${state.dataMode === 'live' ? 'live' : 'fallback'}`;
+      modeText.textContent = state.dataMode === 'live' ? 'LIVE MODE' : 'FALLBACK';
+
+      // Yellow status
+      document.getElementById('yellowStatus').textContent = state.yellowConnected ? '✓' : '--';
+
+      // Buttons - based on flow state
+      const hasBalance = state.usdcBalance > 0;
+      const hasDecision = state.decision && state.decision.action !== 'HOLD';
+      const decisionConfirmed = state.decisionConfirmed;
+
+      document.getElementById('analyzeBtn').disabled = !hasBalance || state.isRunning;
+      document.getElementById('quoteBtn').disabled = !hasDecision || !decisionConfirmed || state.isRunning;
+      document.getElementById('executeBtn').disabled = !state.quote || state.isRunning;
+
+      // Sentiment
+      updateSentiment();
+      updateDecision();
+      updatePortfolio();
+      updateQuote();
+      updateLogs();
+      updateExecution();
+    }
+
+    function updateSentiment() {
+      const content = document.getElementById('sentimentContent');
+      const badge = document.getElementById('sentimentBadge');
+
+      if (!state.sentiment) {
+        content.innerHTML = `<div class="empty-state"><div class="icon">📊</div>Select a symbol and click ANALYZE</div>`;
+        badge.className = 'card-badge pending';
+        badge.textContent = 'WAITING';
+        return;
+      }
+
+      const s = state.sentiment;
+      const scoreClass = s.score > 20 ? 'bullish' : s.score < -20 ? 'bearish' : 'neutral';
+      badge.className = `card-badge ${s.isLive ? 'live' : 'simulated'}`;
+      badge.textContent = s.isLive ? 'LIVE' : 'FALLBACK';
+
+      content.innerHTML = `
+        <div class="sentiment-display">
+          <div class="sentiment-score ${scoreClass}">${s.score.toFixed(0)}</div>
+          <div class="sentiment-label">${s.label.toUpperCase()}</div>
+        </div>
+        <div class="source-count">Analyzed <strong>${s.sources.length}</strong> ${s.isLive ? 'live' : 'fallback'} sources</div>
+        <div class="sources-list">
+          ${s.sources.slice(0, 5).map(src => `
+            <div class="source-item">
+              <div class="source-icon ${src.type}">${src.type === 'reddit' ? 'R' : 'T'}</div>
+              <div class="source-text">${src.title.substring(0, 50)}${src.title.length > 50 ? '...' : ''}</div>
+              <div class="source-score ${src.score < 0 ? 'negative' : ''}">${src.score > 0 ? '+' : ''}${src.score.toFixed(1)}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      document.getElementById('sentimentCard').classList.add('highlight');
+      setTimeout(() => document.getElementById('sentimentCard').classList.remove('highlight'), 500);
+    }
+
+    function updateDecision() {
+      const content = document.getElementById('decisionContent');
+      const badge = document.getElementById('decisionBadge');
+      const confirmPanel = document.getElementById('decisionConfirm');
+
+      if (!state.decision) {
+        content.innerHTML = `<div class="empty-state"><div class="icon">🧠</div>Awaiting sentiment analysis</div>`;
+        badge.className = 'card-badge pending';
+        badge.textContent = 'PENDING';
+        confirmPanel.style.display = 'none';
+        return;
+      }
+
+      const d = state.decision;
+      const actionClass = d.action.includes('BULLISH') ? 'bullish' : d.action.includes('BEARISH') ? 'bearish' : 'hold';
+      const icon = actionClass === 'bullish' ? '↗' : actionClass === 'bearish' ? '↘' : '◼';
+
+      // Update badge based on confirmation status
+      if (state.decisionConfirmed) {
+        badge.className = 'card-badge live';
+        badge.textContent = 'CONFIRMED';
+      } else {
+        badge.className = 'card-badge simulated';
+        badge.textContent = 'NEEDS APPROVAL';
+      }
+
+      content.innerHTML = `
+        <div class="decision-display">
+          <div class="decision-action ${actionClass}">
+            <span class="decision-icon">${icon}</span>
+            ${d.action}
+          </div>
+          <div class="decision-reason">${d.reason}</div>
+          ${d.fromToken !== '-' ? `
+            <div class="trade-preview">
+              <div class="trade-flow">
+                <div class="trade-token">
+                  <div class="token-amount">${d.amount}</div>
+                  <div class="token-symbol">${d.fromToken}</div>
+                </div>
+                <div class="trade-arrow">→</div>
+                <div class="trade-token">
+                  <div class="token-amount">~</div>
+                  <div class="token-symbol">${d.toToken}</div>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      // Show/hide confirmation panel
+      if (!state.decisionConfirmed) {
+        confirmPanel.style.display = 'block';
+        // Pre-select the AI's suggestion
+        if (!selectedAction) {
+          selectedAction = d.action;
+          updateDecisionButtons();
+          document.getElementById('tradeAmount').value = d.amount;
+          document.getElementById('amountInput').style.display = d.action === 'HOLD' ? 'none' : 'flex';
+        }
+      } else {
+        confirmPanel.style.display = 'none';
+      }
+
+      document.getElementById('decisionCard').classList.add('highlight');
+      setTimeout(() => document.getElementById('decisionCard').classList.remove('highlight'), 500);
+    }
+
+    function updatePortfolio() {
+      if (!state.portfolio) return;
+      const total = state.portfolio.reduce((sum, h) => sum + h.valueUsd, 0);
+      document.getElementById('totalValue').textContent = '$' + total.toFixed(2);
+
+      // Only show holdings with non-zero balance
+      const holdings = state.portfolio.filter(h => parseFloat(h.balance) > 0);
+      document.getElementById('portfolioList').innerHTML = holdings.length > 0 ? holdings.map(h => `
+        <div class="holding-item">
+          <div class="holding-icon">${h.token.charAt(0)}</div>
+          <div class="holding-info">
+            <div class="holding-token">${h.token}</div>
+            <div class="holding-chain">${h.chainName}</div>
+          </div>
+          <div class="holding-balance">
+            <div class="balance-amount">${parseFloat(h.balance).toFixed(h.token === 'USDC' ? 2 : 6)}</div>
+            <div class="balance-usd">$${h.valueUsd.toFixed(2)}</div>
+          </div>
+        </div>
+      `).join('') : '<div class="empty-state" style="padding: 15px;"><div class="icon">💼</div>No holdings yet</div>';
+
+      // Update P&L section
+      const pnlSection = document.getElementById('pnlSection');
+      if (state.pnl && state.pnl.tradeHistory && state.pnl.tradeHistory.length > 0) {
+        pnlSection.style.display = 'block';
+
+        const totalPnl = state.pnl.totalPnl || 0;
+        const pnlPercent = state.pnl.totalPnlPercent || 0;
+        const isPositive = totalPnl >= 0;
+
+        const pnlValue = document.getElementById('pnlTotal');
+        pnlValue.textContent = (isPositive ? '+' : '') + '$' + totalPnl.toFixed(2);
+        pnlValue.className = 'pnl-value ' + (isPositive ? 'positive' : 'negative');
+
+        const pnlPercentEl = document.getElementById('pnlPercent');
+        pnlPercentEl.textContent = '(' + (isPositive ? '+' : '') + pnlPercent.toFixed(2) + '%)';
+        pnlPercentEl.className = 'pnl-percent ' + (isPositive ? 'positive' : 'negative');
+
+        document.getElementById('pnlRealized').textContent = '$' + (state.pnl.realizedPnl || 0).toFixed(2);
+        document.getElementById('pnlUnrealized').textContent = '$' + (state.pnl.unrealizedPnl || 0).toFixed(2);
+        document.getElementById('tradeCount').textContent = state.pnl.tradeHistory.length + ' trade(s)';
+      } else {
+        pnlSection.style.display = 'none';
+      }
+
+      // Update deposit section visibility
+      const depositSection = document.getElementById('depositSection');
+      const promptText = document.querySelector('.prompt-text');
+      if (state.usdcBalance > 0) {
+        promptText.textContent = 'Add more funds';
+      } else {
+        promptText.textContent = 'Deposit funds to start trading';
+      }
+    }
+
+    function updateQuote() {
+      const content = document.getElementById('quoteContent');
+      const badge = document.getElementById('quoteBadge');
+
+      if (!state.quote) {
+        content.innerHTML = `<div class="empty-state"><div class="icon">🔄</div>Click GET QUOTE after analysis</div>`;
+        badge.className = 'card-badge pending';
+        badge.textContent = 'STANDBY';
+        return;
+      }
+
+      const q = state.quote;
+      badge.className = `card-badge ${q.isLive ? 'live' : 'simulated'}`;
+      badge.textContent = q.isLive ? 'LIVE ROUTE' : 'FALLBACK';
+
+      content.innerHTML = `
+        <div class="route-diagram">
+          <div class="route-node"><div class="node-icon">💰</div><div class="node-label">USDC</div></div>
+          <div class="route-node dex"><div class="node-icon">⚡</div><div class="node-label">${q.route}</div></div>
+          <div class="route-node"><div class="node-icon">◆</div><div class="node-label">WETH</div></div>
+        </div>
+        <div class="quote-stats">
+          <div class="stat-item"><div class="stat-value">${q.estimatedOutput}</div><div class="stat-label">OUTPUT</div></div>
+          <div class="stat-item"><div class="stat-value">$${q.gasCost}</div><div class="stat-label">GAS</div></div>
+          <div class="stat-item"><div class="stat-value">${q.steps}</div><div class="stat-label">STEPS</div></div>
+        </div>
+      `;
+
+      document.getElementById('quoteCard').classList.add('highlight');
+      setTimeout(() => document.getElementById('quoteCard').classList.remove('highlight'), 500);
+    }
+
+    function updateLogs() {
+      if (!state.logs) return;
+      const container = document.getElementById('logsContainer');
+      const isNew = state.logs.length > prevLogCount;
+      prevLogCount = state.logs.length;
+
+      container.innerHTML = state.logs.map((log, i) => {
+        const msgClass = log.includes('✓') ? 'success' : log.includes('→') ? 'info' : log.includes('⚠') ? 'warning' : '';
+        const parts = log.match(/\[([^\]]+)\]\s*(.*)/);
+        return `
+          <div class="log-entry ${i === state.logs.length - 1 && isNew ? 'new' : ''}">
+            <span class="log-time">${parts ? parts[1] : ''}</span>
+            <span class="log-message ${msgClass}">${parts ? parts[2] : log}</span>
+          </div>
+        `;
+      }).join('');
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function updateExecution() {
+      if (!state.execution) return;
+      const overlay = document.getElementById('executionOverlay');
+      overlay.style.display = 'block';
+      document.getElementById('execHash').textContent = state.execution.txHash;
+    }
+
+    // Poll every 500ms
+    setInterval(fetchState, 500);
+    fetchState();
+  </script>
+</body>
+</html>

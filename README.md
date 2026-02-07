@@ -6,8 +6,8 @@
 
   <h3>⚡ Extreme DeFi Payments for AI Agents ⚡</h3>
 
-  [![ETHGlobal HackMoney](https://img.shields.io/badge/ETHGlobal-HackMoney-7B3FE4?logo=ethereum&logoColor=white)](https://hackmoney.ethglobal.com/)
   [![Yellow](https://img.shields.io/badge/Yellow-Network-FFD700?logo=ethereum&logoColor=black)](https://yellow.org)
+  [![LI.FI](https://img.shields.io/badge/LI.FI-SDK-8B5CF6?logo=ethereum&logoColor=white)](https://li.fi)
   [![x402](https://img.shields.io/badge/x402-v2-0066CC?logo=protocol&logoColor=white)](https://x402.org)
   [![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-1.9+-FF6B35?logo=openai&logoColor=white)](https://modelcontextprotocol.io)
 
@@ -191,6 +191,186 @@ npm run minimal-session
 
 Demonstrates quorum 2 governance with agent + merchant signatures. See `docs/history/QUORUM-2-SOLVED.md` for technical details.
 
+---
+
+## 🧠 Sentifi: AI Cross-Chain Trading Agent
+
+Sentifi is an autonomous AI trading agent that combines real-time market sentiment analysis with cross-chain DeFi execution. It uses Yellow MCP for paid market intelligence and LI.FI SDK for optimal swap routing across chains.
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                    SENTIFI: AI Cross-Chain Trading Agent                     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌──────────┐  │
+│   │   MONITOR   │────▶│   ANALYZE   │────▶│   DECIDE    │────▶│ EXECUTE  │  │
+│   └─────────────┘     └─────────────┘     └─────────────┘     └──────────┘  │
+│         │                   │                   │                   │        │
+│         ▼                   ▼                   ▼                   ▼        │
+│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌──────────┐  │
+│   │ Reddit API  │     │  Sentiment  │     │  Strategy   │     │  LI.FI   │  │
+│   │ News/Tavily │     │  Scoring    │     │  Engine     │     │  SDK     │  │
+│   │ Stock Price │     │  Negation   │     │  Risk Mgmt  │     │  Swap    │  │
+│   └─────────────┘     └─────────────┘     └─────────────┘     └──────────┘  │
+│                                                                              │
+│   ┌──────────────────────────────────────────────────────────────────────┐  │
+│   │                      YELLOW NETWORK LAYER                            │  │
+│   │  • Prepaid MCP sessions for bulk market data queries                 │  │
+│   │  • Off-chain settlement (no per-call fees)                           │  │
+│   │  • Sub-millisecond data access                                       │  │
+│   └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│   ┌──────────────────────────────────────────────────────────────────────┐  │
+│   │                       LI.FI EXECUTION LAYER                          │  │
+│   │  • DEX aggregation across 30+ exchanges                              │  │
+│   │  • Cross-chain swaps (Arbitrum, Optimism, Base, Polygon)             │  │
+│   │  • Optimal routing with gas estimation                               │  │
+│   └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Agent Decision Flow
+
+```mermaid
+flowchart TD
+    A[Start] --> B[Fetch Market Sentiment]
+    B --> C{Analyze Signals}
+    C --> D[Score: -100 to +100]
+    D --> E{Decision Engine}
+
+    E -->|Score > 40| F[BULLISH: Buy Signal]
+    E -->|Score < -40| G[BEARISH: Sell Signal]
+    E -->|-40 ≤ Score ≤ 40| H[NEUTRAL: Hold]
+
+    F --> I[Risk Assessment]
+    G --> I
+    I --> J{Approved?}
+
+    J -->|Yes| K[Get LI.FI Quote]
+    J -->|No| L[Skip Trade]
+
+    K --> M[Execute Swap]
+    M --> N[Record P&L]
+    N --> O[Update Dashboard]
+    O --> B
+
+    H --> B
+    L --> B
+```
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Live Sentiment** | Real-time data from Reddit + news via Yellow MCP `market_rumors` tool |
+| **Smart Analysis** | Negation detection ("not bullish" → bearish), recency weighting, engagement scoring |
+| **Multi-Signal** | Combines sentiment (60%) + momentum indicators (40%) |
+| **Risk Management** | Confidence-based position sizing, max drawdown limits, circuit breakers |
+| **LI.FI Integration** | Real DEX quotes from Kyberswap, OKX, Uniswap across multiple chains |
+| **P&L Tracking** | Entry prices, average cost basis, realized/unrealized gains |
+| **Live Dashboard** | Real-time visualization at `localhost:3456` |
+
+### Run Sentifi Demo
+
+```bash
+# Start the trading agent with dashboard
+npm run demo:sentifi
+
+# Open dashboard in browser
+open http://localhost:3456
+```
+
+### Dashboard Preview
+
+The Sentifi dashboard provides real-time visualization of:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  SENTIFI NEURAL TRADING                                    [LIVE] 🟢       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────┐  ┌─────────────────────────────────────────────┐  │
+│  │   SENTIMENT GAUGE   │  │              MARKET SIGNALS                 │  │
+│  │                     │  │                                             │  │
+│  │    ◀━━━━●━━━━▶     │  │  Reddit:  ████████░░  +45  Bullish          │  │
+│  │   -100    0   +100  │  │  News:    ██████░░░░  +32  Moderate         │  │
+│  │                     │  │  Price:   ███████░░░  +38  Uptrend          │  │
+│  │   Score: +42        │  │                                             │  │
+│  │   BULLISH           │  │  Combined: +38.5 (Confidence: 84%)          │  │
+│  └─────────────────────┘  └─────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  TRADING DECISION                                                    │   │
+│  │                                                                      │   │
+│  │  Action: BUY ETH                                                     │   │
+│  │  Reason: Moderate bullish signal suggests buying opportunity         │   │
+│  │  Size: 15.6% of portfolio ($78.00)                                   │   │
+│  │  Route: Kyberswap → 0.0516 ETH                                       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────────────┐  ┌─────────────────────────────────────────────┐  │
+│  │     PORTFOLIO       │  │              ACTIVITY LOG                   │  │
+│  │                     │  │                                             │  │
+│  │  USDC:    $422.00   │  │  12:34:01  Fetching market sentiment...    │  │
+│  │  ETH:     0.0516    │  │  12:34:03  Score: +42 (bullish)            │  │
+│  │  ─────────────────  │  │  12:34:03  Decision: BUY ETH               │  │
+│  │  P&L: +$29.06       │  │  12:34:04  Quote: Kyberswap, 0.0516 ETH    │  │
+│  │       (+5.81%)      │  │  12:34:05  Executed: TX 0x47ae...          │  │
+│  └─────────────────────┘  └─────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Module Structure
+
+```
+src/sentifi/
+├── index.ts                 # Main orchestrator
+├── config.ts                # Zod-validated configuration
+├── types.ts                 # Core type definitions
+├── providers/               # Data sources
+│   ├── sentiment/           # Reddit, Tavily aggregation
+│   └── price/               # Price feeds
+├── signals/                 # Signal processing
+│   ├── sentiment/           # Sentiment analysis engine
+│   └── momentum/            # Technical indicators
+├── strategies/              # Trading strategies
+│   └── sentiment-momentum/  # Default combined strategy
+├── risk/                    # Risk management
+│   ├── position-sizer.ts    # Confidence-based sizing
+│   └── circuit-breaker.ts   # Emergency stops
+├── execution/               # Trade execution
+│   ├── lifi-executor.ts     # LI.FI SDK integration
+│   └── simulator.ts         # Demo mode
+├── learning/                # Feedback loop
+│   └── tracker.ts           # Prediction accuracy
+└── server/                  # HTTP API + Dashboard
+    └── demo.ts              # Main entry point
+```
+
+### Configuration
+
+Configure via environment variables:
+
+```bash
+# Strategy
+SENTIFI_BULLISH_THRESHOLD=40      # Score above this = bullish
+SENTIFI_BEARISH_THRESHOLD=-40     # Score below this = bearish
+SENTIFI_MIN_CONFIDENCE=0.5        # Minimum confidence to trade
+
+# Risk Management
+SENTIFI_MAX_POSITION_PCT=25       # Max position size (% of portfolio)
+SENTIFI_CONFIDENCE_SCALING=true   # Scale size by confidence
+
+# Execution
+SENTIFI_CHAIN_ID=42161            # Arbitrum One
+```
+
+---
+
 ## Merchant Operations
 
 ### Understanding Merchant Funds
@@ -328,6 +508,7 @@ npm run test:coverage # With coverage report
 ## Links
 
 - [Yellow Network](https://yellow.org) - Off-chain payment infrastructure
+- [LI.FI SDK](https://docs.li.fi) - Cross-chain DEX aggregation
 - [x402 Specification](https://x402.org) - Payment protocol standard
 - [x402 SIWx PR #921](https://github.com/coinbase/x402/pull/921) - SIWx implementation reference
 - [Model Context Protocol](https://modelcontextprotocol.io) - Tool integration framework

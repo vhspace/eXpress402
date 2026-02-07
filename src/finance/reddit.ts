@@ -19,6 +19,8 @@ export async function fetchRedditRumors(query: string, limit = 5): Promise<Reddi
   const response = await fetch(url.toString(), {
     headers: {
       'User-Agent': process.env.REDDIT_USER_AGENT ?? 'eXpress402-mcp/0.1',
+      // Reddit returns HTML (403) to Node fetch unless we explicitly request JSON.
+      Accept: 'application/json',
     },
   });
 
