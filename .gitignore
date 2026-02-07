@@ -4,6 +4,8 @@ node_modules/
 .env
 build/
 .local/
+.next/
+.vercel/
 
 # Attic directory (old development files)
 attic/
