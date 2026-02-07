@@ -809,9 +809,8 @@
       border-top: 2px solid var(--accent-cyan);
       padding: 12px 20px;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 40px;
+      flex-direction: column;
+      gap: 10px;
       font-size: 0.65rem;
       z-index: 50;
       box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.5);
@@ -819,6 +818,46 @@
 
     .status-bar.hidden {
       display: none;
+    }
+
+    .status-bar-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+    }
+
+    .status-bar-progress {
+      width: 100%;
+      height: 4px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-dim);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .status-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-amber), #ffcc00);
+      transition: width 0.3s ease, background 0.3s ease;
+      position: relative;
+      box-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+    }
+
+    .status-bar-fill.low {
+      background: linear-gradient(90deg, var(--accent-amber), #ff8800);
+      animation: pulseGlow 2s infinite;
+    }
+
+    .status-bar-fill.critical {
+      background: linear-gradient(90deg, var(--accent-red), #ff6666);
+      animation: pulseGlow 1s infinite;
+      box-shadow: 0 0 15px rgba(255, 51, 102, 0.7);
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
     }
 
     .status-item {
@@ -878,16 +917,15 @@
       .control-row { flex-direction: column; align-items: stretch; }
       .action-buttons { margin-left: 0; margin-top: 15px; justify-content: center; }
       .header { flex-direction: column; gap: 15px; }
-      .status-bar { 
+      .status-bar-content { 
         flex-direction: column; 
         gap: 10px; 
-        padding: 10px; 
       }
       .status-divider { 
         width: 100%; 
         height: 1px; 
       }
-      .container { padding-bottom: 140px; }
+      .container { padding-bottom: 180px; }
     }
   </style>
 </head>
@@ -1077,29 +1115,34 @@
 
   <!-- Yellow Network Status Bar -->
   <div class="status-bar hidden" id="statusBar">
-    <div class="status-item">
-      <span class="status-label">AGENT</span>
-      <span class="status-address" id="agentAddress">--</span>
+    <div class="status-bar-progress">
+      <div class="status-bar-fill" id="statusBarFill" style="width: 100%;"></div>
     </div>
-    <div class="status-divider"></div>
-    <div class="status-item">
-      <span class="status-label">MERCHANT (MCP)</span>
-      <span class="status-address" id="merchantAddress">--</span>
-    </div>
-    <div class="status-divider"></div>
-    <div class="status-item">
-      <span class="status-label">SESSION INITIAL</span>
-      <span class="status-balance" id="sessionInitial">0.00</span>
-    </div>
-    <div class="status-divider"></div>
-    <div class="status-item">
-      <span class="status-label">SESSION SPENT</span>
-      <span class="status-balance" id="sessionSpent">0.00</span>
-    </div>
-    <div class="status-divider"></div>
-    <div class="status-item">
-      <span class="status-label">SESSION REMAINING</span>
-      <span class="status-balance" id="sessionRemaining">0.00</span>
+    <div class="status-bar-content">
+      <div class="status-item">
+        <span class="status-label">AGENT</span>
+        <span class="status-address" id="agentAddress">--</span>
+      </div>
+      <div class="status-divider"></div>
+      <div class="status-item">
+        <span class="status-label">MARKET RESEARCH MCP</span>
+        <span class="status-address" id="merchantAddress">--</span>
+      </div>
+      <div class="status-divider"></div>
+      <div class="status-item">
+        <span class="status-label">SESSION INITIAL</span>
+        <span class="status-balance" id="sessionInitial">0.00</span>
+      </div>
+      <div class="status-divider"></div>
+      <div class="status-item">
+        <span class="status-label">SESSION SPENT</span>
+        <span class="status-balance" id="sessionSpent">0.00</span>
+      </div>
+      <div class="status-divider"></div>
+      <div class="status-item">
+        <span class="status-label">SESSION REMAINING</span>
+        <span class="status-balance" id="sessionRemaining">0.00</span>
+      </div>
     </div>
   </div>
 
@@ -1529,12 +1572,23 @@
       const remainingEl = document.getElementById('sessionRemaining');
       remainingEl.textContent = formatBalance(w.sessionRemaining);
       
+      // Calculate percentage remaining
+      const percentRemaining = w.sessionInitial > 0 ? (w.sessionRemaining / w.sessionInitial) * 100 : 100;
+      
+      // Update progress bar
+      const progressFill = document.getElementById('statusBarFill');
+      progressFill.style.width = `${Math.max(0, Math.min(100, percentRemaining))}%`;
+      
       // Add warning classes based on remaining balance
       remainingEl.className = 'status-balance';
+      progressFill.className = 'status-bar-fill';
+      
       if (w.sessionRemaining < w.sessionInitial * 0.2) {
         remainingEl.classList.add('critical');
+        progressFill.classList.add('critical');
       } else if (w.sessionRemaining < w.sessionInitial * 0.5) {
         remainingEl.classList.add('low');
+        progressFill.classList.add('low');
       }
     }
 
