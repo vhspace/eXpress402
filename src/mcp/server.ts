@@ -72,7 +72,7 @@ export async function startMcpServer() {
         const settlement = await requirePayment(extra, 'stock_price');
         const data = await getStockPrice(symbol);
         console.error(`[MCP] Tool response: ${JSON.stringify(data).substring(0, 100)}...`);
-        console.error(`[MCP] Payment settlement: ${settlement.status}`);
+        console.error(`[MCP] Payment settlement: ${settlement.success ? 'success' : 'failed'}`);
         return {
           content: [{ type: 'text', text: JSON.stringify(data) }],
           _meta: {
@@ -97,7 +97,7 @@ export async function startMcpServer() {
         const redditCount = data.reddit?.length || 0;
         const tavilyCount = data.tavily?.length || 0;
         console.error(`[MCP] Tool response: ${redditCount} Reddit posts, ${tavilyCount} Tavily articles`);
-        console.error(`[MCP] Payment settlement: ${settlement.status}`);
+        console.error(`[MCP] Payment settlement: ${settlement.success ? 'success' : 'failed'}`);
         return {
           content: [{ type: 'text', text: JSON.stringify(data) }],
           _meta: {
