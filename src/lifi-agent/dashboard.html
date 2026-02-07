@@ -1605,8 +1605,8 @@
       // Check Yellow session balance for research
       let hasYellowBalance = true;
       if (state.yellowWallets && state.yellowConnected) {
-        // MCP cost per query
-        const minRequired = 1.15;
+        // MCP cost per query (from backend)
+        const minRequired = state.yellowWallets.pricePerCall || 0.001;
         hasYellowBalance = state.yellowWallets.sessionRemaining >= minRequired;
       }
 
