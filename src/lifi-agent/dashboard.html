@@ -1692,8 +1692,19 @@
     function updateLogs() {
       if (!state.logs) return;
       const container = document.getElementById('logsContainer');
+      
+      // Only update if logs actually changed
       const isNew = state.logs.length > prevLogCount;
+      if (!isNew && state.logs.length === prevLogCount) {
+        return; // No changes, skip update
+      }
       prevLogCount = state.logs.length;
+
+      // Save current scroll position and check if at bottom
+      const scrollTop = container.scrollTop;
+      const scrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
+      const isScrolledToBottom = scrollHeight - clientHeight <= scrollTop + 50;
 
       container.innerHTML = state.logs.map((log, i) => {
         const msgClass = log.includes('✓') ? 'success' : log.includes('→') ? 'info' : log.includes('⚠') ? 'warning' : '';
@@ -1706,7 +1717,13 @@
         `;
       }).join('');
 
-      container.scrollTop = container.scrollHeight;
+      // Restore scroll position or scroll to bottom
+      if (isScrolledToBottom) {
+        container.scrollTop = container.scrollHeight;
+      } else {
+        // Preserve the exact scroll position
+        container.scrollTop = scrollTop;
+      }
     }
 
     let prevDebugLogCount = 0;
@@ -1723,8 +1740,19 @@
 
       if (!state.debugLogs) return;
       const container = document.getElementById('debugLogsContainer');
+      
+      // Only update if logs actually changed
       const isNew = state.debugLogs.length > prevDebugLogCount;
+      if (!isNew && state.debugLogs.length === prevDebugLogCount) {
+        return; // No changes, skip update
+      }
       prevDebugLogCount = state.debugLogs.length;
+
+      // Save current scroll position and check if at bottom
+      const scrollTop = container.scrollTop;
+      const scrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
+      const isScrolledToBottom = scrollHeight - clientHeight <= scrollTop + 50;
 
       container.innerHTML = state.debugLogs.map((log, i) => {
         // Parse log format: [timestamp] emoji [CATEGORY] message
@@ -1743,7 +1771,13 @@
         return `<div class="log-entry">${log}</div>`;
       }).join('');
 
-      container.scrollTop = container.scrollHeight;
+      // Restore scroll position or scroll to bottom
+      if (isScrolledToBottom) {
+        container.scrollTop = container.scrollHeight;
+      } else {
+        // Preserve the exact scroll position
+        container.scrollTop = scrollTop;
+      }
     }
 
     function updateExecution() {
