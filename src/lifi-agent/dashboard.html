@@ -951,8 +951,11 @@
     .status-bar-content {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 40px;
+      justify-content: space-between;
+      gap: 30px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
     }
 
     .status-bar-progress {
@@ -990,8 +993,14 @@
 
     .status-item {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 4px;
+    }
+    
+    .status-item:first-child,
+    .status-item:last-child {
+      min-width: 180px;
     }
 
     .status-label {
@@ -1272,16 +1281,16 @@
       <div class="status-bar-fill" id="statusBarFill" style="width: 100%;"></div>
     </div>
     <div class="status-bar-content">
+      <!-- Left: AI Agent Off-Chain Wallet -->
       <div class="status-item">
-        <span class="status-label">AGENT</span>
+        <span class="status-label">AI AGENT</span>
         <span class="status-address" id="agentAddress">--</span>
+        <span class="status-balance" id="agentBalance">0.00</span>
       </div>
+      
       <div class="status-divider"></div>
-      <div class="status-item">
-        <span class="status-label">MARKET RESEARCH MCP</span>
-        <span class="status-address" id="merchantAddress">--</span>
-      </div>
-      <div class="status-divider"></div>
+      
+      <!-- Center: Session Info -->
       <div class="status-item">
         <span class="status-label">SESSION INITIAL</span>
         <span class="status-balance" id="sessionInitial">0.00</span>
@@ -1295,6 +1304,15 @@
       <div class="status-item">
         <span class="status-label">SESSION REMAINING</span>
         <span class="status-balance" id="sessionRemaining">0.00</span>
+      </div>
+      
+      <div class="status-divider"></div>
+      
+      <!-- Right: MCP Merchant -->
+      <div class="status-item">
+        <span class="status-label">MARKET RESEARCH MCP</span>
+        <span class="status-address" id="merchantAddress">--</span>
+        <span class="status-balance" id="merchantBalance">0.00</span>
       </div>
     </div>
   </div>
@@ -1861,19 +1879,25 @@
         return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
       };
 
-      document.getElementById('agentAddress').textContent = formatAddress(w.agentAddress);
-      document.getElementById('merchantAddress').textContent = formatAddress(w.merchantAddress);
-      
       // Format balances
       const formatBalance = (amount) => {
         return `${amount.toFixed(2)} ${w.assetSymbol}`;
       };
 
+      // Update AI Agent (left side)
+      document.getElementById('agentAddress').textContent = formatAddress(w.agentAddress);
+      document.getElementById('agentBalance').textContent = formatBalance(w.agentBalance || 0);
+      
+      // Update Session (center)
       document.getElementById('sessionInitial').textContent = formatBalance(w.sessionInitial);
       document.getElementById('sessionSpent').textContent = formatBalance(w.sessionSpent);
       
       const remainingEl = document.getElementById('sessionRemaining');
       remainingEl.textContent = formatBalance(w.sessionRemaining);
+      
+      // Update MCP Merchant (right side)
+      document.getElementById('merchantAddress').textContent = formatAddress(w.merchantAddress);
+      document.getElementById('merchantBalance').textContent = formatBalance(w.merchantBalance || 0);
       
       // Calculate percentage remaining
       const percentRemaining = w.sessionInitial > 0 ? (w.sessionRemaining / w.sessionInitial) * 100 : 100;
