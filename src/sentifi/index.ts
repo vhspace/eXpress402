@@ -137,7 +137,7 @@ export class SentifiAgent {
   private eventHandlers: AgentEventHandler[] = [];
 
   constructor(config?: Partial<SentifiConfig>) {
-    this.config = config || {};
+    this.config = config ?? {};
 
     // Initialize strategy config
     this.strategyConfig = {
@@ -307,7 +307,7 @@ export class SentifiAgent {
   ): Promise<TradeIntent | null> {
     this.setPhase('decide', 'Generating trading decision');
 
-    const currentSignal = signal || this.state.lastSignal;
+    const currentSignal = signal ?? this.state.lastSignal;
     if (!currentSignal) {
       this.emit({ type: 'decision', intent: null, reason: 'No signal available' });
       return null;
@@ -337,7 +337,7 @@ export class SentifiAgent {
     this.emit({
       type: 'decision',
       intent,
-      reason: intent?.reason || 'No action recommended',
+      reason: intent?.reason ?? 'No action recommended',
     });
 
     if (intent) {
@@ -356,7 +356,7 @@ export class SentifiAgent {
    * Assess risk for a trade intent
    */
   async assessRisk(intent?: TradeIntent): Promise<RiskAssessment | null> {
-    const currentIntent = intent || this.state.lastIntent;
+    const currentIntent = intent ?? this.state.lastIntent;
     if (!currentIntent) {
       return null;
     }
@@ -390,7 +390,7 @@ export class SentifiAgent {
   ): Promise<QuoteResult> {
     this.setPhase('quote', 'Getting swap quote');
 
-    const currentIntent = intent || this.state.lastIntent;
+    const currentIntent = intent ?? this.state.lastIntent;
     if (!currentIntent) {
       const errorQuote: QuoteResult = {
         success: false,
@@ -457,7 +457,7 @@ export class SentifiAgent {
   ): Promise<ExecutionResult> {
     this.setPhase('execute', 'Executing trade');
 
-    const currentQuote = quote || this.state.lastQuote;
+    const currentQuote = quote ?? this.state.lastQuote;
     const currentIntent = this.state.lastIntent;
 
     if (!currentQuote || !currentIntent) {
@@ -495,7 +495,7 @@ export class SentifiAgent {
           currentQuote.inputToken,
           currentQuote.outputToken,
           parseFloat(currentQuote.inputAmount),
-          parseFloat(result.outputAmount || currentQuote.estimatedOutput),
+          parseFloat(result.outputAmount ?? currentQuote.estimatedOutput),
           result.chainId,
         );
         await this.updatePortfolio();
@@ -558,7 +558,7 @@ export class SentifiAgent {
     }
 
     // Get quote
-    const quote = await this.getQuote(assessment.adjustedIntent || intent);
+    const quote = await this.getQuote(assessment.adjustedIntent ?? intent);
 
     // If quote failed or no auto-execute, return
     if (!quote.success || !options?.autoExecute) {

@@ -118,7 +118,7 @@ export function loadConfig(): SentifiConfig {
       sessionAllocations: parseJsonEnv('YELLOW_APP_SESSION_ALLOCATIONS'),
     },
     wallet: {
-      privateKey: process.env.SENTIFI_WALLET_PRIVATE_KEY || process.env.YELLOW_AGENT_PRIVATE_KEY,
+      privateKey: process.env.SENTIFI_WALLET_PRIVATE_KEY ?? process.env.YELLOW_AGENT_PRIVATE_KEY,
     },
     lifi: {
       integratorId: process.env.LIFI_INTEGRATOR_ID,
@@ -169,7 +169,7 @@ export function loadConfig(): SentifiConfig {
       enabled: parseBoolEnv('SENTIFI_LEARNING'),
       trackOutcomes: parseBoolEnv('SENTIFI_TRACK_OUTCOMES'),
       outcomeHorizonHours: parseArrayEnv('SENTIFI_OUTCOME_HORIZONS', Number),
-      redisUrl: process.env.KV_URL || process.env.REDIS_URL,
+      redisUrl: process.env.KV_URL ?? process.env.REDIS_URL,
     },
     pollingIntervalMs: parseNumberEnv('SENTIFI_POLLING_MS'),
     maxIterations: parseNumberEnv('SENTIFI_MAX_ITERATIONS'),
@@ -258,14 +258,14 @@ export function createDemoConfig(overrides?: Partial<SentifiConfig>): SentifiCon
   return SentifiConfigSchema.parse({
     yellow: {
       clearnodeUrl: 'wss://clearnet-sandbox.yellow.com/ws',
-      agentPrivateKey: process.env.YELLOW_AGENT_PRIVATE_KEY || demoPrivateKey,
+      agentPrivateKey: process.env.YELLOW_AGENT_PRIVATE_KEY ?? demoPrivateKey,
       merchantAddress:
-        process.env.YELLOW_MERCHANT_ADDRESS || '0x0000000000000000000000000000000000000001',
-      merchantPrivateKey: process.env.YELLOW_MERCHANT_PRIVATE_KEY || demoPrivateKey,
+        process.env.YELLOW_MERCHANT_ADDRESS ?? '0x0000000000000000000000000000000000000001',
+      merchantPrivateKey: process.env.YELLOW_MERCHANT_PRIVATE_KEY ?? demoPrivateKey,
       assetSymbol: 'ytest.usd',
     },
     wallet: {
-      privateKey: process.env.YELLOW_AGENT_PRIVATE_KEY || demoPrivateKey,
+      privateKey: process.env.YELLOW_AGENT_PRIVATE_KEY ?? demoPrivateKey,
     },
     execution: {
       mode: 'demo',

@@ -20,9 +20,10 @@ const defaultConfig: RiskConfig = {
   maxPositionPercent: 25,
   minConfidenceToTrade: 0.5,
   confidenceScaling: true,
-  maxDailyLossPercent: 10,
+  dailyLossLimitPercent: 10,
   maxDrawdownPercent: 15,
   maxTradesPerHour: 5,
+  maxOpenPositions: 3,
 };
 
 const mockPortfolio: Holding[] = [
@@ -30,16 +31,20 @@ const mockPortfolio: Holding[] = [
     chainId: 42161,
     chainName: 'Arbitrum',
     token: 'USDC',
+    tokenAddress: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
     address: '0xaf88d065e77c8cc2239327c5edb3a432268e5831',
     balance: 500,
+    decimals: 6,
     valueUsd: 500,
   },
   {
     chainId: 42161,
     chainName: 'Arbitrum',
     token: 'ETH',
+    tokenAddress: '0x0000000000000000000000000000000000000000',
     address: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
     balance: 0.1,
+    decimals: 18,
     valueUsd: 250,
   },
 ];
@@ -80,8 +85,10 @@ describe('calculatePositionSize', () => {
         chainId: 42161,
         chainName: 'Arbitrum',
         token: 'USDC',
+        tokenAddress: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
         address: '0xaf88d065e77c8cc2239327c5edb3a432268e5831',
         balance: 10000,
+        decimals: 6,
         valueUsd: 10000,
       },
     ];
@@ -151,23 +158,29 @@ describe('calculateConfidenceMultiplier', () => {
 
 describe('calculateKellySize', () => {
   it('returns 0 for edge cases', () => {
-    expect(calculateKellySize({
-      winProbability: 0,
-      averageWin: 100,
-      averageLoss: 50,
-    })).toBe(0);
+    expect(
+      calculateKellySize({
+        winProbability: 0,
+        averageWin: 100,
+        averageLoss: 50,
+      }),
+    ).toBe(0);
 
-    expect(calculateKellySize({
-      winProbability: 1,
-      averageWin: 100,
-      averageLoss: 50,
-    })).toBe(0);
+    expect(
+      calculateKellySize({
+        winProbability: 1,
+        averageWin: 100,
+        averageLoss: 50,
+      }),
+    ).toBe(0);
 
-    expect(calculateKellySize({
-      winProbability: 0.6,
-      averageWin: 100,
-      averageLoss: 0,
-    })).toBe(0);
+    expect(
+      calculateKellySize({
+        winProbability: 0.6,
+        averageWin: 100,
+        averageLoss: 0,
+      }),
+    ).toBe(0);
   });
 
   it('calculates positive Kelly for favorable odds', () => {

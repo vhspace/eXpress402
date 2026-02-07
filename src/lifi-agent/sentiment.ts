@@ -82,18 +82,7 @@ const BEARISH_KEYWORDS = [
   'overheated',
 ];
 
-// Reserved for future neutral sentiment detection
-const _NEUTRAL_KEYWORDS = [
-  'hold',
-  'holding',
-  'sideways',
-  'consolidate',
-  'consolidating',
-  'wait',
-  'neutral',
-  'mixed',
-  'uncertain',
-];
+// Note: neutral sentiment is derived from near-zero scores.
 
 /**
  * Calculate sentiment score for a Reddit post
