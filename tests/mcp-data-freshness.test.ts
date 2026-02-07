@@ -67,21 +67,32 @@ describeIfEnabled('MCP Data Freshness E2E', () => {
 
     const signer = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
     const participants = [agentAddress as `0x${string}`, env.merchantAddress as `0x${string}`];
+    const weights = participants.map(() => 1);
+    const allocations = [
+      { participant: agentAddress as `0x${string}`, asset: env.assetSymbol, amount: '1.000000' },
+      { participant: env.merchantAddress as `0x${string}`, asset: env.assetSymbol, amount: '0.000000' },
+    ];
+    
     const message = await createAppSessionMessage(signer, {
       definition: {
         application: 'mcp-freshness-test',
         protocol: RPCProtocolVersion.NitroRPC_0_4,
         participants,
-        allocation: [
-          { participant: agentAddress as `0x${string}`, asset: env.assetSymbol, amount: '1.000000' },
-          { participant: env.merchantAddress as `0x${string}`, asset: env.assetSymbol, amount: '0.000000' },
-        ],
+        weights,
         quorum: 1,
+        challenge: 0,
+        nonce: Date.now(),
       },
+      allocations,
+      session_data: JSON.stringify({ ttlSeconds: 3600 }),
     });
 
-    sessionId = message.channelId;
-    await yellow.sendMessage(message);
+    const response = (await yellow.sendRawMessage(message)) as any;
+    sessionId = (response.appSessionId ??
+      response.app_session_id ??
+      response.appSession?.appSessionId) as string;
+    
+    expect(sessionId).toBeDefined();
 
     // Start MCP server
     mcpTransport = new StdioClientTransport({
@@ -101,15 +112,14 @@ describeIfEnabled('MCP Data Freshness E2E', () => {
     if (mcpTransport) {
       await mcpTransport.close();
     }
-    if (yellow) {
-      yellow.close();
-    }
+    // Yellow client will cleanup on process exit
   }, 10000);
 
   it('should return Reddit data within last 4 hours', async () => {
     const result = await mcpClient.callTool({
       name: 'market_rumors',
       arguments: { symbol: 'ETH' },
+      _meta: { 'x402/yellow': { appSessionId: sessionId, payer: agentAddress } },
     });
 
     expect(result.isError).toBeFalsy();
@@ -147,6 +157,7 @@ describeIfEnabled('MCP Data Freshness E2E', () => {
     const result = await mcpClient.callTool({
       name: 'market_rumors',
       arguments: { symbol: 'ETH' },
+      _meta: { 'x402/yellow': { appSessionId: sessionId, payer: agentAddress } },
     });
 
     expect(result.isError).toBeFalsy();
@@ -189,6 +200,7 @@ describeIfEnabled('MCP Data Freshness E2E', () => {
     const result = await mcpClient.callTool({
       name: 'market_rumors',
       arguments: { symbol: 'BTC' },
+      _meta: { 'x402/yellow': { appSessionId: sessionId, payer: agentAddress } },
     });
 
     expect(result.isError).toBeFalsy();
@@ -205,6 +217,7 @@ describeIfEnabled('MCP Data Freshness E2E', () => {
     const result1 = await mcpClient.callTool({
       name: 'market_rumors',
       arguments: { symbol: 'ETH' },
+      _meta: { 'x402/yellow': { appSessionId: sessionId, payer: agentAddress } },
     });
 
     // Wait a moment
@@ -213,6 +226,7 @@ describeIfEnabled('MCP Data Freshness E2E', () => {
     const result2 = await mcpClient.callTool({
       name: 'market_rumors',
       arguments: { symbol: 'SOL' },
+      _meta: { 'x402/yellow': { appSessionId: sessionId, payer: agentAddress } },
     });
 
     const data1 = JSON.parse(result1.content.find((c: any) => c.type === 'text')?.text!);
