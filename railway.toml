@@ -1,0 +1,6 @@
+[build]
+
+[deploy]
+startCommand = "npm run demo:sentifi"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
