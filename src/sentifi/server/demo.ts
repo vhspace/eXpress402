@@ -22,6 +22,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import {
   createAppSessionMessage,
+  createCloseAppSessionMessage,
   createECDSAMessageSigner,
 } from '@erc7824/nitrolite/dist/rpc/api.js';
 import { RPCProtocolVersion } from '@erc7824/nitrolite/dist/rpc/types/index.js';
@@ -232,11 +233,12 @@ async function initializeYellow(): Promise<boolean> {
     console.log(chalk.green('✓ MCP Server connected'));
     log('✓ Connected to MCP Server');
 
-    // Create Yellow app session for payment tracking
-    console.log(chalk.dim('   Creating Yellow payment session...'));
+    // Create Yellow app session for payment tracking with QUORUM 2
+    console.log(chalk.dim('   Creating Yellow payment session (Quorum 2)...'));
     const participants: `0x${string}`[] = [yellowContext.agentAddress, yellowContext.merchantAddress];
     yellowContext.participants = participants;
-    const signer = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
+    const agentSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
+    const merchantSigner = createECDSAMessageSigner(env.merchantPrivateKey as `0x${string}`);
     const allocations = participants.map((participant, i) => ({
       participant,
       asset: env.assetSymbol,
@@ -244,21 +246,26 @@ async function initializeYellow(): Promise<boolean> {
     }));
     yellowContext.sessionInitialAmount = Number(allocations[0]?.amount ?? 0);
 
-    const message = await createAppSessionMessage(signer, {
+    const sessionParams = {
       definition: {
         application: YELLOW_APPLICATION,
         protocol: RPCProtocolVersion.NitroRPC_0_4,
         participants,
         weights: participants.map(() => 1),
-        quorum: 1,
+        quorum: 2, // BOTH agent and merchant must sign
         challenge: 0,
         nonce: Date.now(),
       },
       allocations,
       session_data: JSON.stringify({ ttlSeconds: 3600 }),
-    });
+    };
 
-    const response = (await yellowContext.yellow.sendRawMessage(message)) as Record<string, unknown>;
+    const agentSessionMessage = await createAppSessionMessage(agentSigner, sessionParams);
+    const sessionParsed = JSON.parse(agentSessionMessage);
+    const merchantSessionSig = await merchantSigner(sessionParsed.req);
+    sessionParsed.sig.push(merchantSessionSig);
+
+    const response = (await yellowContext.yellow.sendRawMessage(JSON.stringify(sessionParsed))) as Record<string, unknown>;
     yellowContext.appSessionId =
       (response.appSessionId as string | undefined) ??
       (response.app_session_id as string | undefined) ??
@@ -511,12 +518,23 @@ async function closeYellowSession(): Promise<void> {
       
       debugLog('SESSION', `Final settlement: Agent refund ${remaining.toFixed(2)} ${asset}, Merchant payment ${yellowContext.sessionSpent.toFixed(2)} ${asset}`);
 
-      await yellowContext.yellow.closeAppSession({
-        appSessionId: yellowContext.appSessionId,
+      // Close with QUORUM 2 (both agent and merchant sign)
+      const agentCloseSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
+      const merchantCloseSigner = createECDSAMessageSigner(env.merchantPrivateKey as `0x${string}`);
+
+      const agentCloseMessage = await createCloseAppSessionMessage(agentCloseSigner, {
+        app_session_id: yellowContext.appSessionId as `0x${string}`,
         allocations,
       });
-      debugLog('SESSION', `✓ Yellow Network session closed and settled`);
-      log('✓ Yellow session closed');
+
+      const closeParsed = JSON.parse(agentCloseMessage);
+      const merchantCloseSig = await merchantCloseSigner(closeParsed.req);
+      closeParsed.sig.push(merchantCloseSig);
+
+      await yellowContext.yellow.sendRawMessage(JSON.stringify(closeParsed));
+      
+      debugLog('SESSION', `✓ Yellow Network session closed with Quorum 2`);
+      log('✓ Yellow session closed (Quorum 2)');
     } catch (error) {
       log(`⚠️ Failed to close session: ${error instanceof Error ? error.message : String(error)}`);
       debugLog('SESSION', `⚠️ Session close failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -1278,11 +1296,19 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  if (url.pathname === '/api/reset' && req.method === 'POST') {
+  if (url.pathname === '/api/logout' && req.method === 'POST') {
+    // Close Yellow session and settle funds to merchant
+    await closeYellowSession();
+    
+    // Reinitialize Yellow with new session
+    await initializeYellow();
+    
+    // Reset UI state but keep balances
     const currentBalance = state.usdcBalance;
     resetState();
     state.usdcBalance = currentBalance;
     updatePortfolio();
+    
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));
     return;
