@@ -403,10 +403,11 @@ All logs exported with timestamps and structured data.
 
 ## Documentation
 
-- [Hackathon Flow Diagrams](docs/HACKATHON-FLOWS.md) - Visual architecture overview for judges
-- [x402 Yellow Extension](docs/x402-yellow-extension.md) - Payment protocol details
-- [Setup Guide](docs/) - Complete environment and deployment instructions
-- [API Reference](docs/) - Tool specifications and examples
+- [Docs index](docs/README.md) - Start here
+- [Hackathon flow diagrams](docs/HACKATHON-FLOWS.md) - Architecture and payment rails (Yellow, Arc + Circle Gateway)
+- [Arc + Circle Gateway setup](docs/ARC-GATEWAY-SETUP.md) - Arc Testnet USDC settlement rail
+- [x402 Yellow extension](docs/x402-yellow-extension.md) - Payment protocol details
+- [Demo commands](DEMO-COMMANDS.md) - Quick reference for all demos
 
 ## Deployment to Vercel
 

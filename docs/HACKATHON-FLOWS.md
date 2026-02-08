@@ -641,13 +641,46 @@ npm run demo
 ### Overview
 eXpress402 can also satisfy x402 payments using **Arc Testnet + Circle Gateway** with `scheme: arc-usd-offchain`.
 
-In this mode, the agent proves payment by submitting a **GatewayMinter mint transaction** on Arc Testnet that emits:
-- `AttestationUsed(recipient=merchant, value>=price)`
+In this mode, the client pays by submitting an Arc transaction calling `GatewayMinter.gatewayMint(...)`. The MCP server verifies
+the mint transaction contains a `GatewayMinter.AttestationUsed` event for the configured merchant `payTo` and `value >= pricePerCall`.
 
 The MCP server verifies this onchain proof before returning tool results.
 
+### Sequence (happy path)
+
+```mermaid
+sequenceDiagram
+    participant Agent as Agent (EOA)
+    participant MCP as eXpress402 MCP Server
+    participant Gateway as Circle Gateway API
+    participant Arc as Arc Testnet (GatewayMinter)
+    participant Merchant as Merchant (payTo)
+
+    Agent->>MCP: Tool call (no payment)
+    MCP-->>Agent: 402 + SIWx challenge + accepts(scheme=arc-usd-offchain)
+    Agent->>Agent: Sign SIWx challenge
+
+    Note over Agent: Prereq: deposit USDC into unified balance<br/>(GatewayWallet.deposit)
+
+    Agent->>Gateway: POST /v1/transfer (burnIntent + signature)
+    Gateway-->>Agent: attestation + signature
+    Agent->>Arc: gatewayMint(attestation, signature)
+    Arc-->>Agent: mintTxHash
+
+    Agent->>MCP: Retry tool call<br/>SIGN-IN-WITH-X + x402/payment{mintTxHash}
+    MCP->>Arc: Get tx receipt + decode AttestationUsed
+    MCP->>MCP: Verify token, recipient, amount (and optional payer binding)
+    MCP-->>Agent: 200 OK tool result
+```
+
+### Verification details
+
+- The server checks `AttestationUsed(token=USDC, recipient=payTo, value>=pricePerCall)`
+- If SIWx is present, the server can bind `sourceSigner` to the authenticated wallet (when available)
+- Replay protection marks `transferSpecHash` as used in Redis/KV
+
 ### Setup
-See `docs/ARC-GATEWAY-SETUP.md` for required configuration and funding steps.
+See [Arc + Circle Gateway setup](ARC-GATEWAY-SETUP.md) for required configuration and funding steps.
 
 ---
 
