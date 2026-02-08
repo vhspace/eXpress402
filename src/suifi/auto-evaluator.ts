@@ -10,6 +10,14 @@ import type { SuiVaultDecision, SuiDecisionRecord, DecisionEvaluation } from './
 import type { SuiDecisionTracker } from './tracker.js';
 import { findVault } from './providers/defillama.js';
 
+type AutoEvaluatorStats = {
+  totalDecisions: number;
+  evaluatedDecisions: number;
+  pendingDecisions: number;
+  evaluationCount: number;
+  byHorizon: Record<number, number>;
+};
+
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -78,7 +86,7 @@ export class SuifiAutoEvaluator {
    */
   stop(): void {
     if (this.cronJob) {
-      this.cronJob.stop();
+      void this.cronJob.stop();
       this.cronJob = null;
       console.log('🛑 Auto-evaluator stopped');
     }
@@ -150,7 +158,6 @@ export class SuifiAutoEvaluator {
     horizonDays: number,
   ): Promise<DecisionEvaluation | null> {
     const decision = record.decision;
-    const now = Date.now();
 
     console.log(`   📊 Evaluating ${decision.id.slice(0, 20)}... (${horizonDays}d horizon)`);
 
@@ -244,13 +251,7 @@ export class SuifiAutoEvaluator {
   /**
    * Get evaluation statistics
    */
-  getStats(): {
-    totalDecisions: number;
-    evaluatedDecisions: number;
-    pendingDecisions: number;
-    evaluationCount: number;
-    byHorizon: Record<number, number>;
-  } {
+  getStats(): AutoEvaluatorStats {
     const allDecisions = this.tracker.getAllDecisions();
     const evaluated = allDecisions.filter(d => d.decision.evaluated);
     const pending = allDecisions.filter(d => !d.decision.evaluated);
