@@ -120,12 +120,12 @@ Merchant can keep funds in unified balance and:
 
 ## What Gets Proven
 
-✅ Agent pays 0.2 USDC for MCP research tools
-✅ Merchant receives 0.2 USDC in wallet
-✅ All transactions on Base blockchain (Basescan proof)
-✅ SIWx authentication (wallet signatures)
-✅ Quorum 2 settlement (multi-sig governance)
-✅ Production Yellow Network integration
+- Agent pays USDC for MCP research tools
+- Merchant receives USDC in wallet
+- Transactions are verifiable on Base (via explorer receipts)
+- SIWx authentication (wallet signatures)
+- Quorum 2 settlement (multi-sig governance)
+- Production Yellow Network integration
 
 ## Cost
 

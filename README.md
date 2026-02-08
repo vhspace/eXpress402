@@ -4,7 +4,7 @@
 
   <img src="docs/assets/express402-logo.png" alt="eXpress402 Logo" width="600">
 
-  <h3>⚡ Extreme DeFi Payments for AI Agents ⚡</h3>
+  <h3>Paid infrastructure for agentic commerce</h3>
 
   [![Yellow](https://img.shields.io/badge/Yellow-Network-FFD700?logo=ethereum&logoColor=black)](https://yellow.org)
   [![LI.FI](https://img.shields.io/badge/LI.FI-SDK-8B5CF6?logo=ethereum&logoColor=white)](https://li.fi)
@@ -17,11 +17,11 @@
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
-A paid MCP server for web3 agents to access real-time market data at scale. Set up once with x402 on Yellow Network's off-chain payment channels, then make unlimited queries without per-transaction blockchain fees. Built for high-volume agent workflows requiring bulk financial data.
+A paid MCP server for web3 agents to access real-time market data at scale. Uses x402 with Yellow Network session-based settlement so agents can make many paid tool calls without per-call on-chain payment transactions.
 
 ## Overview
 
-Web3 agents need market data, but traditional per-call blockchain transactions create bottlenecks and excessive fees. eXpress402 solves this by combining x402 v2 with SIWx wallet authentication and Yellow Network's off-chain channels - agents authenticate once with their wallet, pay once for a session, then make unlimited queries without additional payments or authentication. Perfect for AI agents running high-frequency trading strategies, portfolio analysis, or market research.
+Web3 agents need market data, but per-call on-chain payment transactions add latency and friction. eXpress402 combines x402 v2 with SIWx wallet authentication and Yellow Network app sessions so agents can authenticate, fund a session, and then make repeated paid queries under that session.
 
 ## Architecture: SIWx + Yellow Network
 
@@ -30,32 +30,18 @@ Web3 agents need market data, but traditional per-call blockchain transactions c
 **Key Innovation: Pay Once, Call Many Times**
 
 - First call: Authenticate with wallet signature + Create Yellow session + Pay
-- Subsequent calls: Verify signature + Reuse session + No payment
-- Sub-millisecond session lookup (Redis/Vercel KV)
+- Subsequent calls: Verify signature + Reuse session + No per-call on-chain payment transaction
+- Session lookup backed by Redis
 - Standards-compliant (x402 v2 + CAIP-122 SIWx)
-
-**Result**: 100 API calls for the cost of 1 transaction - **96% cost reduction**
-
-See [detailed flow diagrams](docs/HACKATHON-FLOWS.md) for complete technical architecture.
+ 
+See [detailed flow diagrams](docs/HACKATHON-FLOWS.md) and the short reviewer path in [docs/JUDGES.md](docs/JUDGES.md).
 
 ## Features
 
-### 🎉 NEW: Full Quorum 2 Support!
-
-The minimal session demo (`npm run minimal-session`) now demonstrates **complete quorum 2 governance** where both agent AND merchant sign all operations:
-- ✅ `create_app_session` with quorum 2
-- ✅ `close_app_session` with quorum 2
-- ✅ Full balance verification at each step
-- ✅ Merchant payment confirmed
-
-See `docs/history/QUORUM-2-SOLVED.md` for the technical breakthrough!
-
-### Core Features
-
-- **Prepaid Payment Sessions**: Fund once via x402, query thousands of times without additional transactions
-- **Off-Chain Settlement**: Yellow Network channels eliminate per-call blockchain fees
-- **Real Market Data**: Live stock prices, market sentiment, and financial news from production APIs
-- **Agent-Optimized**: Built for MCP-compatible AI agents requiring high-volume data access
+- **Two payment rails**: Yellow Network sessions (off-chain) and Arc + Circle Gateway (on-chain proof on Arc Testnet)
+- **Wallet authentication**: SIWx (message signing)
+- **Session lifecycle**: create and close app sessions (including quorum 2 mechanics in `npm run minimal-session`)
+- **Sentifi demo app**: web dashboard and agent loop with LI.FI routing
 
 ## Quick Start
 
@@ -170,11 +156,11 @@ npm run demo:production  # Automated production flow with real USDC on Base
 npm run minimal-session
 ```
 
-Demonstrates quorum 2 governance with agent + merchant signatures. See `docs/history/QUORUM-2-SOLVED.md` for technical details.
+Demonstrates quorum 2 governance with agent + merchant signatures. See `docs/minimal-session-demo.md` for details.
 
 ---
 
-## 🧠 Sentifi: AI Cross-Chain Trading Agent
+## Sentifi: AI cross-chain trading demo
 
 Sentifi is an autonomous AI trading agent that combines real-time market sentiment analysis with cross-chain DeFi execution. It uses Yellow MCP for paid market intelligence and LI.FI SDK for optimal swap routing across chains.
 
@@ -212,46 +198,9 @@ npm run demo:sentifi
 open http://localhost:3456
 ```
 
-### Dashboard Preview
+### Dashboard
 
-The Sentifi dashboard provides real-time visualization of:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  SENTIFI NEURAL TRADING                                    [LIVE] 🟢       │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌─────────────────────┐  ┌─────────────────────────────────────────────┐  │
-│  │   SENTIMENT GAUGE   │  │              MARKET SIGNALS                 │  │
-│  │                     │  │                                             │  │
-│  │    ◀━━━━●━━━━▶     │  │  Reddit:  ████████░░  +45  Bullish          │  │
-│  │   -100    0   +100  │  │  News:    ██████░░░░  +32  Moderate         │  │
-│  │                     │  │  Price:   ███████░░░  +38  Uptrend          │  │
-│  │   Score: +42        │  │                                             │  │
-│  │   BULLISH           │  │  Combined: +38.5 (Confidence: 84%)          │  │
-│  └─────────────────────┘  └─────────────────────────────────────────────┘  │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  TRADING DECISION                                                    │   │
-│  │                                                                      │   │
-│  │  Action: BUY ETH                                                     │   │
-│  │  Reason: Moderate bullish signal suggests buying opportunity         │   │
-│  │  Size: 15.6% of portfolio ($78.00)                                   │   │
-│  │  Route: Kyberswap → 0.0516 ETH                                       │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│  ┌─────────────────────┐  ┌─────────────────────────────────────────────┐  │
-│  │     PORTFOLIO       │  │              ACTIVITY LOG                   │  │
-│  │                     │  │                                             │  │
-│  │  USDC:    $422.00   │  │  12:34:01  Fetching market sentiment...    │  │
-│  │  ETH:     0.0516    │  │  12:34:03  Score: +42 (bullish)            │  │
-│  │  ─────────────────  │  │  12:34:03  Decision: BUY ETH               │  │
-│  │  P&L: +$29.06       │  │  12:34:04  Quote: Kyberswap, 0.0516 ETH    │  │
-│  │       (+5.81%)      │  │  12:34:05  Executed: TX 0x47ae...          │  │
-│  └─────────────────────┘  └─────────────────────────────────────────────┘  │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+Open `http://localhost:3456`. Use the **Rail** selector to switch between Yellow and Arc rails, then click **LOGIN** and **Analyze**.
 
 ### Module Structure
 
@@ -353,7 +302,7 @@ npm run merchant-offramp
 2. Close channel (TX: Etherscan link #2)
 3. Withdraw to wallet (TX: Etherscan link #3)
 
-**See:** [MERCHANT-FUND-MANAGEMENT-GUIDE.md](MERCHANT-FUND-MANAGEMENT-GUIDE.md) for complete architecture explanation and options.
+**See:** [Merchant fund management (archive)](docs/archive/MERCHANT-FUND-MANAGEMENT-GUIDE.md) for background and options.
 
 ## Funding (Automated in Development)
 
@@ -403,22 +352,16 @@ All logs exported with timestamps and structured data.
 
 ## Documentation
 
-- [Hackathon Flow Diagrams](docs/HACKATHON-FLOWS.md) - Visual architecture overview for judges
-- [x402 Yellow Extension](docs/x402-yellow-extension.md) - Payment protocol details
-- [Setup Guide](docs/) - Complete environment and deployment instructions
-- [API Reference](docs/) - Tool specifications and examples
+- [Judge guide](docs/JUDGES.md)
+- [Docs index](docs/README.md)
+- [Architecture overview](docs/ARCHITECTURE.md)
+- [Payment rails comparison](docs/PAYMENT-RAILS.md)
+- [Diagrams](docs/HACKATHON-FLOWS.md)
+- [Demo commands](DEMO-COMMANDS.md)
 
-## Deployment to Vercel
+## Deployment
 
-```bash
-# One-time: Create Vercel KV store
-vercel kv create express402-sessions
-
-# Deploy
-vercel --prod
-```
-
-Environment variables are auto-injected by Vercel. No manual configuration needed.
+See `docs/deployment/RAILWAY.md`.
 
 ## Development Resources
 

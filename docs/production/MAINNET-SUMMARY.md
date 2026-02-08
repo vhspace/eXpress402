@@ -102,7 +102,7 @@ npm run merchant-offramp -- base
 
 ## Key Points
 
-### ✅ What Works
+### What works
 - SIWx authentication (wallet signatures)
 - App session creation (off-chain channels)
 - Quorum 2 settlement (multi-sig governance)
@@ -110,7 +110,7 @@ npm run merchant-offramp -- base
 - Merchant offramp (unified → wallet)
 - Real blockchain integration (Base mainnet)
 
-### ⚠️ What Requires Setup
+### What requires setup
 - **Initial unified balance funding**
   - Agent needs 1+ USDC in unified balance
   - Options:
@@ -119,7 +119,7 @@ npm run merchant-offramp -- base
     3. Use Yellow faucet if available
   - **This is a one-time setup**
 
-### 💡 After Initial Setup
+### After initial setup
 - Everything works autonomously
 - Agent can create sessions anytime
 - Payments settle instantly (off-chain)
@@ -172,25 +172,25 @@ npm run check-production
 ## What This Proves
 
 **To investors/users:**
-- Real money flows through the system ✅
-- Agent pays with crypto (USDC) ✅
-- Merchant receives fiat-convertible funds ✅
-- All transactions provable on blockchain ✅
-- Production-grade architecture ✅
+- Real money flows through the system
+- Agent pays with crypto (USDC)
+- Merchant receives fiat-convertible funds
+- All transactions provable on blockchain
+- Production-grade architecture
 
 **Technical validation:**
-- SIWx: Wallet authentication standard ✅
-- Yellow Network: Off-chain payment channels ✅
-- Quorum 2: Multi-party governance ✅
-- x402: HTTP payment protocol ✅
-- Base: L2 blockchain integration ✅
+- SIWx: wallet authentication standard
+- Yellow Network: off-chain payment channels
+- Quorum 2: multi-party governance
+- x402: HTTP payment protocol
+- Base: L2 blockchain integration
 
 **Economic model:**
-- AI agents pay for services ✅
-- Merchants monetize tools ✅
-- Instant settlement ✅
-- Low fees (off-chain) ✅
-- Blockchain proof (on-chain) ✅
+- AI agents pay for services
+- Merchants monetize tools
+- Instant settlement
+- Low fees (off-chain)
+- Blockchain proof (on-chain)
 
 ## Next Steps
 
@@ -247,19 +247,13 @@ npm run check-production
    - Transaction hashes
    - Output of `npm run check-production`
 
-## The Bottom Line
+## Summary
 
-✅ **Your agentkit demo now supports Base mainnet with real USDC**
+Your agentkit demo supports Base mainnet with USDC.
 
-✅ **Complete end-to-end flow works:**
-   - Agent pays → Merchant receives → Blockchain proof
-
-⚠️ **One manual step for first-time setup:**
-   - Custody → Unified balance (use Yellow apps UI)
-
-✅ **After setup, everything is autonomous**
-
-🎯 **Ready to demo with real money!**
+- Complete end-to-end flow works: agent pays, merchant receives, and transactions have on-chain receipts
+- One manual step for first-time setup: custody -> unified balance (via Yellow apps UI)
+- After setup, everything is autonomous
 
 ---
 

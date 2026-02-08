@@ -1,4 +1,4 @@
-# 🎉 Quorum 2 SOLVED for Yellow App Sessions!
+# Quorum 2 for Yellow app sessions
 
 ## The Solution
 
@@ -19,7 +19,7 @@ const merchantSig = await merchantSigner(requestString);
 The `MessageSigner` type expects `RPCData` which is an ARRAY: `[RequestID, RPCMethod, object, Timestamp?]`
 
 ```typescript
-// ✓ CORRECT - Pass the array!
+// CORRECT - Pass the array!
 const requestArray = parsed.req;  // This is [id, method, params, timestamp]
 const merchantSig = await merchantSigner(requestArray);
 ```
@@ -66,11 +66,11 @@ await rpc.sendRawMessage(JSON.stringify(closeParsed));
 ## Verified Results
 
 ```
-Agent:    9999980.9 → 9999980.8 (change: -0.1) ✓
-Session:  1.0 → 0 (distributed) ✓
-Merchant: 16.7 → 16.8 (received: +0.1) ✓
+Agent:    9999980.9 -> 9999980.8 (change: -0.1)
+Session:  1.0 -> 0 (distributed)
+Merchant: 16.7 -> 16.8 (received: +0.1)
 
-🎉🎉 QUORUM 2 SUCCESS! Both create_app_session AND close_app_session used quorum 2!
+QUORUM 2 SUCCESS: Both create_app_session and close_app_session used quorum 2.
 ```
 
 ## Why This Works

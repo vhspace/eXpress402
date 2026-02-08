@@ -6,7 +6,7 @@ This project implements x402 v2 with SIWx (Sign-In-With-X) wallet authentication
 
 - **SIWx (Sign-In-With-X)**: CAIP-122 compliant wallet authentication. AI agents sign a message with their wallet to prove identity.
 - **Yellow Sessions**: Off-chain payment sessions. Pay once, call many times without per-transaction fees.
-- **Session Mapping**: Wallet addresses are mapped to Yellow session IDs in Redis/Vercel KV for instant lookup.
+- **Session Mapping**: Wallet addresses are mapped to Yellow session IDs in Redis for instant lookup.
 
 ## AI Agent Wallets
 
@@ -47,7 +47,7 @@ DO NOT use MetaMask, hardware wallets, or smart contract wallets for AI agents.
 ## Key Files
 
 - `src/x402/siwx/` - SIWx implementation (signature verification, message formatting)
-- `src/x402/siwx/storage.ts` - Session storage (Redis/Vercel KV)
+- `src/x402/siwx/storage.ts` - Session storage (Redis / hosted Redis-compatible KV)
 - `src/mcp/server.ts` - Payment handler with SIWx integration
 - `src/siwx-demo.ts` - Example agent implementation
 
@@ -64,8 +64,7 @@ npm run dev             # Start MCP server
 ## Redis/KV Storage
 
 Local development uses Redis (auto-started in devcontainer).
-Production uses Vercel KV (auto-configured).
-Same code works in both environments via @vercel/kv package.
+Hosted deployments can use a Redis-compatible KV (for example Upstash Redis via HTTPS REST).
 
 ## Critical Lessons from docs/history/MISTAKES.md
 

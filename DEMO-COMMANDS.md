@@ -85,6 +85,20 @@ YELLOW_ENV=production npm run demo
 
 ---
 
+### `npm run demo:sentifi` - Sentifi Dashboard Demo (Yellow or Arc rails)
+
+**What it does:** Runs the Sentifi web dashboard + backend demo server.
+
+**Open:** `http://localhost:3456`
+
+**Highlights:**
+- Yellow rail: pay once, call many (off-chain session)
+- Arc rail: Arc Testnet USDC settlement via Circle Gateway mint proof
+
+**Docs:** [Arc + Circle Gateway setup](docs/ARC-GATEWAY-SETUP.md)
+
+---
+
 ## Development Commands
 
 ### `npm run check-production` - Production Readiness Check
@@ -124,6 +138,7 @@ YELLOW_ENV=production npm run demo
 # All these run in sandbox mode:
 npm run demo
 npm run demo:siwx
+npm run demo:sentifi
 npm run minimal-session
 ```
 

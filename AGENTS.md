@@ -72,7 +72,7 @@ The server uses CAIP-122 SIWx (Sign-In-With-X) for wallet authentication:
 
 ## Session Storage
 
-Sessions are stored in Redis (local) or Vercel KV (production):
+Sessions are stored in Redis (local) or a hosted Redis-compatible KV (for example Upstash Redis):
 
 - Key: `session:${walletAddress}:${resourceUrl}`
 - Value: Yellow session ID
