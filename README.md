@@ -99,7 +99,7 @@ SENTIFI_CHAIN_ID=42161            # Chain ID (Arbitrum One)
 
 ## Additional Projects
 
-**Suifi**: Alternative Sentifi implementation using Sui blockchain. Fully complete but not integrated due to time constraints. See the [Suifi repository](https://github.com/vhspace/suifi) for details.
+**Suifi**: Alternative implementation using Sui blockchain for AI vault investment decisions. Records and evaluates DeFi vault strategies using DefiLlama data. Fully implemented in `src/suifi/` but not integrated into the main demo due to time constraints.
 
 ---
 
