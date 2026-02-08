@@ -2,10 +2,10 @@
 nixPkgs = ["nodejs-22_x"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm ci"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["npm run build", "test -d build || exit 1"]
 
 [start]
 cmd = "npm run demo:sentifi"
