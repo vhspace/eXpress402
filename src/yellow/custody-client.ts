@@ -214,9 +214,9 @@ export function convertYellowStateToCustody(
   return {
     intent: yellowState.intent,
     version: BigInt(yellowState.version),
-    data: (yellowState.state_data || '0x') as `0x${string}`,
+    data: (yellowState.state_data ?? '0x') as `0x${string}`,
     allocations: yellowState.allocations.map(a => ({
-      destination: (a.destination || a.participant) as `0x${string}`,
+      destination: (a.destination ?? a.participant) as `0x${string}`,
       token: a.token as `0x${string}`,
       amount: BigInt(a.amount),
     })),

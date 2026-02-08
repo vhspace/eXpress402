@@ -5,6 +5,7 @@ This document provides comprehensive flow diagrams explaining the key innovation
 ## Table of Contents
 1. [Yellow Network x402/SIWx Flow](#1-yellow-network-x402siwx-flow)
 2. [Li.fi Trading Agent Flow](#2-lifi-trading-agent-flow-sentifi)
+3. [Arc + Circle Gateway x402 Flow](#3-arc--circle-gateway-x402-flow)
 
 ---
 
@@ -632,6 +633,21 @@ npm run demo
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 3. Arc + Circle Gateway x402 Flow
+
+### Overview
+eXpress402 can also satisfy x402 payments using **Arc Testnet + Circle Gateway** with `scheme: arc-usd-offchain`.
+
+In this mode, the agent proves payment by submitting a **GatewayMinter mint transaction** on Arc Testnet that emits:
+- `AttestationUsed(recipient=merchant, value>=price)`
+
+The MCP server verifies this onchain proof before returning tool results.
+
+### Setup
+See `docs/ARC-GATEWAY-SETUP.md` for required configuration and funding steps.
 
 ---
 

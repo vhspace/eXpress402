@@ -995,6 +995,166 @@
       box-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
     }
 
+    /* Rail Selection Modal */
+    .rail-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(3, 5, 8, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 250;
+      animation: fadeIn 0.3s ease;
+      backdrop-filter: blur(4px);
+    }
+
+    .rail-modal.hidden {
+      display: none;
+    }
+
+    .rail-content {
+      background: var(--bg-panel);
+      border: 2px solid var(--accent-cyan);
+      padding: 28px 30px;
+      width: min(780px, 92vw);
+      box-shadow: 0 0 40px rgba(15, 244, 234, 0.25);
+      animation: scaleIn 0.25s ease;
+    }
+
+    .rail-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      text-align: center;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .rail-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+
+    .rail-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 700px) {
+      .rail-options {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .rail-option {
+      display: flex;
+      gap: 12px;
+      padding: 14px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-dim);
+      color: var(--text-secondary);
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+      width: 100%;
+    }
+
+    .rail-option:hover {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 15px rgba(15, 244, 234, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .rail-option.selected {
+      border-color: var(--accent-amber);
+      box-shadow: 0 0 15px rgba(255, 170, 0, 0.15);
+    }
+
+    .rail-option:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .rail-icon {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-dim);
+      flex: 0 0 auto;
+    }
+
+    .rail-option[data-rail="yellow"] .rail-icon {
+      color: var(--accent-amber);
+      border-color: rgba(255, 170, 0, 0.35);
+    }
+
+    .rail-option[data-rail="arc"] .rail-icon {
+      color: var(--accent-cyan);
+      border-color: rgba(15, 244, 234, 0.35);
+    }
+
+    .rail-icon svg {
+      width: 28px;
+      height: 28px;
+      stroke: currentColor;
+    }
+
+    .rail-option-text {
+      flex: 1;
+    }
+
+    .rail-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    .rail-benefit {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    .rail-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .rail-cancel {
+      padding: 10px 12px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 600;
+      background: transparent;
+      border: 1px solid var(--border-dim);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .rail-cancel:hover {
+      border-color: var(--text-muted);
+      color: var(--text-secondary);
+    }
+
     /* Empty/Loading states */
     .empty-state {
       text-align: center;
@@ -1158,8 +1318,9 @@
           <span id="modeText">CONNECTING...</span>
         </div>
         <div class="badge" id="yellowBadge">
-          <span>Yellow:</span>
-          <span id="yellowStatus">--</span>
+          <span>Rail:</span>
+          <span id="railName">YELLOW</span>
+          <span id="railStatus">--</span>
         </div>
         <div class="badge" id="debugBadge" style="cursor: pointer;" onclick="toggleDebugLogs()">
           <span id="debugToggleIcon">👁️</span>
@@ -1365,34 +1526,80 @@
     </div>
   </div>
 
-  <!-- Yellow Network Status Bar -->
+  <!-- Rail Selection Modal -->
+  <div class="rail-modal hidden" id="railModal" onclick="closeRailModalOnBackdrop(event)">
+    <div class="rail-content">
+      <div class="rail-title">Choose a payment rail</div>
+      <div class="rail-subtitle">
+        Select how the agent pays for x402-protected MCP calls. You can switch rails after logging out.
+      </div>
+
+      <div class="rail-options">
+        <button class="rail-option" data-rail="yellow" onclick="selectRailAndLogin('yellow')">
+          <div class="rail-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M6 3l6 8 6-8"></path>
+              <path d="M12 11v10"></path>
+            </svg>
+          </div>
+          <div class="rail-option-text">
+            <div class="rail-name">Yellow Network</div>
+            <div class="rail-benefit">
+              Pay once, call many. Off-chain session metering is the fastest and cheapest option for repeated tool calls.
+            </div>
+          </div>
+        </button>
+
+        <button class="rail-option" data-rail="arc" onclick="selectRailAndLogin('arc')">
+          <div class="rail-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M4 14a8 8 0 0 1 16 0"></path>
+              <path d="M4 14v7h16v-7"></path>
+            </svg>
+          </div>
+          <div class="rail-option-text">
+            <div class="rail-name">Arc + Circle Gateway</div>
+            <div class="rail-benefit">
+              Onchain USDC settlement on Arc with a verifiable mint proof. Best when you need Arc-native USDC receipts.
+            </div>
+          </div>
+        </button>
+      </div>
+
+      <div class="rail-actions">
+        <button class="rail-cancel" onclick="closeRailModal()">CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment Rail Status Bar -->
   <div class="status-bar hidden" id="statusBar">
     <div class="status-bar-progress">
       <div class="status-bar-fill" id="statusBarFill" style="width: 100%;"></div>
     </div>
     <div class="status-bar-content">
-      <!-- Left: AI Agent Off-Chain Wallet -->
+      <!-- Left: AI Agent -->
       <div class="status-item">
-        <span class="status-label">AI AGENT</span>
+        <span class="status-label" id="agentLabel">AI AGENT</span>
         <span class="status-address" id="agentAddress">--</span>
         <span class="status-balance" id="agentBalance">0.00</span>
       </div>
       
       <div class="status-divider"></div>
       
-      <!-- Center: Session Info -->
+      <!-- Center: Rail Info -->
       <div class="status-item">
-        <span class="status-label">SESSION INITIAL</span>
+        <span class="status-label" id="mid1Label">SESSION INITIAL</span>
         <span class="status-balance" id="sessionInitial">0.00</span>
       </div>
       <div class="status-divider"></div>
       <div class="status-item">
-        <span class="status-label">SESSION SPENT</span>
+        <span class="status-label" id="mid2Label">SESSION SPENT</span>
         <span class="status-balance" id="sessionSpent">0.00</span>
       </div>
       <div class="status-divider"></div>
       <div class="status-item">
-        <span class="status-label">SESSION REMAINING</span>
+        <span class="status-label" id="mid3Label">SESSION REMAINING</span>
         <span class="status-balance" id="sessionRemaining">0.00</span>
       </div>
       
@@ -1400,7 +1607,7 @@
       
       <!-- Right: MCP Merchant -->
       <div class="status-item">
-        <span class="status-label">MARKET RESEARCH MCP</span>
+        <span class="status-label" id="merchantLabel">MARKET RESEARCH MCP</span>
         <span class="status-address" id="merchantAddress">--</span>
         <span class="status-balance" id="merchantBalance">0.00</span>
       </div>
@@ -1415,6 +1622,9 @@
     let userScrollingDebug = false;
     let scrollTimeout = null;
     let debugScrollTimeout = null;
+    let lastExecutionTxHash = null;
+    let executionHideTimeout = null;
+    let executionVisibleUntil = 0;
 
     // Symbol selection
     document.querySelectorAll('.symbol-btn').forEach(btn => {
@@ -1444,7 +1654,7 @@
           if (data.budgetDepleted) {
             showErrorModal('RESEARCH BUDGET DEPLETED', data.message);
           } else {
-            showErrorModal('ERROR', data.error || 'Analysis failed');
+            showErrorModal('ERROR', data.message || data.error || 'Analysis failed');
           }
           btn.classList.remove('loading');
           btn.disabled = false;
@@ -1497,7 +1707,11 @@
       const btn = document.getElementById('logoutBtn');
       btn.disabled = true;
       
-      showAuthLoading('LOGGING OUT', 'Closing Yellow Network session and settling funds to Market Research MCP...');
+      const rail = (state && state.paymentRail) ? state.paymentRail : (localStorage.getItem('paymentRail') || 'yellow');
+      const msg = rail === 'yellow'
+        ? 'Closing Yellow Network session and settling funds to Market Research MCP...'
+        : 'Logging out of Arc payment rail...';
+      showAuthLoading('LOGGING OUT', msg);
       
       try {
         await fetch('/api/logout', { method: 'POST' });
@@ -1508,8 +1722,10 @@
         selectedAction = null;
         updateDecisionButtons();
         
-        // Wait for merchant balance to update (server waits 5 seconds for settlement)
-        await new Promise(resolve => setTimeout(resolve, 6000));
+        if (rail === 'yellow') {
+          // Wait for merchant balance to update (server waits 5 seconds for settlement)
+          await new Promise(resolve => setTimeout(resolve, 6000));
+        }
         
       } finally {
         hideAuthLoading();
@@ -1519,21 +1735,69 @@
     }
 
     async function login() {
+      openRailModal();
+    }
+
+    function openRailModal() {
+      const modal = document.getElementById('railModal');
+      if (!modal) return;
+      const last = localStorage.getItem('paymentRail') || 'yellow';
+      document.querySelectorAll('.rail-option').forEach(btn => {
+        const rail = btn.dataset.rail;
+        btn.classList.toggle('selected', rail === last);
+        btn.disabled = false;
+      });
+      modal.classList.remove('hidden');
+    }
+
+    function closeRailModal() {
+      const modal = document.getElementById('railModal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+    }
+
+    function closeRailModalOnBackdrop(event) {
+      if (event.target && event.target.id === 'railModal') {
+        closeRailModal();
+      }
+    }
+
+    async function selectRailAndLogin(rail) {
+      // Prevent double-submits if user clicks repeatedly
+      document.querySelectorAll('.rail-option').forEach(btn => {
+        btn.disabled = true;
+      });
+
+      closeRailModal();
+      await loginWithRail(rail);
+    }
+
+    async function loginWithRail(rail) {
       const btn = document.getElementById('logoutBtn');
       btn.disabled = true;
-      
-      showAuthLoading('LOGGING IN', 'Creating new Yellow Network session with Quorum 2 governance...');
-      
+
+      localStorage.setItem('paymentRail', rail);
+
+      const msg =
+        rail === 'yellow'
+          ? 'Creating new Yellow Network session with Quorum 2 governance...'
+          : 'Initializing Arc + Circle Gateway payment rail...';
+      showAuthLoading('LOGGING IN', msg);
+
       try {
+        await fetch('/api/set-rail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rail }),
+        });
+
         await fetch('/api/login', { method: 'POST' });
-        
-        // Wait for session to be created
+
+        // Wait briefly for the backend state to refresh
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
       } finally {
         hideAuthLoading();
         btn.disabled = false;
-        // Button text will be updated by updateUI based on state.loggedIn
       }
     }
 
@@ -1541,7 +1805,7 @@
       if (state.loggedIn) {
         logout();
       } else {
-        login();
+        openRailModal();
       }
     }
 
@@ -1680,8 +1944,16 @@
       modeBadge.className = `badge ${state.dataMode === 'live' ? 'live' : 'fallback'}`;
       modeText.textContent = state.dataMode === 'live' ? 'LIVE MODE' : 'FALLBACK';
 
-      // Yellow status
-      document.getElementById('yellowStatus').textContent = state.yellowConnected ? '✓' : '--';
+      // Rail badge (Yellow or Arc)
+      const railNameEl = document.getElementById('railName');
+      const railStatusEl = document.getElementById('railStatus');
+      const rail = state.paymentRail || 'yellow';
+      railNameEl.textContent = rail === 'yellow' ? 'YELLOW' : 'ARC';
+      if (rail === 'yellow') {
+        railStatusEl.textContent = state.yellowConnected ? '✓' : '--';
+      } else {
+        railStatusEl.textContent = state.arcWallets ? '✓' : '--';
+      }
 
       // Debug badge
       updateDebugBadge();
@@ -1703,15 +1975,20 @@
       const hasDecision = state.decision && state.decision.action !== 'HOLD';
       const decisionConfirmed = state.decisionConfirmed;
 
-      // Check Yellow session balance for research
-      let hasYellowBalance = true;
-      if (state.yellowWallets && state.yellowConnected) {
-        // MCP cost per query (from backend)
-        const minRequired = state.yellowWallets.pricePerCall || 0.001;
-        hasYellowBalance = state.yellowWallets.sessionRemaining >= minRequired;
+      // Check research budget depending on rail
+      let hasBudget = true;
+      if (rail === 'yellow') {
+        if (state.yellowWallets && state.yellowConnected) {
+          const minRequired = state.yellowWallets.pricePerCall || 0.001;
+          hasBudget = state.yellowWallets.sessionRemaining >= minRequired;
+        }
       }
 
-      document.getElementById('analyzeBtn').disabled = !hasBalance || !hasYellowBalance || state.isRunning || !state.loggedIn;
+      // In Arc/Gateway mode we don't block on research budget client-side (backend validates unified balance).
+      // In Yellow mode we block analysis when the session budget is depleted.
+      const yellowBudgetDepleted = rail === 'yellow' && !hasBudget;
+      document.getElementById('analyzeBtn').disabled =
+        !hasBalance || yellowBudgetDepleted || state.isRunning || !state.loggedIn;
       document.getElementById('quoteBtn').disabled = !hasDecision || !decisionConfirmed || state.isRunning;
       document.getElementById('executeBtn').disabled = !state.quote || state.isRunning;
 
@@ -1723,7 +2000,8 @@
       updateLogs();
       updateDebugLogs();
       updateExecution();
-      updateYellowStatusBar();
+      updatePaymentStatusBar();
+      updateExecutionOverlayPosition();
     }
 
     function updateSentiment() {
@@ -1880,10 +2158,14 @@
       // Update deposit section visibility
       const depositSection = document.getElementById('depositSection');
       const promptText = document.querySelector('.prompt-text');
+      const rail = state.paymentRail || 'yellow';
       if (state.usdcBalance > 0) {
-        promptText.textContent = 'Add more funds';
+        promptText.textContent = 'Add more demo funds';
       } else {
-        promptText.textContent = 'Deposit funds to start trading';
+        promptText.textContent =
+          rail === 'arc'
+            ? 'Seed demo bankroll (separate from Gateway)'
+            : 'Seed demo bankroll (separate from Session)';
       }
     }
 
@@ -2022,64 +2304,166 @@
 
     function updateExecution() {
       if (!state.execution) return;
+      const txHash = state.execution.txHash;
       const overlay = document.getElementById('executionOverlay');
-      overlay.style.display = 'block';
-      document.getElementById('execHash').textContent = state.execution.txHash;
-    }
+      if (!overlay) return;
 
-    function updateYellowStatusBar() {
-      const statusBar = document.getElementById('statusBar');
-      
-      if (!state.yellowWallets) {
-        statusBar.classList.add('hidden');
+      // If the overlay is already visible, enforce auto-hide deadline (failsafe in case timers are throttled).
+      if (overlay.style.display !== 'none' && executionVisibleUntil && Date.now() >= executionVisibleUntil) {
+        overlay.style.display = 'none';
         return;
       }
 
-      statusBar.classList.remove('hidden');
-      const w = state.yellowWallets;
+      // Only re-show when we see a new execution tx hash.
+      if (!txHash || txHash === lastExecutionTxHash) return;
 
-      // Format addresses (show first 6 and last 4 characters)
+      lastExecutionTxHash = txHash;
+      overlay.style.display = 'block';
+      executionVisibleUntil = Date.now() + 8000;
+      document.getElementById('execHash').textContent = txHash;
+
+      if (executionHideTimeout) clearTimeout(executionHideTimeout);
+      executionHideTimeout = setTimeout(() => {
+        // Avoid races if a newer txHash arrived.
+        if (lastExecutionTxHash === txHash) {
+          overlay.style.display = 'none';
+        }
+      }, 8000);
+    }
+
+    function updateExecutionOverlayPosition() {
+      const overlay = document.getElementById('executionOverlay');
+      const statusBar = document.getElementById('statusBar');
+      if (!overlay || !statusBar) return;
+      const offset = statusBar.classList.contains('hidden') ? 25 : statusBar.offsetHeight + 25;
+      overlay.style.bottom = `${offset}px`;
+    }
+
+    function updatePaymentStatusBar() {
+      const statusBar = document.getElementById('statusBar');
+      const rail = state.paymentRail || 'yellow';
+      
+      const agentLabelEl = document.getElementById('agentLabel');
+      const mid1LabelEl = document.getElementById('mid1Label');
+      const mid2LabelEl = document.getElementById('mid2Label');
+      const mid3LabelEl = document.getElementById('mid3Label');
+      const merchantLabelEl = document.getElementById('merchantLabel');
+
+      const agentAddressEl = document.getElementById('agentAddress');
+      const agentBalanceEl = document.getElementById('agentBalance');
+      const mid1ValueEl = document.getElementById('sessionInitial');
+      const mid2ValueEl = document.getElementById('sessionSpent');
+      const mid3ValueEl = document.getElementById('sessionRemaining');
+      const merchantAddressEl = document.getElementById('merchantAddress');
+      const merchantBalanceEl = document.getElementById('merchantBalance');
+      const progressFill = document.getElementById('statusBarFill');
+
       const formatAddress = (addr) => {
         if (!addr || addr === '--') return '--';
         return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
       };
 
-      // Format balances
-      const formatBalance = (amount) => {
-        return `${amount.toFixed(2)} ${w.assetSymbol}`;
+      const formatUnit = (amount, symbol) => {
+        const n = Number(amount);
+        if (!Number.isFinite(n)) return '--';
+        return `${n.toFixed(2)} ${symbol}`;
       };
 
-      // Update AI Agent (left side)
-      document.getElementById('agentAddress').textContent = formatAddress(w.agentAddress);
-      document.getElementById('agentBalance').textContent = formatBalance(w.agentBalance || 0);
-      
-      // Update Session (center)
-      document.getElementById('sessionInitial').textContent = formatBalance(w.sessionInitial);
-      document.getElementById('sessionSpent').textContent = formatBalance(w.sessionSpent);
-      
-      const remainingEl = document.getElementById('sessionRemaining');
-      remainingEl.textContent = formatBalance(w.sessionRemaining);
-      
-      // Update MCP Merchant (right side)
-      document.getElementById('merchantAddress').textContent = formatAddress(w.merchantAddress);
-      document.getElementById('merchantBalance').textContent = formatBalance(w.merchantBalance || 0);
-      
-      // Calculate percentage remaining
-      const percentRemaining = w.sessionInitial > 0 ? (w.sessionRemaining / w.sessionInitial) * 100 : 100;
-      
-      // Update progress bar
-      const progressFill = document.getElementById('statusBarFill');
-      progressFill.style.width = `${Math.max(0, Math.min(100, percentRemaining))}%`;
-      
-      // Add warning classes based on remaining balance
-      remainingEl.className = 'status-balance';
+      // Reset styles
+      agentBalanceEl.className = 'status-balance';
+      mid3ValueEl.className = 'status-balance';
       progressFill.className = 'status-bar-fill';
-      
-      if (w.sessionRemaining < w.sessionInitial * 0.2) {
-        remainingEl.classList.add('critical');
+
+      if (rail === 'yellow') {
+        if (!state.yellowWallets) {
+          statusBar.classList.add('hidden');
+          return;
+        }
+
+        statusBar.classList.remove('hidden');
+        const w = state.yellowWallets;
+
+        agentLabelEl.textContent = 'AI AGENT';
+        mid1LabelEl.textContent = 'SESSION INITIAL';
+        mid2LabelEl.textContent = 'SESSION SPENT';
+        mid3LabelEl.textContent = 'SESSION REMAINING';
+        merchantLabelEl.textContent = 'MARKET RESEARCH MCP';
+
+        const symbol = w.assetSymbol || 'ytest.usd';
+        const formatBalance = (amount) => formatUnit(amount, symbol);
+
+        agentAddressEl.textContent = formatAddress(w.agentAddress);
+        agentBalanceEl.textContent = formatBalance(w.agentBalance || 0);
+
+        mid1ValueEl.textContent = formatBalance(w.sessionInitial);
+        mid2ValueEl.textContent = formatBalance(w.sessionSpent);
+        mid3ValueEl.textContent = formatBalance(w.sessionRemaining);
+
+        merchantAddressEl.textContent = formatAddress(w.merchantAddress);
+        merchantBalanceEl.textContent = formatBalance(w.merchantBalance || 0);
+
+        const percentRemaining =
+          w.sessionInitial > 0 ? (w.sessionRemaining / w.sessionInitial) * 100 : 100;
+        progressFill.style.width = `${Math.max(0, Math.min(100, percentRemaining))}%`;
+
+        if (w.sessionRemaining < w.sessionInitial * 0.2) {
+          mid3ValueEl.classList.add('critical');
+          progressFill.classList.add('critical');
+        } else if (w.sessionRemaining < w.sessionInitial * 0.5) {
+          mid3ValueEl.classList.add('low');
+          progressFill.classList.add('low');
+        }
+        return;
+      }
+
+      // Arc + Circle Gateway status bar
+      if (!state.arcWallets) {
+        statusBar.classList.add('hidden');
+        return;
+      }
+
+      statusBar.classList.remove('hidden');
+      const w = state.arcWallets;
+
+      const unified = Number(w.unifiedBalanceUsdc);
+      const merchantUsdc = Number(w.merchantUsdcBalanceUsdc);
+      const pricePerCall = Number(w.pricePerCallUsd);
+      const callsLeft = pricePerCall > 0 ? Math.max(0, Math.floor(unified / pricePerCall)) : 0;
+      const targetCalls = 10;
+      const targetBudget = pricePerCall > 0 ? pricePerCall * targetCalls : 0;
+      const percentFunded =
+        targetBudget > 0 ? (unified / targetBudget) * 100 : unified > 0 ? 100 : 0;
+      const formatHash = (hash) => {
+        if (!hash || hash === '--') return '--';
+        return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
+      };
+
+      agentLabelEl.textContent = 'AI AGENT (GATEWAY)';
+      mid1LabelEl.textContent = 'COST / CALL';
+      mid2LabelEl.textContent = 'EST CALLS LEFT';
+      mid3LabelEl.textContent = 'LAST MINT';
+      merchantLabelEl.textContent = 'MERCHANT';
+
+      agentAddressEl.textContent = formatAddress(w.agentAddress);
+      agentBalanceEl.textContent = Number.isFinite(unified) ? formatUnit(unified, 'USDC') : '--';
+
+      mid1ValueEl.textContent =
+        pricePerCall > 0 ? formatUnit(pricePerCall, 'USDC') : '--';
+      mid2ValueEl.textContent =
+        pricePerCall > 0 ? `${callsLeft.toFixed(0)} calls` : '--';
+      mid3ValueEl.className = 'status-address';
+      mid3ValueEl.textContent = formatHash(w.lastMintTxHash);
+
+      merchantAddressEl.textContent = formatAddress(w.merchantAddress);
+      merchantBalanceEl.textContent = Number.isFinite(merchantUsdc) ? formatUnit(merchantUsdc, 'USDC') : '--';
+
+      progressFill.style.width = `${Math.max(0, Math.min(100, percentFunded))}%`;
+
+      if (!Number.isFinite(unified) || unified <= 0) {
+        agentBalanceEl.classList.add('critical');
         progressFill.classList.add('critical');
-      } else if (w.sessionRemaining < w.sessionInitial * 0.5) {
-        remainingEl.classList.add('low');
+      } else if (targetBudget > 0 && unified < targetBudget * 0.5) {
+        agentBalanceEl.classList.add('low');
         progressFill.classList.add('low');
       }
     }

@@ -1,10 +1,26 @@
-import { randomBytes } from 'crypto';
 import {
   PaymentPayload,
   PaymentRequired,
   PaymentRequirements,
   SettlementResponse,
 } from './types.js';
+import { ARC_TESTNET, getArcConfig } from '../arc/config.js';
+
+function randomHex(bytes: number): string {
+  const buf = new Uint8Array(bytes);
+
+  // Node 18+ exposes WebCrypto at globalThis.crypto; browsers do too.
+  if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === 'function') {
+    globalThis.crypto.getRandomValues(buf);
+  } else {
+    // Last-resort fallback (should not happen in supported runtimes).
+    for (let i = 0; i < buf.length; i++) {
+      buf[i] = Math.floor(Math.random() * 256);
+    }
+  }
+
+  return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+}
 
 export type YellowPaymentConfig = {
   clearnodeUrl: string;
@@ -14,6 +30,8 @@ export type YellowPaymentConfig = {
   network: string;
   maxTimeoutSeconds: number;
 };
+
+export const ARC_USD_OFFCHAIN_SCHEME = 'arc-usd-offchain';
 
 const yellowExtensionSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -65,12 +83,56 @@ const siwxExtensionSchema = {
   ],
 };
 
+const arcGatewayExtensionSchema = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  type: 'object',
+  properties: {
+    network: { type: 'string' },
+    chainId: { type: 'number' },
+    caip2: { type: 'string' },
+    rpcUrl: { type: 'string' },
+    explorerBaseUrl: { type: 'string' },
+    usdcAddress: { type: 'string' },
+    gatewayDomain: { type: 'number' },
+    gatewayWallet: { type: 'string' },
+    gatewayMinter: { type: 'string' },
+    gatewayApiBaseUrl: { type: 'string' },
+  },
+  required: [
+    'network',
+    'chainId',
+    'caip2',
+    'rpcUrl',
+    'usdcAddress',
+    'gatewayDomain',
+    'gatewayWallet',
+    'gatewayMinter',
+    'gatewayApiBaseUrl',
+  ],
+  additionalProperties: true,
+};
+
+function buildSIWxSupportedChains() {
+  // SIWx verification in this repo only checks the CAIP-2 prefix today ("eip155:*").
+  // Provide useful EVM chain IDs clients can select from.
+  const chains = [ARC_TESTNET.caip2, 'eip155:84532', 'eip155:8453'];
+  return chains.map(chainId => ({ chainId, type: 'eip191' as const }));
+}
+
 export function buildPaymentRequired(
   config: YellowPaymentConfig,
   resourceUrl: string,
   description: string,
 ): PaymentRequired {
-  const requirement: PaymentRequirements = {
+  const arcRuntime = getArcConfig();
+  const arcInfo = {
+    ...ARC_TESTNET,
+    rpcUrl: arcRuntime.rpcUrl,
+    usdcAddress: arcRuntime.usdcAddress,
+    gatewayMinter: arcRuntime.gatewayMinter,
+  } as const;
+
+  const yellowRequirement: PaymentRequirements = {
     scheme: 'yellow-offchain',
     network: config.network,
     amount: config.pricePerCall,
@@ -82,8 +144,33 @@ export function buildPaymentRequired(
     },
   };
 
+  const arcRequirement: PaymentRequirements = {
+    scheme: ARC_USD_OFFCHAIN_SCHEME,
+    network: arcInfo.network,
+    amount: config.pricePerCall,
+    asset: 'usdc',
+    payTo: config.merchantAddress,
+    maxTimeoutSeconds: config.maxTimeoutSeconds,
+    extra: {
+      settlement: 'arc',
+      rail: 'circle-gateway',
+      arc: {
+        chainId: arcInfo.chainId,
+        rpcUrl: arcInfo.rpcUrl,
+        explorerBaseUrl: arcInfo.explorerBaseUrl,
+        usdcAddress: arcInfo.usdcAddress,
+      },
+      gateway: {
+        apiBaseUrl: arcInfo.gatewayApiBaseUrl,
+        domain: arcInfo.gatewayDomain,
+        walletContract: arcInfo.gatewayWallet,
+        minterContract: arcInfo.gatewayMinter,
+      },
+    },
+  };
+
   // Generate SIWx extension for wallet authentication
-  const nonce = randomBytes(16).toString('hex');
+  const nonce = randomHex(16);
   const issuedAt = new Date().toISOString();
   const expirationTime = new Date(Date.now() + 300000).toISOString(); // 5 minutes
 
@@ -103,7 +190,7 @@ export function buildPaymentRequired(
       description,
       mimeType: 'application/json',
     },
-    accepts: [requirement],
+    accepts: [yellowRequirement, arcRequirement],
     extensions: {
       yellow: {
         info: {
@@ -113,6 +200,10 @@ export function buildPaymentRequired(
           pricePerCall: config.pricePerCall,
         },
         schema: yellowExtensionSchema,
+      },
+      arc: {
+        info: arcInfo,
+        schema: arcGatewayExtensionSchema,
       },
       'sign-in-with-x': {
         info: {
@@ -125,7 +216,7 @@ export function buildPaymentRequired(
           statement: `Sign in to access ${description}`,
           resources: [resourceUrl],
         },
-        supportedChains: [{ chainId: config.network, type: 'eip191' }],
+        supportedChains: buildSIWxSupportedChains(),
         schema: siwxExtensionSchema,
       },
     },

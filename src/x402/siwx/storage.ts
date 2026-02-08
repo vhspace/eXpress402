@@ -1,6 +1,6 @@
 /**
  * Session storage for SIWx authentication
- * Maps wallet addresses to Yellow session IDs
+ * Maps wallet addresses to payment-rail session IDs and tracks replay protection
  * Uses Redis (local via ioredis) or Upstash Redis (production via Vercel)
  */
 
@@ -9,7 +9,8 @@ import { Redis as IORedisClient } from 'ioredis';
 
 type SessionMapping = {
   walletAddress: string;
-  yellowSessionId: string;
+  scheme: string;
+  sessionId: string;
   resourceUrl: string;
   createdAt: string;
 };
@@ -129,20 +130,26 @@ function getKV(): RedisClient | null {
  */
 export class SIWxSessionStorage {
   /**
-   * Store wallet to Yellow session mapping
+   * Store wallet to rail session mapping
    * Auto-configured for local Redis or Upstash
    *
    * @param wallet - Wallet address (checksummed)
    * @param resource - Resource URL
-   * @param sessionId - Yellow session ID
+   * @param sessionId - Session ID (rail-specific)
+   * @param scheme - Payment rail scheme (defaults to yellow-offchain)
    */
-  async storeSession(wallet: string, resource: string, sessionId: string): Promise<void> {
-    // Store session per-wallet (not per-resource) for Yellow Network
-    // One Yellow session can be used for all resources
-    const key = `session:${wallet.toLowerCase()}`;
+  async storeSession(
+    wallet: string,
+    resource: string,
+    sessionId: string,
+    scheme: string = 'yellow-offchain',
+  ): Promise<void> {
+    // Store session per-wallet per-scheme (not per-resource)
+    const key = `session:${scheme}:${wallet.toLowerCase()}`;
     const data: SessionMapping = {
       walletAddress: wallet,
-      yellowSessionId: sessionId,
+      scheme,
+      sessionId,
       resourceUrl: resource, // Track original resource for reference
       createdAt: new Date().toISOString(),
     };
@@ -150,7 +157,7 @@ export class SIWxSessionStorage {
     const client = getKV();
     if (client) {
       await client.set(key, data);
-      console.error(`[SIWx] Session stored in Redis: ${wallet} -> ${sessionId}`);
+      console.error(`[SIWx] Session stored in Redis: ${scheme}:${wallet} -> ${sessionId}`);
     } else {
       console.error('[SIWx Storage] Warning: No storage available, sessions not persisted');
     }
@@ -161,12 +168,12 @@ export class SIWxSessionStorage {
    *
    * @param wallet - Wallet address
    * @param resource - Resource URL
-   * @returns Yellow session ID or null if not found
+   * @param scheme - Payment rail scheme (defaults to yellow-offchain)
+   * @returns Session ID or null if not found
    */
-  async getSession(wallet: string, resource: string): Promise<string | null> {
-    // Lookup session by wallet only (not per-resource)
-    // One Yellow session works for all resources
-    const key = `session:${wallet.toLowerCase()}`;
+  async getSession(wallet: string, resource: string, scheme: string = 'yellow-offchain'): Promise<string | null> {
+    // Lookup session by wallet + scheme (not per-resource)
+    const key = `session:${scheme}:${wallet.toLowerCase()}`;
 
     const client = getKV();
     if (!client) {
@@ -177,8 +184,8 @@ export class SIWxSessionStorage {
     const data = await client.get(key);
 
     if (data) {
-      console.error(`[SIWx] Session found in Redis: ${wallet} -> ${data.yellowSessionId}`);
-      return data.yellowSessionId;
+      console.error(`[SIWx] Session found in Redis: ${scheme}:${wallet} -> ${data.sessionId}`);
+      return data.sessionId as string;
     }
 
     return null;
@@ -220,14 +227,37 @@ export class SIWxSessionStorage {
    * @param resource - Resource URL
    */
   async deleteSession(wallet: string, resource: string): Promise<void> {
-    // Delete session by wallet only
-    const key = `session:${wallet.toLowerCase()}`;
+    // Delete yellow session by default (legacy signature kept for compatibility)
+    const key = `session:yellow-offchain:${wallet.toLowerCase()}`;
 
     const client = getKV();
     if (client) {
       await client.del(key);
-      console.error(`[SIWx] Session deleted from Redis: ${wallet}`);
+      console.error(`[SIWx] Session deleted from Redis: yellow-offchain:${wallet}`);
     }
+  }
+
+  /**
+   * Mark a payment proof as used to prevent replay attacks.
+   * Intended for onchain receipts (e.g. Gateway transferSpecHash).
+   *
+   * @throws if storage is unavailable or payment was already used
+   */
+  async markPaymentUsed(paymentId: string): Promise<void> {
+    const ttlSeconds = Number(process.env.PAYMENT_REPLAY_TTL_SECONDS ?? '86400');
+    const key = `payment:${paymentId.toLowerCase()}`;
+
+    const client = getKV();
+    if (!client) {
+      throw new Error('storage_unavailable');
+    }
+
+    const exists = await client.exists(key);
+    if (exists > 0) {
+      throw new Error('payment_replay_detected');
+    }
+
+    await client.set(key, '1', { ex: Number.isFinite(ttlSeconds) ? ttlSeconds : 86400 });
   }
 
   /**
