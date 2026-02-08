@@ -21,7 +21,7 @@ Open `http://localhost:3456`.
 - **Diagrams (detailed)**: `HACKATHON-FLOWS.md`
 - **Payment rails comparison**: `PAYMENT-RAILS.md`
 
-## Bounty-track mapping (no prize amounts)
+## Bounty-track mapping 
 
 - **Yellow Network track**: `bounties/YELLOW.md`
 - **Arc + Circle Gateway (Arc track)**: `ARC-GATEWAY-SETUP.md`
