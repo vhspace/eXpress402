@@ -102,5 +102,23 @@
       "score": 75,
       "evaluated": false
     }
+  },
+  {
+    "decision": {
+      "id": "suifi-decision-1770534021334",
+      "timestamp": "2026-02-08T07:00:21.334Z",
+      "action": "deposit",
+      "project": "full-sail",
+      "pool": "0852f988-3bc5-497a-813e-f9809f744a5d",
+      "symbol": "USDC-ETH",
+      "apyAtDecision": 220.05,
+      "tvlAtDecision": 201685,
+      "confidence": 0.25,
+      "reason": "High APY (220.1%) with solid TVL ($201.7K) and score (445.1)",
+      "expectedApy": 220.05,
+      "riskLevel": "high",
+      "evaluated": false,
+      "score": 445.1
+    }
   }
 ]

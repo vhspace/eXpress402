@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc",
+    "build": "tsc --project tsconfig.build.json",
     "start": "node build/index.js",
     "demo": "tsx scripts/ensure-redis.ts && tsx src/agentkit-demo.ts",
     "demo:client": "tsx src/client-demo.ts",

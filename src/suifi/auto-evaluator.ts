@@ -6,7 +6,7 @@
  */
 
 import cron from 'node-cron';
-import type { SuiVaultDecision, SuiDecisionRecord } from './types.js';
+import type { SuiVaultDecision, SuiDecisionRecord, DecisionEvaluation } from './types.js';
 import type { SuiDecisionTracker } from './tracker.js';
 import { findVault } from './providers/defillama.js';
 
@@ -30,34 +30,15 @@ const DEFAULT_CONFIG: AutoEvaluatorConfig = {
 };
 
 // ============================================================================
-// EVALUATION RESULT
-// ============================================================================
-
-export interface DecisionEvaluation {
-  decisionId: string;
-  horizonDays: number;
-  actualApy: number;
-  actualTvl: number;
-  apyChange: number;
-  tvlChange: number;
-  outcome: 'correct' | 'incorrect' | 'neutral';
-  pnlPercent: number;
-  evaluatedAt: Date;
-}
-
-// ============================================================================
 // AUTO EVALUATOR
 // ============================================================================
 
 export class SuifiAutoEvaluator {
   private config: AutoEvaluatorConfig;
   private tracker: SuiDecisionTracker;
-  private cronJob: cron.ScheduledTask | null = null;
+  private cronJob: ReturnType<typeof cron.schedule> | null = null;
 
-  constructor(
-    tracker: SuiDecisionTracker,
-    config?: Partial<AutoEvaluatorConfig>
-  ) {
+  constructor(tracker: SuiDecisionTracker, config?: Partial<AutoEvaluatorConfig>) {
     this.tracker = tracker;
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
@@ -76,25 +57,18 @@ export class SuifiAutoEvaluator {
       return;
     }
 
-    console.log(
-      `🕐 Starting auto-evaluator (schedule: ${this.config.cronSchedule})`
-    );
+    console.log(`🕐 Starting auto-evaluator (schedule: ${this.config.cronSchedule})`);
 
     // Schedule evaluation every hour
-    this.cronJob = cron.schedule(
-      this.config.cronSchedule!,
-      async () => {
+    this.cronJob = cron.schedule(this.config.cronSchedule!, () => {
+      void (async () => {
         try {
           await this.evaluatePending();
         } catch (error) {
           console.error('Auto-evaluation error:', error);
         }
-      },
-      {
-        scheduled: true,
-        timezone: 'UTC',
-      }
-    );
+      })();
+    });
 
     console.log('✅ Auto-evaluator started');
   }
@@ -115,7 +89,7 @@ export class SuifiAutoEvaluator {
    */
   async evaluatePending(): Promise<number> {
     const allDecisions = this.tracker.getAllDecisions();
-    const pending = allDecisions.filter((d) => !d.decision.evaluated);
+    const pending = allDecisions.filter(d => !d.decision.evaluated);
 
     if (pending.length === 0) {
       return 0;
@@ -143,16 +117,11 @@ export class SuifiAutoEvaluator {
 
         if (daysSince >= horizonDays) {
           // Evaluate for this horizon
-          const evaluation = await this.evaluateDecision(
-            record,
-            horizonDays
-          );
+          const evaluation = await this.evaluateDecision(record, horizonDays);
 
           // Store evaluation
           if (evaluation) {
-            if (!record.evaluations) {
-              record.evaluations = [];
-            }
+            record.evaluations ??= [];
             record.evaluations.push(evaluation);
 
             // Mark as evaluated for this horizon
@@ -178,7 +147,7 @@ export class SuifiAutoEvaluator {
    */
   private async evaluateDecision(
     record: SuiDecisionRecord,
-    horizonDays: number
+    horizonDays: number,
   ): Promise<DecisionEvaluation | null> {
     const decision = record.decision;
     const now = Date.now();
@@ -187,13 +156,10 @@ export class SuifiAutoEvaluator {
 
     try {
       // Fetch current vault data from DefiLlama
-      const currentVault = await findVault(
-        decision.project,
-        decision.pool
-      );
+      const currentVault = await findVault(decision.project, decision.pool);
 
       if (!currentVault) {
-        console.log(`      ⚠️  Vault no longer exists`);
+        console.log('      ⚠️  Vault no longer exists');
         return null;
       }
 
@@ -243,13 +209,12 @@ export class SuifiAutoEvaluator {
 
       // Log result
       const changeStr = apyChange > 0 ? `+${apyChange.toFixed(2)}%` : `${apyChange.toFixed(2)}%`;
-      const tvlChangeStr = tvlChange > 0
-        ? `+$${this.formatNumber(tvlChange)}`
-        : `$${this.formatNumber(Math.abs(tvlChange))}`;
+      const tvlChangeStr =
+        tvlChange > 0
+          ? `+$${this.formatNumber(tvlChange)}`
+          : `$${this.formatNumber(Math.abs(tvlChange))}`;
 
-      console.log(
-        `      ${outcome.toUpperCase()}: APY ${changeStr}, TVL ${tvlChangeStr}`
-      );
+      console.log(`      ${outcome.toUpperCase()}: APY ${changeStr}, TVL ${tvlChangeStr}`);
 
       // Update decision
       decision.evaluated = true;
@@ -262,7 +227,7 @@ export class SuifiAutoEvaluator {
 
       return evaluation;
     } catch (error) {
-      console.error(`      ❌ Error: ${error}`);
+      console.error(`      ❌ Error: ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
   }
@@ -287,8 +252,8 @@ export class SuifiAutoEvaluator {
     byHorizon: Record<number, number>;
   } {
     const allDecisions = this.tracker.getAllDecisions();
-    const evaluated = allDecisions.filter((d) => d.decision.evaluated);
-    const pending = allDecisions.filter((d) => !d.decision.evaluated);
+    const evaluated = allDecisions.filter(d => d.decision.evaluated);
+    const pending = allDecisions.filter(d => !d.decision.evaluated);
 
     // Count evaluations by horizon
     const byHorizon: Record<number, number> = {};
@@ -342,7 +307,7 @@ export class SuifiAutoEvaluator {
 
 export function createAutoEvaluator(
   tracker: SuiDecisionTracker,
-  config?: Partial<AutoEvaluatorConfig>
+  config?: Partial<AutoEvaluatorConfig>,
 ): SuifiAutoEvaluator {
   return new SuifiAutoEvaluator(tracker, config);
 }

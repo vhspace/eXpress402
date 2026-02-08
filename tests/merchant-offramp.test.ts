@@ -24,14 +24,7 @@ describe('Merchant Offramp - Payment Channel Operations', () => {
   describe('createChannel', () => {
     it('should create a payment channel with valid parameters', async () => {
       // Get asset information
-      const assetsResponse = (await client.request('get_assets', {})) as {
-        assets?: Array<{
-          symbol: string;
-          address: string;
-          chainId: number;
-          decimals: number;
-        }>;
-      };
+      const assetsResponse = await client.request('get_assets', {});
 
       const asset = assetsResponse.assets?.find(
         (a: { symbol: string; chainId: number }) =>
@@ -273,14 +266,7 @@ describe('Merchant Offramp - Payment Channel Operations', () => {
 
   describe('Asset Configuration', () => {
     it('should fetch assets from Yellow Network', async () => {
-      const assetsResponse = (await client.request('get_assets', {})) as {
-        assets?: Array<{
-          symbol: string;
-          address: string;
-          chainId: number;
-          decimals: number;
-        }>;
-      };
+      const assetsResponse = await client.request('get_assets', {});
 
       expect(assetsResponse).toBeDefined();
       if (assetsResponse.assets) {
@@ -289,14 +275,7 @@ describe('Merchant Offramp - Payment Channel Operations', () => {
     }, 30000);
 
     it('should find ytest.usd on Sepolia', async () => {
-      const assetsResponse = (await client.request('get_assets', {})) as {
-        assets?: Array<{
-          symbol: string;
-          address: string;
-          chainId: number;
-          decimals: number;
-        }>;
-      };
+      const assetsResponse = await client.request('get_assets', {});
 
       const asset = assetsResponse.assets?.find(
         (a: { symbol: string; chainId: number }) =>

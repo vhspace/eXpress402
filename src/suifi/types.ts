@@ -76,6 +76,19 @@ export interface SuiVaultDecision {
   tvlChange?: number;
 }
 
+/** Evaluation result for a specific time horizon */
+export interface DecisionEvaluation {
+  decisionId: string;
+  horizonDays: number;
+  actualApy: number;
+  actualTvl: number;
+  apyChange: number;
+  tvlChange: number;
+  outcome: 'correct' | 'incorrect' | 'neutral';
+  pnlPercent: number;
+  evaluatedAt: Date;
+}
+
 /** Complete decision record with evaluation */
 export interface SuiDecisionRecord {
   decision: SuiVaultDecision;
@@ -87,6 +100,7 @@ export interface SuiDecisionRecord {
     metExpectation: boolean;
     evaluatedAt: Date;
   };
+  evaluations?: DecisionEvaluation[];
 }
 
 // ============================================================================

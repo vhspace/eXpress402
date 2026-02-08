@@ -5,8 +5,9 @@
  * for accessing yield data and decision making
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
 import type { YellowRpcClient } from '../../yellow/rpc.js';
 import type { SuifiConfig } from '../config.js';
 import { getTopVaultsByScore, formatNumber, formatApy, formatUsd } from '../providers/defillama.js';
@@ -20,18 +21,14 @@ import { YellowSessionManager } from './session.js';
 // ============================================================================
 
 export class SuifiMCPServer {
-  private server: Server;
+  private server: McpServer;
   private yellow: YellowRpcClient;
   private config: SuifiConfig;
   private sessionManager: YellowSessionManager;
   private strategy: SuiVaultStrategy;
   private tracker: SuiDecisionTracker;
 
-  constructor(
-    yellow: YellowRpcClient,
-    config: SuifiConfig,
-    tracker?: SuiDecisionTracker
-  ) {
+  constructor(yellow: YellowRpcClient, config: SuifiConfig, tracker?: SuiDecisionTracker) {
     this.yellow = yellow;
     this.config = config;
     this.sessionManager = new YellowSessionManager(yellow, config);
@@ -39,17 +36,10 @@ export class SuifiMCPServer {
     this.tracker = tracker || new SuiDecisionTracker(config.tracker);
 
     // Initialize MCP server
-    this.server = new Server(
-      {
-        name: 'suifi-mcp-server',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
-    );
+    this.server = new McpServer({
+      name: 'suifi-mcp-server',
+      version: '1.0.0',
+    });
 
     this.setupTools();
   }
@@ -59,14 +49,11 @@ export class SuifiMCPServer {
    */
   private setupTools(): void {
     // Tool: Check session status
-    this.server.tool(
+    this.server.registerTool(
       'check_session',
       {
         description: 'Check Yellow payment session status and remaining quota',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
+        inputSchema: z.object({}),
       },
       async () => {
         const session = this.sessionManager.getCurrentSession();
@@ -83,7 +70,7 @@ export class SuifiMCPServer {
                     message: 'No active session. Please create a session first.',
                   },
                   null,
-                  2
+                  2,
                 ),
               },
             ],
@@ -106,23 +93,20 @@ export class SuifiMCPServer {
                   expiresAt: session.expiresAt,
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
         };
-      }
+      },
     );
 
     // Tool: Create payment session
-    this.server.tool(
+    this.server.registerTool(
       'create_session',
       {
         description: 'Create a new Yellow payment session for Suifi API access',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
+        inputSchema: z.object({}),
       },
       async () => {
         try {
@@ -144,7 +128,7 @@ export class SuifiMCPServer {
                     message: `Session created with ${session.initialAmount} ${session.assetSymbol}`,
                   },
                   null,
-                  2
+                  2,
                 ),
               },
             ],
@@ -160,37 +144,26 @@ export class SuifiMCPServer {
                     error: error instanceof Error ? error.message : String(error),
                   },
                   null,
-                  2
+                  2,
                 ),
               },
             ],
           };
         }
-      }
+      },
     );
 
     // Tool: Get top vaults (requires valid session)
-    this.server.tool(
+    this.server.registerTool(
       'get_top_vaults',
       {
         description: 'Get top Sui vaults by score (requires payment session)',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            limit: {
-              type: 'number',
-              description: 'Number of vaults to return (default: 20)',
-              default: 20,
-            },
-            minTvl: {
-              type: 'number',
-              description: 'Minimum TVL in USD (default: 100000)',
-              default: 100000,
-            },
-          },
-        },
+        inputSchema: z.object({
+          limit: z.number().default(20).describe('Number of vaults to return (default: 20)'),
+          minTvl: z.number().default(100000).describe('Minimum TVL in USD (default: 100000)'),
+        }),
       },
-      async ({ limit, minTvl }) => {
+      async ({ limit, minTvl }: { limit: number; minTvl: number }) => {
         // Check session
         const allowed = await this.sessionManager.consumeCall();
         if (!allowed) {
@@ -205,7 +178,7 @@ export class SuifiMCPServer {
                     tool: 'create_session',
                   },
                   null,
-                  2
+                  2,
                 ),
               },
             ],
@@ -213,15 +186,12 @@ export class SuifiMCPServer {
         }
 
         // Fetch vaults
-        const vaults = await getTopVaultsByScore(
-          limit || 20,
-          { minTvlUsd: minTvl || 100000 }
-        );
+        const vaults = await getTopVaultsByScore(limit || 20, { minTvlUsd: minTvl || 100000 });
 
-        const formatted = vaults.map((v) => ({
+        const formatted = vaults.map(v => ({
           rank: v.rank,
           project: v.vault.project,
-          pool: v.pool,
+          pool: v.vault.pool,
           symbol: v.vault.symbol,
           apy: v.vault.apy,
           tvlUsd: v.vault.tvlUsd,
@@ -240,31 +210,28 @@ export class SuifiMCPServer {
                   vaults: formatted,
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
         };
-      }
+      },
     );
 
     // Tool: Get vault decision (requires valid session)
-    this.server.tool(
+    this.server.registerTool(
       'get_vault_decision',
       {
-        description: 'Get AI vault decision (deposit/withdraw/hold) based on current yields (requires payment session)',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            record: {
-              type: 'boolean',
-              description: 'Whether to record the decision (default: true)',
-              default: true,
-            },
-          },
-        },
+        description:
+          'Get AI vault decision (deposit/withdraw/hold) based on current yields (requires payment session)',
+        inputSchema: z.object({
+          record: z
+            .boolean()
+            .default(true)
+            .describe('Whether to record the decision (default: true)'),
+        }),
       },
-      async ({ record }) => {
+      async ({ record }: { record: boolean }) => {
         // Check session
         const allowed = await this.sessionManager.consumeCall();
         if (!allowed) {
@@ -279,7 +246,7 @@ export class SuifiMCPServer {
                     tool: 'create_session',
                   },
                   null,
-                  2
+                  2,
                 ),
               },
             ],
@@ -305,7 +272,7 @@ export class SuifiMCPServer {
                     message: 'No clear signal - holding',
                   },
                   null,
-                  2
+                  2,
                 ),
               },
             ],
@@ -340,23 +307,20 @@ export class SuifiMCPServer {
                   recorded: record,
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
         };
-      }
+      },
     );
 
     // Tool: Get decision metrics
-    this.server.tool(
+    this.server.registerTool(
       'get_metrics',
       {
         description: 'Get decision metrics and accuracy statistics',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
+        inputSchema: z.object({}),
       },
       async () => {
         const metrics = this.tracker.getMetrics();
@@ -379,23 +343,20 @@ export class SuifiMCPServer {
                   },
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
         };
-      }
+      },
     );
 
     // Tool: Close session
-    this.server.tool(
+    this.server.registerTool(
       'close_session',
       {
         description: 'Close current payment session and return remaining funds',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-        },
+        inputSchema: z.object({}),
       },
       async () => {
         try {
@@ -411,7 +372,7 @@ export class SuifiMCPServer {
                     message: 'Session closed successfully',
                   },
                   null,
-                  2
+                  2,
                 ),
               },
             ],
@@ -427,13 +388,13 @@ export class SuifiMCPServer {
                     error: error instanceof Error ? error.message : String(error),
                   },
                   null,
-                  2
+                  2,
                 ),
               },
             ],
           };
         }
-      }
+      },
     );
   }
 
@@ -469,7 +430,7 @@ export class SuifiMCPServer {
 export function createSuifiMCPServer(
   yellow: YellowRpcClient,
   config: SuifiConfig,
-  tracker?: SuiDecisionTracker
+  tracker?: SuiDecisionTracker,
 ): SuifiMCPServer {
   return new SuifiMCPServer(yellow, config, tracker);
 }

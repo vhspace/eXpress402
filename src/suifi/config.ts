@@ -178,7 +178,8 @@ export function createDemoConfig(overrides?: Partial<SuifiConfig>): SuifiConfig 
     yellow: {
       clearnodeUrl: 'wss://clearnet-sandbox.yellow.com/ws',
       agentPrivateKey: process.env.YELLOW_AGENT_PRIVATE_KEY ?? demoPrivateKey,
-      merchantAddress: process.env.YELLOW_MERCHANT_ADDRESS ?? '0x0000000000000000000000000000000000000001',
+      merchantAddress:
+        process.env.YELLOW_MERCHANT_ADDRESS ?? '0x0000000000000000000000000000000000000001',
       merchantPrivateKey: process.env.YELLOW_MERCHANT_PRIVATE_KEY ?? demoPrivateKey,
       assetSymbol: 'ytest.usd',
     },

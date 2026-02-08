@@ -56,7 +56,7 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
       authDomain: 'clearnet-sandbox.yellow.com',
       debug: false,
     });
-    
+
     await merchantYellow.connect();
     await merchantYellow.authenticate({
       allowances: [{ asset: env.assetSymbol, amount: '1000' }],
@@ -91,7 +91,7 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
       if (response.ok) {
         console.log('  Waiting for faucet...');
         await new Promise(resolve => setTimeout(resolve, 5000));
-        
+
         // Refresh balance
         const newBalances = await yellow.getLedgerBalances(agentAddress);
         const newAsset = newBalances.find((b: any) => b.asset === env.assetSymbol);
@@ -107,16 +107,16 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
 
     const agentSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
     const merchantSigner = createECDSAMessageSigner(env.merchantPrivateKey as `0x${string}`);
-    
+
     const participants = [agentAddress as `0x${string}`, merchantAddress as `0x${string}`];
     const allocations = [
       { participant: agentAddress as `0x${string}`, asset: env.assetSymbol, amount: '5.0' },
       { participant: merchantAddress as `0x${string}`, asset: env.assetSymbol, amount: '0.0' },
     ];
-    
+
     console.log('\n📝 Creating session with Quorum 2...');
     console.log('  Initial allocation: 5.0 to agent, 0.0 to merchant');
-    
+
     const sessionParams = {
       definition: {
         application: 'merchant-funding-test',
@@ -134,7 +134,7 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
     // Agent signs
     const agentSessionMessage = await createAppSessionMessage(agentSigner, sessionParams);
     const sessionParsed = JSON.parse(agentSessionMessage);
-    
+
     // Merchant signs
     const merchantSessionSig = await merchantSigner(sessionParsed.req);
     sessionParsed.sig.push(merchantSessionSig);
@@ -144,7 +144,7 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
     sessionId = (response.appSessionId ??
       response.app_session_id ??
       response.appSession?.appSessionId) as string;
-    
+
     expect(sessionId).toBeDefined();
     console.log(`  ✓ Session created: ${sessionId.substring(0, 20)}...`);
     console.log('  ✓ Both agent and merchant signed (Quorum 2)');
@@ -172,7 +172,7 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
 
   it('should fund merchant wallet after session close', async () => {
     console.log('\n💸 Making MCP calls to spend from session...');
-    
+
     // Make 3 MCP calls (should cost ~3.45 ytest.usd in sandbox at 1.15 per call)
     const symbols = ['ETH', 'BTC', 'SOL'];
     for (const symbol of symbols) {
@@ -201,8 +201,16 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
     const sessionInitial = 5.0;
     const sessionRemaining = sessionInitial - expectedSpent;
     const finalAllocations = [
-      { participant: agentAddress as `0x${string}`, asset: env.assetSymbol, amount: sessionRemaining.toFixed(6) },
-      { participant: merchantAddress as `0x${string}`, asset: env.assetSymbol, amount: expectedSpent.toFixed(6) },
+      {
+        participant: agentAddress as `0x${string}`,
+        asset: env.assetSymbol,
+        amount: sessionRemaining.toFixed(6),
+      },
+      {
+        participant: merchantAddress as `0x${string}`,
+        asset: env.assetSymbol,
+        amount: expectedSpent.toFixed(6),
+      },
     ];
 
     console.log('  Final allocations:');
@@ -216,7 +224,7 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
     });
 
     const closeParsed = JSON.parse(agentCloseMessage);
-    
+
     // Merchant signs close
     const merchantCloseSig = await merchantCloseSigner(closeParsed.req);
     closeParsed.sig.push(merchantCloseSig);
@@ -231,7 +239,7 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
 
     // Check final UNIFIED balances
     console.log('\n💰 Checking final unified balances...');
-    
+
     // Each party queries their own unified balance
     const finalAgentBalances = await yellow.getLedgerBalances(); // Agent's OWN balance
     const finalAgentAsset = finalAgentBalances.find((b: any) => b.asset === env.assetSymbol);
@@ -241,16 +249,24 @@ describeIfEnabled('Merchant Funding E2E (Quorum 2)', () => {
     const finalMerchantAsset = finalMerchantBalances.find((b: any) => b.asset === env.assetSymbol);
     const finalMerchantBalance = finalMerchantAsset ? parseFloat(finalMerchantAsset.amount) : 0;
 
-    console.log(`  Agent: ${initialAgentBalance.toFixed(2)} → ${finalAgentBalance.toFixed(2)} ${env.assetSymbol}`);
-    console.log(`  Merchant: ${initialMerchantBalance.toFixed(2)} → ${finalMerchantBalance.toFixed(2)} ${env.assetSymbol}`);
+    console.log(
+      `  Agent: ${initialAgentBalance.toFixed(2)} → ${finalAgentBalance.toFixed(2)} ${env.assetSymbol}`,
+    );
+    console.log(
+      `  Merchant: ${initialMerchantBalance.toFixed(2)} → ${finalMerchantBalance.toFixed(2)} ${env.assetSymbol}`,
+    );
 
     // Calculate changes
     const agentChange = finalAgentBalance - initialAgentBalance;
     const merchantChange = finalMerchantBalance - initialMerchantBalance;
 
     console.log('\n📊 Balance Changes:');
-    console.log(`  Agent: ${agentChange >= 0 ? '+' : ''}${agentChange.toFixed(2)} ${env.assetSymbol}`);
-    console.log(`  Merchant: ${merchantChange >= 0 ? '+' : ''}${merchantChange.toFixed(2)} ${env.assetSymbol}`);
+    console.log(
+      `  Agent: ${agentChange >= 0 ? '+' : ''}${agentChange.toFixed(2)} ${env.assetSymbol}`,
+    );
+    console.log(
+      `  Merchant: ${merchantChange >= 0 ? '+' : ''}${merchantChange.toFixed(2)} ${env.assetSymbol}`,
+    );
 
     // Assertions
     // Agent should have DECREASED by sessionInitial (5.0) and INCREASED by sessionRemaining

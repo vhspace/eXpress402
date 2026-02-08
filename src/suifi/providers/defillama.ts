@@ -4,11 +4,7 @@
  * Fetches yield data from DefiLlama API for Sui chain
  */
 
-import type {
-  DefiLlamaVault,
-  VaultScore,
-  ScoreFactors,
-} from '../types.js';
+import type { DefiLlamaVault, VaultScore, ScoreFactors } from '../types.js';
 
 // ============================================================================
 // CONSTANTS
@@ -50,7 +46,7 @@ export async function fetchSuiYields(): Promise<DefiLlamaVault[]> {
  */
 export async function getTopVaultsByScore(
   limit: number = 20,
-  config: { minTvlUsd?: number } = {}
+  config: { minTvlUsd?: number } = {},
 ): Promise<VaultScore[]> {
   const vaults = await fetchSuiYields();
 
@@ -86,22 +82,15 @@ export async function getTopVaultsByScore(
  */
 export async function getVaultsByProject(projectName: string): Promise<DefiLlamaVault[]> {
   const vaults = await fetchSuiYields();
-  return vaults.filter(v =>
-    v.project.toLowerCase().includes(projectName.toLowerCase())
-  );
+  return vaults.filter(v => v.project.toLowerCase().includes(projectName.toLowerCase()));
 }
 
 /**
  * Find a specific vault by project and pool name
  */
-export async function findVault(
-  project: string,
-  pool: string
-): Promise<DefiLlamaVault | null> {
+export async function findVault(project: string, pool: string): Promise<DefiLlamaVault | null> {
   const vaults = await fetchSuiYields();
-  return vaults.find(v =>
-    v.project === project && v.pool === pool
-  ) || null;
+  return vaults.find(v => v.project === project && v.pool === pool) || null;
 }
 
 // ============================================================================
@@ -135,11 +124,11 @@ export function calculateScoreFactors(vault: DefiLlamaVault): ScoreFactors {
  * Calculate TVL score (logarithmic scale)
  */
 function calculateTvlScore(tvlUsd: number): number {
-  if (tvlUsd < 100000) return 0;           // < $100K
-  if (tvlUsd < 1000000) return 5;          // $100K - $1M
-  if (tvlUsd < 10000000) return 10;        // $1M - $10M
-  if (tvlUsd < 50000000) return 15;        // $10M - $50M
-  return 20;                               // > $50M
+  if (tvlUsd < 100000) return 0; // < $100K
+  if (tvlUsd < 1000000) return 5; // $100K - $1M
+  if (tvlUsd < 10000000) return 10; // $1M - $10M
+  if (tvlUsd < 50000000) return 15; // $10M - $50M
+  return 20; // > $50M
 }
 
 /**

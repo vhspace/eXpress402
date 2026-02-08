@@ -72,10 +72,7 @@ export class SuiDecisionTracker {
     }
 
     // Fetch current vault data
-    const currentVault = await findVault(
-      record.decision.project,
-      record.decision.pool
-    );
+    const currentVault = await findVault(record.decision.project, record.decision.pool);
 
     if (!currentVault) {
       console.log(`⚠️ Vault ${record.decision.project}/${record.decision.pool} no longer exists`);
@@ -127,9 +124,10 @@ export class SuiDecisionTracker {
     }
 
     const changeStr = apyChange > 0 ? `+${apyChange.toFixed(2)}%` : `${apyChange.toFixed(2)}%`;
-    const tvlChangeStr = tvlChange > 0
-      ? `+$${this.formatNumber(tvlChange)}`
-      : `-$${this.formatNumber(Math.abs(tvlChange))}`;
+    const tvlChangeStr =
+      tvlChange > 0
+        ? `+$${this.formatNumber(tvlChange)}`
+        : `-$${this.formatNumber(Math.abs(tvlChange))}`;
 
     console.log(`📊 Evaluated ${id}:`);
     console.log(`   Outcome: ${outcome.toUpperCase()}`);
@@ -141,8 +139,7 @@ export class SuiDecisionTracker {
    * Evaluate all pending decisions
    */
   async evaluatePending(): Promise<number> {
-    const pending = Array.from(this.decisions.values())
-      .filter(r => !r.decision.evaluated);
+    const pending = Array.from(this.decisions.values()).filter(r => !r.decision.evaluated);
 
     console.log(`🔍 Evaluating ${pending.length} pending decisions...`);
 
@@ -206,8 +203,9 @@ export class SuiDecisionTracker {
    * Get decisions by project
    */
   getDecisionsByProject(projectName: string): SuiDecisionRecord[] {
-    return Array.from(this.decisions.values())
-      .filter(r => r.decision.project.toLowerCase().includes(projectName.toLowerCase()));
+    return Array.from(this.decisions.values()).filter(r =>
+      r.decision.project.toLowerCase().includes(projectName.toLowerCase()),
+    );
   }
 
   /**
@@ -218,10 +216,7 @@ export class SuiDecisionTracker {
     let removed = 0;
 
     for (const [id, record] of this.decisions) {
-      if (
-        record.decision.timestamp.getTime() < cutoff &&
-        record.decision.evaluated
-      ) {
+      if (record.decision.timestamp.getTime() < cutoff && record.decision.evaluated) {
         this.decisions.delete(id);
         removed++;
       }
@@ -251,9 +246,7 @@ export class SuiDecisionTracker {
   /**
    * Calculate metrics by action type
    */
-  private getActionMetrics(
-    decisions: SuiDecisionRecord[]
-  ): Record<string, ActionMetrics> {
+  private getActionMetrics(decisions: SuiDecisionRecord[]): Record<string, ActionMetrics> {
     const actions = ['deposit', 'withdraw', 'hold'] as const;
     const result: Record<string, ActionMetrics> = {};
 
@@ -279,9 +272,7 @@ export class SuiDecisionTracker {
   /**
    * Calculate metrics by project
    */
-  private getProjectMetrics(
-    decisions: SuiDecisionRecord[]
-  ): Record<string, ProjectMetrics> {
+  private getProjectMetrics(decisions: SuiDecisionRecord[]): Record<string, ProjectMetrics> {
     const byProject: Record<string, SuiDecisionRecord[]> = {};
 
     // Group by project
@@ -305,8 +296,7 @@ export class SuiDecisionTracker {
       for (const record of records) {
         actionCounts[record.decision.action]++;
       }
-      const bestAction = Object.entries(actionCounts)
-        .sort((a, b) => b[1] - a[1])[0][0] as any;
+      const bestAction = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0][0] as any;
 
       result[project] = {
         total: records.length,
@@ -327,11 +317,10 @@ export class SuiDecisionTracker {
    * Find best performing project
    */
   private findBestProject(
-    decisions: SuiDecisionRecord[]
+    decisions: SuiDecisionRecord[],
   ): { name: string; accuracy: number; totalDecisions: number } | undefined {
     const byProject = this.getProjectMetrics(decisions);
-    const validProjects = Object.entries(byProject)
-      .filter(([_, metrics]) => metrics.total >= 3); // At least 3 decisions
+    const validProjects = Object.entries(byProject).filter(([_, metrics]) => metrics.total >= 3); // At least 3 decisions
 
     if (validProjects.length === 0) {
       return undefined;
@@ -380,11 +369,7 @@ export class SuiDecisionTracker {
   private saveToDisk(): void {
     try {
       const data = Array.from(this.decisions.values());
-      fs.writeFileSync(
-        this.config.dbPath,
-        JSON.stringify(data, null, 2),
-        'utf-8'
-      );
+      fs.writeFileSync(this.config.dbPath, JSON.stringify(data, null, 2), 'utf-8');
     } catch (error) {
       console.error('❌ Error saving to disk:', error);
     }

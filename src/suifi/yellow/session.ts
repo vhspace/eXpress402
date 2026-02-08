@@ -51,15 +51,10 @@ export class YellowSessionManager {
   private merchantAddress: `0x${string}`;
   private currentSession: SessionInfo | null = null;
 
-  constructor(
-    yellow: YellowRpcClient,
-    config: SuifiConfig,
-  ) {
+  constructor(yellow: YellowRpcClient, config: SuifiConfig) {
     this.yellow = yellow;
     this.config = config;
-    this.agentAddress = privateKeyToAccount(
-      config.yellow.agentPrivateKey as `0x${string}`
-    ).address;
+    this.agentAddress = privateKeyToAccount(config.yellow.agentPrivateKey as `0x${string}`).address;
     this.merchantAddress = config.yellow.merchantAddress as `0x${string}`;
   }
 
@@ -69,16 +64,13 @@ export class YellowSessionManager {
   async createSession(): Promise<SessionInfo> {
     console.log('🔑 Creating Yellow payment session...');
 
-    const participants: `0x${string}`[] = [
-      this.agentAddress,
-      this.merchantAddress,
-    ];
+    const participants: `0x${string}`[] = [this.agentAddress, this.merchantAddress];
 
     const agentSigner = createECDSAMessageSigner(
-      this.config.yellow.agentPrivateKey as `0x${string}`
+      this.config.yellow.agentPrivateKey as `0x${string}`,
     );
     const merchantSigner = createECDSAMessageSigner(
-      this.config.yellow.merchantPrivateKey as `0x${string}`
+      this.config.yellow.merchantPrivateKey as `0x${string}`,
     );
 
     const sessionAmount = this.config.pricing.sessionDepositAmount;
@@ -108,10 +100,7 @@ export class YellowSessionManager {
     };
 
     // Agent signs first
-    const agentSessionMessage = await createAppSessionMessage(
-      agentSigner,
-      sessionParams
-    );
+    const agentSessionMessage = await createAppSessionMessage(agentSigner, sessionParams);
     const sessionParsed = JSON.parse(agentSessionMessage);
 
     // Merchant signs the session request
@@ -119,21 +108,19 @@ export class YellowSessionManager {
     sessionParsed.sig.push(merchantSessionSig);
 
     // Send to Yellow Network
-    const response = await this.yellow.sendRawMessage(
-      JSON.stringify(sessionParsed)
-    ) as Record<string, unknown>;
+    const response = (await this.yellow.sendRawMessage(JSON.stringify(sessionParsed))) as Record<
+      string,
+      unknown
+    >;
 
     const sessionId =
       (response.appSessionId as string | undefined) ??
       (response.app_session_id as string | undefined) ??
-      (response.appSession as { appSessionId?: string } | undefined)
-        ?.appSessionId ??
+      (response.appSession as { appSessionId?: string } | undefined)?.appSessionId ??
       null;
 
     if (!sessionId) {
-      throw new Error(
-        `Failed to create Yellow session: ${JSON.stringify(response)}`
-      );
+      throw new Error(`Failed to create Yellow session: ${JSON.stringify(response)}`);
     }
 
     // Create session info
@@ -201,9 +188,7 @@ export class YellowSessionManager {
     return {
       sessionId: this.currentSession.sessionId,
       callsUsed,
-      callsRemaining: isExhausted
-        ? 0
-        : Math.floor(remainingAmount / pricePerCall),
+      callsRemaining: isExhausted ? 0 : Math.floor(remainingAmount / pricePerCall),
       isExpired,
       isExhausted,
     };
@@ -233,7 +218,9 @@ export class YellowSessionManager {
     }
 
     // Paid call - balance will be checked on next Yellow MCP call
-    console.log(`✅ Paid call (${usage.callsUsed + 1} - balance: ${this.currentSession?.remainingAmount.toFixed(2)})`);
+    console.log(
+      `✅ Paid call (${usage.callsUsed + 1} - balance: ${this.currentSession?.remainingAmount.toFixed(2)})`,
+    );
     return true;
   }
 
@@ -249,24 +236,41 @@ export class YellowSessionManager {
     console.log('🔒 Closing Yellow session...');
 
     const agentSigner = createECDSAMessageSigner(
-      this.config.yellow.agentPrivateKey as `0x${string}`
+      this.config.yellow.agentPrivateKey as `0x${string}`,
     );
     const merchantSigner = createECDSAMessageSigner(
-      this.config.yellow.merchantPrivateKey as `0x${string}`
+      this.config.yellow.merchantPrivateKey as `0x${string}`,
     );
 
     // Get current balances before closing
     const remainingAmount = await this.getSessionBalance();
 
-    // Close session message
+    // Get agent and merchant addresses
+    const agentAccount = privateKeyToAccount(this.config.yellow.agentPrivateKey as `0x${string}`);
+    const merchantAccount = privateKeyToAccount(
+      this.config.yellow.merchantPrivateKey as `0x${string}`,
+    );
+
+    // Close session with proper allocations (return remaining to agent)
     const closeParams = {
       appSessionId: this.currentSession.sessionId,
+      allocations: [
+        {
+          asset: this.config.yellow.assetSymbol,
+          amount: remainingAmount.toString(),
+          participant: agentAccount.address,
+        },
+      ],
     };
 
-    const agentCloseMessage = await createCloseAppSessionMessage(
-      agentSigner,
-      closeParams
-    );
+    const agentCloseMessage = await createCloseAppSessionMessage(agentSigner, {
+      app_session_id: closeParams.appSessionId as `0x${string}`,
+      allocations: closeParams.allocations.map(a => ({
+        asset: a.asset,
+        amount: a.amount,
+        participant: a.participant,
+      })),
+    });
     const closeParsed = JSON.parse(agentCloseMessage);
 
     // Merchant signs
@@ -274,9 +278,7 @@ export class YellowSessionManager {
     closeParsed.sig.push(merchantCloseSig);
 
     // Send to Yellow
-    const response = await this.yellow.sendRawMessage(
-      JSON.stringify(closeParsed)
-    );
+    const response = await this.yellow.sendRawMessage(JSON.stringify(closeParsed));
 
     console.log('✅ Session closed');
     console.log(`   Final balance: ${remainingAmount} ${this.config.yellow.assetSymbol}`);
@@ -293,13 +295,9 @@ export class YellowSessionManager {
     }
 
     try {
-      const balances = (await this.yellow.getLedgerBalances(
-        this.currentSession.sessionId
-      )) as LedgerBalance[];
+      const balances = await this.yellow.getLedgerBalances(this.currentSession.sessionId);
 
-      const match = balances.find(
-        (entry) => entry.asset === this.config.yellow.assetSymbol
-      );
+      const match = balances.find(entry => entry.asset === this.config.yellow.assetSymbol);
 
       const amount = match ? Number(match.amount) : 0;
       return Number.isFinite(amount) ? amount : 0;
@@ -317,8 +315,7 @@ export class YellowSessionManager {
       return 'No active session';
     }
 
-    const { sessionId, initialAmount, remainingAmount, createdAt, expiresAt } =
-      this.currentSession;
+    const { sessionId, initialAmount, remainingAmount, createdAt, expiresAt } = this.currentSession;
 
     const used = initialAmount - remainingAmount;
     const usagePercent = (used / initialAmount) * 100;
@@ -339,7 +336,7 @@ Expires: ${expiresAt.toLocaleString()}
 
 export function createSessionManager(
   yellow: YellowRpcClient,
-  config: SuifiConfig
+  config: SuifiConfig,
 ): YellowSessionManager {
   return new YellowSessionManager(yellow, config);
 }

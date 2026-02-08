@@ -59,7 +59,7 @@ export class SuiVaultStrategy {
     vault: DefiLlamaVault,
     score: number,
     confidence: number,
-    factors: any
+    factors: any,
   ): Omit<SuiVaultDecision, 'id' | 'timestamp' | 'score'> | null {
     const action = this.determineAction(vault, score);
     const riskLevel = this.assessRisk(vault);
@@ -83,18 +83,11 @@ export class SuiVaultStrategy {
   /**
    * Determine action based on vault metrics
    */
-  private determineAction(
-    vault: DefiLlamaVault,
-    score: number
-  ): DecisionAction {
+  private determineAction(vault: DefiLlamaVault, score: number): DecisionAction {
     const { minApyForDeposit, minTvlUsd, maxApyForWithdraw } = this.config;
 
     // DEPOSIT conditions
-    if (
-      vault.apy >= minApyForDeposit &&
-      vault.tvlUsd >= minTvlUsd &&
-      score >= 30
-    ) {
+    if (vault.apy >= minApyForDeposit && vault.tvlUsd >= minTvlUsd && score >= 30) {
       return 'deposit';
     }
 
@@ -112,19 +105,12 @@ export class SuiVaultStrategy {
    */
   private assessRisk(vault: DefiLlamaVault): RiskLevel {
     // Low risk conditions
-    if (
-      vault.stablecoin &&
-      vault.tvlUsd > 10000000 &&
-      vault.apy < 20
-    ) {
+    if (vault.stablecoin && vault.tvlUsd > 10000000 && vault.apy < 20) {
       return 'low';
     }
 
     // High risk conditions
-    if (
-      vault.apy > this.config.highApyThreshold ||
-      vault.tvlUsd < 500000
-    ) {
+    if (vault.apy > this.config.highApyThreshold || vault.tvlUsd < 500000) {
       return 'high';
     }
 
@@ -139,7 +125,7 @@ export class SuiVaultStrategy {
     vault: DefiLlamaVault,
     action: DecisionAction,
     score: number,
-    factors: any
+    _factors: any,
   ): string {
     const apyStr = vault.apy.toFixed(1);
     const tvlStr = `$${this.formatNumber(vault.tvlUsd)}`;

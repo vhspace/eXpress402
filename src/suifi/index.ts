@@ -14,7 +14,7 @@ export * from './yellow/index.js';
 export * from './auto-evaluator.js';
 
 // Main imports
-import { getTopVaultsByScore, formatNumber, formatApy, formatUsd } from './providers/defillama.js';
+import { getTopVaultsByScore, formatApy, formatUsd } from './providers/defillama.js';
 import { SuiVaultStrategy } from './strategy.js';
 import { SuiDecisionTracker } from './tracker.js';
 import { SuifiAutoEvaluator, type AutoEvaluatorConfig } from './auto-evaluator.js';
@@ -32,7 +32,7 @@ export class SuifiRecorder {
   constructor(
     strategyConfig?: Partial<StrategyConfig>,
     trackerConfig?: Partial<TrackerConfig>,
-    autoEvalConfig?: Partial<AutoEvaluatorConfig>
+    autoEvalConfig?: Partial<AutoEvaluatorConfig>,
   ) {
     this.strategy = new SuiVaultStrategy(strategyConfig);
     this.tracker = new SuiDecisionTracker(trackerConfig);
@@ -42,16 +42,14 @@ export class SuifiRecorder {
   /**
    * Run a complete decision cycle
    */
-  async runCycle(options: {
-    topN?: number;
-    minTvlUsd?: number;
-    record?: boolean;
-  } = {}): Promise<void> {
-    const {
-      topN = 20,
-      minTvlUsd = 1000000,
-      record = true,
-    } = options;
+  async runCycle(
+    options: {
+      topN?: number;
+      minTvlUsd?: number;
+      record?: boolean;
+    } = {},
+  ): Promise<void> {
+    const { topN = 20, minTvlUsd = 1000000, record = true } = options;
 
     console.log('🚀 Starting Suifi Decision Cycle...\n');
 
@@ -92,18 +90,17 @@ export class SuifiRecorder {
   private displayTopVaults(vaults: VaultScore[], limit: number): void {
     console.log('🏆 Top Vaults by Score:\n');
     console.log(
-      '  Rank  Project              Pool                APY      TVL        Score   Conf.'
+      '  Rank  Project              Pool                APY      TVL        Score   Conf.',
     );
     console.log(
-      '  ───── ──────────────────── ─────────────────── ──────── ───────── ─────── ──────'
+      '  ───── ──────────────────── ─────────────────── ──────── ───────── ─────── ──────',
     );
 
     for (let i = 0; i < Math.min(limit, vaults.length); i++) {
       const v = vaults[i];
       const project = v.vault.project.padEnd(21);
-      const pool = (v.vault.pool.length > 18
-        ? v.vault.pool.substring(0, 15) + '...'
-        : v.vault.pool
+      const pool = (
+        v.vault.pool.length > 18 ? `${v.vault.pool.substring(0, 15)}...` : v.vault.pool
       ).padEnd(20);
       const apy = formatApy(v.vault.apy).padStart(7);
       const tvl = formatUsd(v.vault.tvlUsd).padStart(8);
@@ -111,7 +108,7 @@ export class SuifiRecorder {
       const conf = `${(v.confidence * 100).toFixed(0)}%`.padStart(5);
 
       console.log(
-        `  ${String(i + 1).padStart(4)}  ${project} ${pool} ${apy} ${tvl} ${score} ${conf}`
+        `  ${String(i + 1).padStart(4)}  ${project} ${pool} ${apy} ${tvl} ${score} ${conf}`,
       );
     }
   }
@@ -152,7 +149,7 @@ export class SuifiRecorder {
     // Best project
     if (metrics.bestPerformingProject) {
       console.log(
-        `\n  Best Project:\n    ${metrics.bestPerformingProject.name} (${(metrics.bestPerformingProject.accuracy * 100).toFixed(1)}% accuracy, ${metrics.bestPerformingProject.totalDecisions} decisions)`
+        `\n  Best Project:\n    ${metrics.bestPerformingProject.name} (${(metrics.bestPerformingProject.accuracy * 100).toFixed(1)}% accuracy, ${metrics.bestPerformingProject.totalDecisions} decisions)`,
       );
     }
 
@@ -160,7 +157,7 @@ export class SuifiRecorder {
     console.log('\n  By Action:');
     for (const [action, data] of Object.entries(metrics.byAction)) {
       console.log(
-        `    ${action.padEnd(8)}: ${data.total} total, ${(data.accuracy * 100).toFixed(1)}% accuracy, ${formatApy(data.avgApy)} avg APY`
+        `    ${action.padEnd(8)}: ${data.total} total, ${(data.accuracy * 100).toFixed(1)}% accuracy, ${formatApy(data.avgApy)} avg APY`,
       );
     }
   }
@@ -215,7 +212,7 @@ export class SuifiRecorder {
 export function createSuifiRecorder(
   strategyConfig?: Partial<StrategyConfig>,
   trackerConfig?: Partial<TrackerConfig>,
-  autoEvalConfig?: Partial<AutoEvaluatorConfig>
+  autoEvalConfig?: Partial<AutoEvaluatorConfig>,
 ): SuifiRecorder {
   return new SuifiRecorder(strategyConfig, trackerConfig, autoEvalConfig);
 }
