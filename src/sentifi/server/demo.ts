@@ -15,7 +15,19 @@ import { dirname, join } from 'path';
 import { exec } from 'child_process';
 import { platform } from 'os';
 import chalk from 'chalk';
-import { parseUnits } from 'viem';
+import {
+  createPublicClient,
+  createWalletClient,
+  erc20Abi,
+  formatUnits,
+  getContract,
+  http,
+  maxUint256,
+  pad,
+  parseUnits,
+  zeroAddress,
+} from 'viem';
+import { randomBytes } from 'crypto';
 
 // Yellow and MCP imports
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -29,6 +41,9 @@ import { RPCProtocolVersion } from '@erc7824/nitrolite/dist/rpc/types/index.js';
 import { privateKeyToAccount } from 'viem/accounts';
 import { getYellowConfig } from '../../yellow/config.js';
 import { YellowRpcClient } from '../../yellow/rpc.js';
+import { ARC_TESTNET, arcTestnetChain, getArcConfig } from '../../arc/config.js';
+import { createSIWxPayload, encodeSIWxHeader } from '../../x402/siwx/client.js';
+import type { CompleteSIWxInfo } from '../../x402/siwx/types.js';
 
 // Import new Sentifi modules
 import {
@@ -60,6 +75,8 @@ const YELLOW_APPLICATION = 'eXpress402-sentifi';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const ALLOW_MOCK_DATA = process.env.SENTIFI_ALLOW_MOCK_DATA === 'true';
 
 // Fallback mock data generator (randomized for variety)
 function generateMockRumors(symbol: string): any {
@@ -157,6 +174,155 @@ const yellowContext: YellowMcpContext = {
   connected: false,
 };
 
+type ArcGatewayContext = {
+  account: ReturnType<typeof privateKeyToAccount> | null;
+  agentAddress: `0x${string}` | null;
+  merchantAddress: `0x${string}` | null;
+  connected: boolean;
+  unifiedBalanceUsdc: number;
+  merchantUsdcBalanceUsdc: number;
+  lastMintTxHash?: string;
+};
+
+const arcContext: ArcGatewayContext = {
+  account: null,
+  agentAddress: null,
+  merchantAddress: null,
+  connected: false,
+  unifiedBalanceUsdc: 0,
+  merchantUsdcBalanceUsdc: 0,
+  lastMintTxHash: undefined,
+};
+
+async function ensureMcpConnected(): Promise<void> {
+  if (yellowContext.client && yellowContext.transport) {
+    return;
+  }
+
+  const transport = new StdioClientTransport({
+    command: 'bash',
+    args: ['-c', 'npm run dev'],
+    env: Object.fromEntries(
+      Object.entries(process.env).filter(([_, value]) => value !== undefined),
+    ) as Record<string, string>,
+    stderr: 'pipe',
+  });
+  yellowContext.transport = transport;
+
+  yellowContext.client = new Client({ name: 'sentifi-agent', version: '0.1.0' });
+  await yellowContext.client.connect(transport);
+
+  // Capture MCP server stderr for debug logging
+  if ((transport as any)._process?.stderr) {
+    (transport as any)._process.stderr.on('data', (data: Buffer) => {
+      const output = data.toString().trim();
+      if (output.includes('[MCP]')) {
+        const lines = output.split('\n').filter(line => line.includes('[MCP]'));
+        lines.forEach(line => {
+          const mcpMessage = line.replace(/^\[MCP\]\s*/, '');
+          debugLog('HTTP', `MCP Server: ${mcpMessage}`);
+        });
+      }
+    });
+  }
+}
+
+async function postGatewayJson<T>(path: string, body: unknown): Promise<T> {
+  const url = `${ARC_TESTNET.gatewayApiBaseUrl}${path}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Gateway API ${res.status}: ${text}`);
+  }
+  return JSON.parse(text) as T;
+}
+
+async function fetchArcUnifiedBalanceUsdc(depositor: string): Promise<number> {
+  const response = await postGatewayJson<{
+    token: string;
+    balances: Array<{ domain: number; depositor: string; balance: string }>;
+  }>('/v1/balances', {
+    token: 'USDC',
+    sources: [{ depositor, domain: ARC_TESTNET.gatewayDomain }],
+  });
+  const match = response.balances?.find(b => b.domain === ARC_TESTNET.gatewayDomain);
+  const raw = match?.balance ?? '0';
+  // Gateway API returns a decimal string like "10.000000" (not atomic units).
+  // Parse into 6-decimal atomic units, then format consistently.
+  let atomic: bigint;
+  try {
+    atomic = parseUnits(raw, 6);
+  } catch {
+    // Fallback for any unexpected integer-style payloads.
+    atomic = BigInt(raw);
+  }
+  const formatted = Number(formatUnits(atomic, 6));
+  return Number.isFinite(formatted) ? formatted : 0;
+}
+
+async function fetchArcOnchainUsdcBalance(address: `0x${string}`): Promise<number> {
+  const { rpcUrl, usdcAddress } = getArcConfig();
+  const publicClient = createPublicClient({ chain: arcTestnetChain, transport: http(rpcUrl) });
+  const balance = await publicClient.readContract({
+    address: usdcAddress,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [address],
+  });
+  const formatted = Number(formatUnits(balance, 6));
+  return Number.isFinite(formatted) ? formatted : 0;
+}
+
+async function initializeArcGateway(): Promise<boolean> {
+  try {
+    const env = getYellowConfig();
+    if (!env.agentPrivateKey || !env.merchantAddress) {
+      console.log(chalk.yellow('⚠️  Arc/Gateway credentials not configured'));
+      console.log(chalk.yellow(`   Agent key: ${env.agentPrivateKey ? 'Set' : 'Missing'}`));
+      console.log(chalk.yellow(`   Merchant address: ${env.merchantAddress ? 'Set' : 'Missing'}`));
+      return false;
+    }
+
+    arcContext.account = privateKeyToAccount(env.agentPrivateKey as `0x${string}`);
+    arcContext.agentAddress = arcContext.account.address;
+    arcContext.merchantAddress = env.merchantAddress as `0x${string}`;
+
+    await ensureMcpConnected();
+
+    const balance = await fetchArcUnifiedBalanceUsdc(arcContext.agentAddress);
+    arcContext.unifiedBalanceUsdc = balance;
+    try {
+      arcContext.merchantUsdcBalanceUsdc = await fetchArcOnchainUsdcBalance(arcContext.merchantAddress);
+    } catch (error) {
+      debugLog(
+        'HTTP',
+        `Failed to fetch Arc merchant USDC balance: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    arcContext.connected = true;
+
+    state.arcWallets = {
+      agentAddress: arcContext.agentAddress,
+      merchantAddress: arcContext.merchantAddress,
+      unifiedBalanceUsdc: arcContext.unifiedBalanceUsdc,
+      merchantUsdcBalanceUsdc: arcContext.merchantUsdcBalanceUsdc,
+      pricePerCallUsd: getToolPriceUsd('market_rumors'),
+      lastMintTxHash: arcContext.lastMintTxHash,
+    };
+
+    return true;
+  } catch (error) {
+    console.error('Arc/Gateway initialization failed:', error);
+    arcContext.connected = false;
+    state.arcWallets = null;
+    return false;
+  }
+}
+
 async function initializeYellow(): Promise<boolean> {
   try {
     const env = getYellowConfig();
@@ -165,8 +331,13 @@ async function initializeYellow(): Promise<boolean> {
       console.log(chalk.yellow('⚠️  Yellow credentials not configured'));
       console.log(chalk.yellow(`   Agent key: ${env.agentPrivateKey ? 'Set' : 'Missing'}`));
       console.log(chalk.yellow(`   Merchant address: ${env.merchantAddress ? 'Set' : 'Missing'}`));
-      console.log(chalk.yellow('   → Will use mock market data'));
-      log('⚠️ Yellow credentials not configured - using fallback data');
+      if (ALLOW_MOCK_DATA) {
+        console.log(chalk.yellow('   → Mock market data enabled (SENTIFI_ALLOW_MOCK_DATA=true)'));
+        log('⚠️ Yellow credentials not configured - using mock market data');
+      } else {
+        console.log(chalk.yellow('   → Mock market data disabled (set SENTIFI_ALLOW_MOCK_DATA=true to enable)'));
+        log('⚠️ Yellow credentials not configured - mock market data disabled');
+      }
       return false;
     }
 
@@ -199,37 +370,8 @@ async function initializeYellow(): Promise<boolean> {
     console.log(chalk.green('✓ Connected to Yellow Network'));
     log('✓ Connected to Yellow Network');
 
-    // Spawn MCP server via npm run dev
-    // Use -c (not -lc) to avoid login shell loading old Node via bash_profile
     console.log(chalk.dim('   Starting MCP server...'));
-    const transport = new StdioClientTransport({
-      command: 'bash',
-      args: ['-c', 'npm run dev'],
-      env: Object.fromEntries(
-        Object.entries(process.env).filter(([_, value]) => value !== undefined),
-      ) as Record<string, string>,
-      stderr: 'pipe',
-    });
-    yellowContext.transport = transport;
-
-    yellowContext.client = new Client({ name: 'sentifi-agent', version: '0.1.0' });
-    await yellowContext.client.connect(transport);
-    
-    // Capture MCP server stderr for debug logging
-    if ((transport as any)._process?.stderr) {
-      (transport as any)._process.stderr.on('data', (data: Buffer) => {
-        const output = data.toString().trim();
-        if (output.includes('[MCP]')) {
-          // Extract the MCP log message and add to debug logs
-          const lines = output.split('\n').filter(line => line.includes('[MCP]'));
-          lines.forEach(line => {
-            const mcpMessage = line.replace(/^\[MCP\]\s*/, '');
-            debugLog('HTTP', `MCP Server: ${mcpMessage}`);
-          });
-        }
-      });
-    }
-    
+    await ensureMcpConnected();
     console.log(chalk.green('✓ MCP Server connected'));
     log('✓ Connected to MCP Server');
 
@@ -377,33 +519,57 @@ async function updateYellowWalletState() {
 }
 
 async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: boolean }> {
+  if (state.paymentRail === 'arc') {
+    return fetchMarketRumorsViaArcGateway(symbol);
+  }
+
   // Check Yellow Network connection status
   if (!yellowContext.connected) {
     console.log(chalk.yellow('⚠️  Yellow Network not connected'));
-    log('📋 Using MOCK market data (Yellow Network not connected)');
-    debugLog('HTTP', `⚠️ ⚠️ ⚠️ MOCK DATA - Yellow Network not connected ⚠️ ⚠️ ⚠️`);
-    return { data: generateMockRumors(symbol), isLive: false };
+    if (ALLOW_MOCK_DATA) {
+      log('Using mock market data (Yellow Network not connected)');
+      debugLog('HTTP', `Mock data enabled - Yellow Network not connected`);
+      return { data: generateMockRumors(symbol), isLive: false };
+    }
+    throw new Error(
+      'Yellow Network not connected. Login to Yellow or set SENTIFI_ALLOW_MOCK_DATA=true to enable mock fallback.',
+    );
   }
   
   if (!yellowContext.client) {
     console.log(chalk.yellow('⚠️  MCP client not initialized'));
-    log('📋 Using MOCK market data (MCP client not available)');
-    debugLog('HTTP', `⚠️ ⚠️ ⚠️ MOCK DATA - MCP client not available ⚠️ ⚠️ ⚠️`);
-    return { data: generateMockRumors(symbol), isLive: false };
+    if (ALLOW_MOCK_DATA) {
+      log('Using mock market data (MCP client not available)');
+      debugLog('HTTP', `Mock data enabled - MCP client not available`);
+      return { data: generateMockRumors(symbol), isLive: false };
+    }
+    throw new Error(
+      'MCP client not available. Restart the demo server or set SENTIFI_ALLOW_MOCK_DATA=true to enable mock fallback.',
+    );
   }
   
   if (!yellowContext.appSessionId) {
     console.log(chalk.yellow('⚠️  No Yellow session ID'));
-    log('📋 Using MOCK market data (No active Yellow session)');
-    debugLog('SESSION', `⚠️ ⚠️ ⚠️ MOCK DATA - No active Yellow Network session ⚠️ ⚠️ ⚠️`);
-    return { data: generateMockRumors(symbol), isLive: false };
+    if (ALLOW_MOCK_DATA) {
+      log('Using mock market data (No active Yellow session)');
+      debugLog('SESSION', `Mock data enabled - No active Yellow session`);
+      return { data: generateMockRumors(symbol), isLive: false };
+    }
+    throw new Error(
+      'No active Yellow session. Click LOGIN (Yellow) or set SENTIFI_ALLOW_MOCK_DATA=true to enable mock fallback.',
+    );
   }
   
   if (!yellowContext.agentAddress) {
     console.log(chalk.yellow('⚠️  No agent wallet address'));
-    log('📋 Using MOCK market data (No wallet configured)');
-    debugLog('WALLET', `⚠️ ⚠️ ⚠️ MOCK DATA - No wallet configured ⚠️ ⚠️ ⚠️`);
-    return { data: generateMockRumors(symbol), isLive: false };
+    if (ALLOW_MOCK_DATA) {
+      log('Using mock market data (No wallet configured)');
+      debugLog('WALLET', `Mock data enabled - No wallet configured`);
+      return { data: generateMockRumors(symbol), isLive: false };
+    }
+    throw new Error(
+      'No wallet configured. Configure Yellow keys or set SENTIFI_ALLOW_MOCK_DATA=true to enable mock fallback.',
+    );
   }
 
   // All conditions met, try to call MCP with Yellow payment
@@ -490,12 +656,271 @@ async function fetchMarketRumors(symbol: string): Promise<{ data: any; isLive: b
     );
     return { data, isLive: true };
   } catch (error) {
-    console.log(chalk.red(`❌ MCP call failed: ${error instanceof Error ? error.message : String(error)}`));
-    log(`⚠️ MCP call failed: ${error instanceof Error ? error.message : String(error)}`);
-    debugLog('HTTP', `⚠️ ⚠️ ⚠️ MOCK DATA - MCP call failed: ${error instanceof Error ? error.message : String(error)} ⚠️ ⚠️ ⚠️`);
-    console.log(chalk.yellow('📋 Falling back to MOCK market data'));
-    log('📋 Using MOCK market data (API call failed)');
-    return { data: generateMockRumors(symbol), isLive: false };
+    const msg = error instanceof Error ? error.message : String(error);
+    console.log(chalk.red(`❌ MCP call failed: ${msg}`));
+    log(`MCP call failed: ${msg}`);
+    if (ALLOW_MOCK_DATA) {
+      debugLog('HTTP', `Mock data enabled - MCP call failed: ${msg}`);
+      console.log(chalk.yellow('Using mock market data (fallback enabled)'));
+      log('Using mock market data (API call failed)');
+      return { data: generateMockRumors(symbol), isLive: false };
+    }
+    throw error;
+  }
+}
+
+async function fetchMarketRumorsViaArcGateway(symbol: string): Promise<{ data: any; isLive: boolean }> {
+  if (!arcContext.connected || !arcContext.account || !arcContext.agentAddress || !arcContext.merchantAddress) {
+    throw new Error('Arc/Circle Gateway not initialized. Click LOGIN and choose Arc + Circle Gateway.');
+  }
+  if (!yellowContext.client) {
+    throw new Error('MCP client not available. Restart the demo server and try again.');
+  }
+
+  try {
+    debugLog('HTTP', `Calling MCP tool via Arc/Gateway: market_rumors(symbol=${symbol})`);
+
+    const env = getYellowConfig();
+    const resourceUrl = 'mcp://tool/market_rumors';
+    const pricePerCall = getToolPriceUsd('market_rumors');
+    const requiredAmountUsd = pricePerCall.toString();
+    const requiredValue = parseUnits(requiredAmountUsd, 6);
+    const arcRuntime = getArcConfig();
+
+    // Build a SIWx payload locally (server does not require a server-issued nonce today;
+    // it only enforces nonce uniqueness + freshness + correct URI).
+    const nonce = randomBytes(16).toString('hex');
+    const issuedAt = new Date().toISOString();
+    const expirationTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+    const siwxInfo: CompleteSIWxInfo = {
+      domain: 'mcp.local',
+      uri: resourceUrl,
+      version: '1',
+      nonce,
+      issuedAt,
+      expirationTime,
+      statement: 'Sign in to access paid MCP tools',
+      resources: [resourceUrl],
+      chainId: ARC_TESTNET.caip2,
+      type: 'eip191' as const,
+    };
+
+    const siwxPayload = await createSIWxPayload(siwxInfo, arcContext.account);
+    const siwxHeader = encodeSIWxHeader(siwxPayload);
+
+    // 2) Ensure unified balance exists (best effort: refresh gateway balance and fail early if empty)
+    arcContext.unifiedBalanceUsdc = await fetchArcUnifiedBalanceUsdc(arcContext.agentAddress);
+    try {
+      arcContext.merchantUsdcBalanceUsdc = await fetchArcOnchainUsdcBalance(arcContext.merchantAddress);
+    } catch {
+      // Non-fatal; only affects UI display.
+    }
+    state.arcWallets = {
+      agentAddress: arcContext.agentAddress,
+      merchantAddress: arcContext.merchantAddress,
+      unifiedBalanceUsdc: arcContext.unifiedBalanceUsdc,
+      merchantUsdcBalanceUsdc: arcContext.merchantUsdcBalanceUsdc,
+      pricePerCallUsd: Number(requiredAmountUsd),
+      lastMintTxHash: arcContext.lastMintTxHash,
+    };
+
+    if (arcContext.unifiedBalanceUsdc < pricePerCall) {
+      throw new Error(
+        `Unified balance too low. Need ${requiredAmountUsd} USDC, have ${arcContext.unifiedBalanceUsdc.toFixed(2)} USDC.`,
+      );
+    }
+
+    // 3) Create and sign burn intent (Arc -> Arc, recipient = merchant)
+    const burnIntent = {
+      maxBlockHeight: maxUint256,
+      maxFee: 2_010000n,
+      spec: {
+        version: 1,
+        sourceDomain: ARC_TESTNET.gatewayDomain,
+        destinationDomain: ARC_TESTNET.gatewayDomain,
+        sourceContract: ARC_TESTNET.gatewayWallet,
+        destinationContract: arcRuntime.gatewayMinter,
+        sourceToken: arcRuntime.usdcAddress,
+        destinationToken: arcRuntime.usdcAddress,
+        sourceDepositor: arcContext.agentAddress,
+        destinationRecipient: arcContext.merchantAddress,
+        sourceSigner: arcContext.agentAddress,
+        destinationCaller: zeroAddress,
+        value: requiredValue,
+        salt: `0x${randomBytes(32).toString('hex')}`,
+        hookData: '0x',
+      },
+    };
+
+    const typedData = {
+      types: {
+        EIP712Domain: [
+          { name: 'name', type: 'string' },
+          { name: 'version', type: 'string' },
+        ],
+        TransferSpec: [
+          { name: 'version', type: 'uint32' },
+          { name: 'sourceDomain', type: 'uint32' },
+          { name: 'destinationDomain', type: 'uint32' },
+          { name: 'sourceContract', type: 'bytes32' },
+          { name: 'destinationContract', type: 'bytes32' },
+          { name: 'sourceToken', type: 'bytes32' },
+          { name: 'destinationToken', type: 'bytes32' },
+          { name: 'sourceDepositor', type: 'bytes32' },
+          { name: 'destinationRecipient', type: 'bytes32' },
+          { name: 'sourceSigner', type: 'bytes32' },
+          { name: 'destinationCaller', type: 'bytes32' },
+          { name: 'value', type: 'uint256' },
+          { name: 'salt', type: 'bytes32' },
+          { name: 'hookData', type: 'bytes' },
+        ],
+        BurnIntent: [
+          { name: 'maxBlockHeight', type: 'uint256' },
+          { name: 'maxFee', type: 'uint256' },
+          { name: 'spec', type: 'TransferSpec' },
+        ],
+      },
+      domain: { name: 'GatewayWallet', version: '1' },
+      primaryType: 'BurnIntent',
+      message: {
+        ...burnIntent,
+        spec: {
+          ...burnIntent.spec,
+          sourceContract: pad(burnIntent.spec.sourceContract.toLowerCase() as `0x${string}`, { size: 32 }),
+          destinationContract: pad(burnIntent.spec.destinationContract.toLowerCase() as `0x${string}`, { size: 32 }),
+          sourceToken: pad(burnIntent.spec.sourceToken.toLowerCase() as `0x${string}`, { size: 32 }),
+          destinationToken: pad(burnIntent.spec.destinationToken.toLowerCase() as `0x${string}`, { size: 32 }),
+          sourceDepositor: pad(burnIntent.spec.sourceDepositor.toLowerCase() as `0x${string}`, { size: 32 }),
+          destinationRecipient: pad(burnIntent.spec.destinationRecipient.toLowerCase() as `0x${string}`, { size: 32 }),
+          sourceSigner: pad(burnIntent.spec.sourceSigner.toLowerCase() as `0x${string}`, { size: 32 }),
+          destinationCaller: pad(burnIntent.spec.destinationCaller.toLowerCase() as `0x${string}`, { size: 32 }),
+        },
+      },
+    } as const;
+
+    const burnSig = await arcContext.account.signTypedData(typedData as any);
+
+    // 4) Request attestation from Gateway API
+    const transferResp = await postGatewayJson<{
+      transferId: string;
+      attestation: `0x${string}`;
+      signature: `0x${string}`;
+      fees?: any;
+    }>('/v1/transfer', [{ burnIntent: typedData.message, signature: burnSig }]);
+
+    // 5) Mint on Arc (GatewayMinter.gatewayMint)
+    const publicClient = createPublicClient({ chain: arcTestnetChain, transport: http(arcRuntime.rpcUrl) });
+    const walletClient = createWalletClient({
+      account: arcContext.account,
+      chain: arcTestnetChain,
+      transport: http(arcRuntime.rpcUrl),
+    });
+
+    const gatewayMinter = getContract({
+      address: arcRuntime.gatewayMinter,
+      abi: [
+        {
+          type: 'function',
+          name: 'gatewayMint',
+          inputs: [
+            { name: 'attestationPayload', type: 'bytes' },
+            { name: 'signature', type: 'bytes' },
+          ],
+          outputs: [],
+          stateMutability: 'nonpayable',
+        },
+      ] as const,
+      client: walletClient,
+    });
+
+    const mintTxHash = await gatewayMinter.write.gatewayMint([transferResp.attestation, transferResp.signature], {
+      account: arcContext.account,
+    });
+    await publicClient.waitForTransactionReceipt({ hash: mintTxHash });
+    arcContext.lastMintTxHash = mintTxHash;
+
+    // Best-effort refresh so the UI reflects spend immediately.
+    try {
+      arcContext.unifiedBalanceUsdc = await fetchArcUnifiedBalanceUsdc(arcContext.agentAddress);
+    } catch (refreshError) {
+      debugLog(
+        'HTTP',
+        `Failed to refresh unified balance after mint: ${
+          refreshError instanceof Error ? refreshError.message : String(refreshError)
+        }`,
+      );
+    }
+    try {
+      arcContext.merchantUsdcBalanceUsdc = await fetchArcOnchainUsdcBalance(arcContext.merchantAddress);
+    } catch (refreshError) {
+      debugLog(
+        'HTTP',
+        `Failed to refresh merchant USDC balance after mint: ${
+          refreshError instanceof Error ? refreshError.message : String(refreshError)
+        }`,
+      );
+    }
+
+    state.arcWallets = {
+      agentAddress: arcContext.agentAddress,
+      merchantAddress: arcContext.merchantAddress,
+      unifiedBalanceUsdc: arcContext.unifiedBalanceUsdc,
+      merchantUsdcBalanceUsdc: arcContext.merchantUsdcBalanceUsdc,
+      pricePerCallUsd: Number(requiredAmountUsd),
+      lastMintTxHash: arcContext.lastMintTxHash,
+    };
+
+    // 6) Retry tool call with payment proof
+    const accepted = {
+      scheme: 'arc-usd-offchain',
+      network: 'arc-testnet',
+      amount: requiredAmountUsd,
+      asset: 'usdc',
+      payTo: arcContext.merchantAddress,
+      maxTimeoutSeconds: env.maxTimeoutSeconds,
+      extra: {
+        settlement: 'arc',
+        rail: 'circle-gateway',
+        arc: {
+          chainId: ARC_TESTNET.chainId,
+          rpcUrl: arcRuntime.rpcUrl,
+          explorerBaseUrl: ARC_TESTNET.explorerBaseUrl,
+          usdcAddress: arcRuntime.usdcAddress,
+        },
+        gateway: {
+          apiBaseUrl: ARC_TESTNET.gatewayApiBaseUrl,
+          domain: ARC_TESTNET.gatewayDomain,
+          walletContract: ARC_TESTNET.gatewayWallet,
+          minterContract: arcRuntime.gatewayMinter,
+        },
+      },
+    };
+
+    const paymentPayload = {
+      x402Version: 2,
+      accepted,
+      payload: { mintTxHash },
+    };
+
+    const result = await yellowContext.client.callTool({
+      name: 'market_rumors',
+      arguments: { symbol },
+      _meta: {
+        'SIGN-IN-WITH-X': siwxHeader,
+        'x402/payment': paymentPayload,
+      },
+    } as any);
+
+    const { text, isError } = getToolText(result);
+    if (!text) throw new Error('Empty response from market_rumors');
+    if (isError) throw new Error(text);
+    const data = parseJsonFromToolText<any>('market_rumors', text);
+    return { data, isLive: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Arc/Gateway MCP call failed:', msg);
+    throw new Error(`Arc/Circle payment failed: ${msg}`);
   }
 }
 
@@ -653,6 +1078,7 @@ interface DemoState {
   yellowConnected: boolean;
   mcpConnected: boolean;
   loggedIn: boolean;
+  paymentRail: 'yellow' | 'arc';
   decisionConfirmed: boolean;
   riskAssessment: {
     approved: boolean;
@@ -671,6 +1097,14 @@ interface DemoState {
     sessionRemaining: number;
     assetSymbol: string;
     pricePerCall: number;
+  } | null;
+  arcWallets: {
+    agentAddress: string;
+    merchantAddress: string;
+    unifiedBalanceUsdc: number;
+    merchantUsdcBalanceUsdc: number;
+    pricePerCallUsd: number;
+    lastMintTxHash?: string;
   } | null;
 }
 
@@ -691,6 +1125,7 @@ const state: DemoState = {
   yellowConnected: false,
   mcpConnected: false,
   loggedIn: true,
+  paymentRail: 'yellow',
   decisionConfirmed: false,
   riskAssessment: null,
   pnl: {
@@ -705,6 +1140,7 @@ const state: DemoState = {
   },
   useLifiQuotes: true, // Use real LI.FI quotes
   yellowWallets: null,
+  arcWallets: null,
 };
 
 // Initialize Sentifi components
@@ -1262,6 +1698,20 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
+  if (url.pathname === '/api/set-rail' && req.method === 'POST') {
+    const body = await readBody(req);
+    const { rail } = JSON.parse(body || '{}') as { rail?: string };
+    if (rail !== 'yellow' && rail !== 'arc') {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Invalid rail. Use \"yellow\" or \"arc\".' }));
+      return;
+    }
+    state.paymentRail = rail;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, rail }));
+    return;
+  }
+
   if (url.pathname === '/api/deposit' && req.method === 'POST') {
     const body = await readBody(req);
     const { amount } = JSON.parse(body);
@@ -1276,44 +1726,113 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     const { symbol } = JSON.parse(body);
 
     if (state.usdcBalance <= 0) {
+      const rail = state.paymentRail === 'arc' ? 'Circle Gateway unified balance' : 'Yellow session balance';
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Please deposit funds first' }));
+      res.end(
+        JSON.stringify({
+          error: 'Please deposit demo trading funds first',
+          message: `This is a simulated trading bankroll (separate from the ${rail}).`,
+          depositRequired: true,
+        }),
+      );
       return;
     }
 
-    // Check if Yellow session has enough balance for research
     const pricePerCall = getToolPriceUsd('market_rumors');
-    if (yellowContext.connected && state.yellowWallets) {
-      const sessionRemaining = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
-      if (sessionRemaining < pricePerCall) {
+    if (state.paymentRail === 'yellow') {
+      // Check if Yellow session has enough balance for research
+      if (yellowContext.connected && state.yellowWallets) {
+        const sessionRemaining = yellowContext.sessionInitialAmount - yellowContext.sessionSpent;
+        if (sessionRemaining < pricePerCall) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              error: 'Research budget depleted',
+              message: `Session balance too low. Need ${pricePerCall} ${state.yellowWallets.assetSymbol}, have ${sessionRemaining.toFixed(2)} ${state.yellowWallets.assetSymbol}`,
+              budgetDepleted: true,
+            }),
+          );
+          return;
+        }
+      }
+    } else {
+      // Arc/Circle Gateway: require unified balance before running paid tool calls.
+      if (!arcContext.connected || !arcContext.agentAddress || !arcContext.merchantAddress) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-          error: 'Research budget depleted',
-          message: `Session balance too low. Need ${pricePerCall} ${state.yellowWallets.assetSymbol}, have ${sessionRemaining.toFixed(2)} ${state.yellowWallets.assetSymbol}`,
-          budgetDepleted: true
-        }));
+        res.end(
+          JSON.stringify({
+            error: 'Arc/Circle Gateway not initialized. Click LOGIN and choose Arc + Circle Gateway.',
+          }),
+        );
+        return;
+      }
+
+      try {
+        const unified = await fetchArcUnifiedBalanceUsdc(arcContext.agentAddress);
+        arcContext.unifiedBalanceUsdc = unified;
+        let merchantUsdc = arcContext.merchantUsdcBalanceUsdc;
+        try {
+          merchantUsdc = await fetchArcOnchainUsdcBalance(arcContext.merchantAddress);
+          arcContext.merchantUsdcBalanceUsdc = merchantUsdc;
+        } catch {
+          // Non-fatal; only affects UI display.
+        }
+        state.arcWallets = {
+          agentAddress: arcContext.agentAddress,
+          merchantAddress: arcContext.merchantAddress,
+          unifiedBalanceUsdc: arcContext.unifiedBalanceUsdc,
+          merchantUsdcBalanceUsdc: merchantUsdc,
+          pricePerCallUsd: pricePerCall,
+          lastMintTxHash: arcContext.lastMintTxHash,
+        };
+
+        if (unified < pricePerCall) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              error: 'Research budget depleted',
+              message: `Gateway unified balance too low. Need ${pricePerCall.toFixed(2)} USDC, have ${unified.toFixed(2)} USDC. Fund the GatewayWallet and try again.`,
+              budgetDepleted: true,
+            }),
+          );
+          return;
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: `Failed to read Gateway unified balance: ${msg}` }));
         return;
       }
     }
 
     state.isRunning = true;
     resetState();
-    state.usdcBalance = parseFloat(body.match(/"usdcBalance":\s*(\d+)/)?.[1] || String(state.usdcBalance)) || state.usdcBalance;
+    state.usdcBalance =
+      parseFloat(body.match(/"usdcBalance":\s*(\d+)/)?.[1] || String(state.usdcBalance)) ||
+      state.usdcBalance;
     updatePortfolio();
 
-    // Fetch sentiment data via Yellow MCP (with fallback to mock)
-    const { data: rumors, isLive } = await fetchMarketRumors(symbol);
-    state.dataMode = isLive ? 'live' : 'fallback';
-    state.yellowConnected = yellowContext.connected;
-    state.mcpConnected = Boolean(yellowContext.client); // Connected to MCP server via stdio
+    try {
+      // Fetch sentiment data via selected rail
+      const { data: rumors, isLive } = await fetchMarketRumors(symbol);
+      state.dataMode = isLive ? 'live' : 'fallback';
+      state.yellowConnected = yellowContext.connected;
+      state.mcpConnected = Boolean(yellowContext.client); // Connected to MCP server via stdio
 
-    const signal = await analyzeWithNewArchitecture(symbol, rumors, isLive);
-    await makeDecision(signal);
+      const signal = await analyzeWithNewArchitecture(symbol, rumors, isLive);
+      await makeDecision(signal);
 
-    state.isRunning = false;
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true }));
-    return;
+      state.isRunning = false;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+      return;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      state.isRunning = false;
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: msg }));
+      return;
+    }
   }
 
   if ((url.pathname === '/api/confirm' || url.pathname === '/api/confirm-decision') && req.method === 'POST') {
@@ -1345,9 +1864,15 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (url.pathname === '/api/logout' && req.method === 'POST') {
-    // Close Yellow session and settle funds to merchant (but stay connected)
-    console.log(chalk.yellow('\n🔒 Logout requested - closing session...'));
-    await closeYellowSession(false);
+    if (state.paymentRail === 'yellow') {
+      // Close Yellow session and settle funds to merchant (but stay connected)
+      console.log(chalk.yellow('\n🔒 Logout requested - closing session...'));
+      await closeYellowSession(false);
+    } else {
+      // Arc/Gateway mode: no offchain session to close
+      arcContext.connected = false;
+      state.arcWallets = null;
+    }
     
     // Mark as logged out
     state.loggedIn = false;
@@ -1374,14 +1899,20 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (url.pathname === '/api/login' && req.method === 'POST') {
-    // Create new Yellow session from agent's off-chain balance
-    await initializeYellow();
+    if (state.paymentRail === 'yellow') {
+      // Create new Yellow session from agent's off-chain balance
+      await initializeYellow();
+    } else {
+      await initializeArcGateway();
+    }
     
     // Mark as logged in
     state.loggedIn = true;
     
     // Update wallet balances
-    await updateYellowWalletState();
+    if (state.paymentRail === 'yellow') {
+      await updateYellowWalletState();
+    }
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));
@@ -1432,14 +1963,11 @@ async function main() {
 
   updatePortfolio();
 
-  // Try to initialize Yellow MCP for live sentiment data
-  console.log(chalk.dim('Initializing Yellow MCP connection...'));
-  const yellowConnected = await initializeYellow();
-  
-  // Update data mode based on Yellow connection
-  state.dataMode = yellowConnected ? 'live' : 'fallback';
-  state.yellowConnected = yellowConnected;
-  state.mcpConnected = Boolean(yellowContext.client);
+  // Do not auto-login any payment rail. The dashboard selects rail at login time.
+  state.loggedIn = false;
+  state.yellowConnected = false;
+  state.mcpConnected = false;
+  state.dataMode = 'fallback';
 
   const PORT = parseInt(process.env.SENTIFI_PORT || '3456');
   const HOST = process.env.SENTIFI_HOST || '127.0.0.1';
@@ -1448,14 +1976,8 @@ async function main() {
   server.listen(PORT, HOST, () => {
     const url = `http://${HOST}:${PORT}`;
     console.log(chalk.green(`\n✓ Server running at ${url}\n`));
-
-    if (yellowConnected) {
-      console.log(chalk.dim('Data mode:'), chalk.green('LIVE (Yellow MCP)'));
-      console.log(chalk.dim('Yellow session:'), chalk.green(yellowContext.appSessionId?.slice(0, 20) + '...'));
-    } else {
-      console.log(chalk.dim('Data mode:'), chalk.yellow('FALLBACK (mock data)'));
-      console.log(chalk.dim('Tip:'), chalk.dim('Set YELLOW_AGENT_PRIVATE_KEY for live data'));
-    }
+    console.log(chalk.dim('Data mode:'), chalk.yellow('FALLBACK (login required)'));
+    console.log(chalk.dim('Tip:'), chalk.dim('Use the dashboard to select Yellow or Arc, then click LOGIN.'));
 
     console.log(chalk.dim('Architecture:'), chalk.cyan('NEW (Sentifi Modules)'));
     console.log(chalk.dim('\nFeatures:'));

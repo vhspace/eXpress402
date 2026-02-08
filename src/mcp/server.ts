@@ -6,12 +6,14 @@ import { getMarketRumors, getStockPrice } from '../finance/index.js';
 import {
   buildPaymentRequired,
   buildSettlementResponse,
+  ARC_USD_OFFCHAIN_SCHEME,
   validateYellowPayment,
 } from '../x402/payment.js';
 import type { PaymentPayload } from '../x402/types.js';
 import { getYellowConfig } from '../yellow/config.js';
 import { YellowRpcClient } from '../yellow/rpc.js';
 import { verifyYellowTransfer } from '../yellow/verify.js';
+import { verifyArcGatewayMintPayment } from '../arc/verify.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { parseSIWxHeader, validateAndVerifySIWx } from '../x402/siwx/index.js';
 import { siwxStorage } from '../x402/siwx/storage.js';
@@ -96,7 +98,9 @@ export async function startMcpServer() {
         const data = await getMarketRumors(symbol);
         const redditCount = data.reddit?.length || 0;
         const tavilyCount = data.tavily?.length || 0;
-        console.error(`[MCP] Tool response: ${redditCount} Reddit posts, ${tavilyCount} Tavily articles`);
+        console.error(
+          `[MCP] Tool response: ${redditCount} Reddit posts, ${tavilyCount} Tavily articles`,
+        );
         console.error(`[MCP] Payment settlement: ${settlement.success ? 'success' : 'failed'}`);
         return {
           content: [{ type: 'text', text: JSON.stringify(data) }],
@@ -174,18 +178,21 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
       );
 
       if (verification.valid && verification.address) {
-        // Check if this wallet has an existing Yellow session
-        const existingSession = await siwxStorage.getSession(verification.address, resourceUrl);
+        // Only attempt session reuse when client did not send a payment payload or explicit session.
+        // This avoids overriding Arc (pay-per-call) payments with a previously stored Yellow session.
+        if (!payment && !yellowMeta.appSessionId) {
+          const existingSession = await siwxStorage.getSession(verification.address, resourceUrl);
 
-        if (existingSession) {
-          // Reuse existing session - no payment needed!
-          console.error(`[SIWx] Reusing session for wallet ${verification.address}`);
-          return buildSettlementResponse(
-            true,
-            config.network,
-            verification.address,
-            existingSession,
-          );
+          if (existingSession) {
+            // Reuse existing session - no payment needed!
+            console.error(`[SIWx] Reusing session for wallet ${verification.address}`);
+            return buildSettlementResponse(
+              true,
+              config.network,
+              verification.address,
+              existingSession,
+            );
+          }
         }
 
         // Valid auth but no session - store for later after payment
@@ -215,6 +222,7 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
     throw new McpError(402, 'Payment required', paymentRequired);
   }
 
+  // Yellow session path (optional, only applies to Yellow rail)
   if (yellowMeta.appSessionId) {
     const payer = yellowMeta.payer ?? config.agentAddress ?? '';
 
@@ -300,52 +308,121 @@ async function requirePayment(extra: RequestHandlerExtra<any, any>, toolName: st
     });
   }
 
-  const validation = validateYellowPayment(payment, {
-    clearnodeUrl: config.clearnodeUrl,
-    merchantAddress: config.merchantAddress,
-    assetSymbol: config.assetSymbol,
-    pricePerCall,
-    network: config.network,
-    maxTimeoutSeconds: config.maxTimeoutSeconds,
-  });
-
-  if (!validation.ok) {
-    const reason = 'reason' in validation ? validation.reason : 'unknown';
-    throw new McpError(402, `Payment invalid: ${reason}`, paymentRequired);
+  const scheme = payment.accepted?.scheme;
+  if (!scheme) {
+    throw new McpError(402, 'Payment requirements missing scheme', paymentRequired);
   }
 
-  if (!yellowClient) {
-    throw new Error('Yellow client not initialized');
-  }
-
-  // Verify Yellow transfer
-  const verified = await verifyYellowTransfer(
-    yellowClient,
-    validation.info,
-    config.merchantAddress,
-    config.assetSymbol,
-  );
-
-  if (!verified) {
-    const paymentResponse = buildSettlementResponse(
-      false,
-      config.network,
-      validation.info.payer,
-      undefined,
-      'verification_failed',
-    );
-    throw new McpError(402, 'Payment verification failed', {
-      ...paymentRequired,
-      'x402/payment-response': paymentResponse,
+  if (scheme === 'yellow-offchain') {
+    const validation = validateYellowPayment(payment, {
+      clearnodeUrl: config.clearnodeUrl,
+      merchantAddress: config.merchantAddress,
+      assetSymbol: config.assetSymbol,
+      pricePerCall,
+      network: config.network,
+      maxTimeoutSeconds: config.maxTimeoutSeconds,
     });
+
+    if (!validation.ok) {
+      const reason = 'reason' in validation ? validation.reason : 'unknown';
+      throw new McpError(402, `Payment invalid: ${reason}`, paymentRequired);
+    }
+
+    if (!yellowClient) {
+      throw new Error('Yellow client not initialized');
+    }
+
+    // Verify Yellow transfer
+    const verified = await verifyYellowTransfer(
+      yellowClient,
+      validation.info,
+      config.merchantAddress,
+      config.assetSymbol,
+    );
+
+    if (!verified) {
+      const paymentResponse = buildSettlementResponse(
+        false,
+        config.network,
+        validation.info.payer,
+        undefined,
+        'verification_failed',
+      );
+      throw new McpError(402, 'Payment verification failed', {
+        ...paymentRequired,
+        'x402/payment-response': paymentResponse,
+      });
+    }
+
+    return buildSettlementResponse(
+      true,
+      env.network,
+      validation.info.payer,
+      String(validation.info.transferId),
+    );
   }
 
-  return buildSettlementResponse(
-    true,
-    env.network,
-    validation.info.payer,
-    String(validation.info.transferId),
-  );
+  if (scheme === ARC_USD_OFFCHAIN_SCHEME) {
+    // Arc/Gateway proof path: client provides a GatewayMinter mint tx hash that minted USDC to payTo.
+    const mintTxHash = (payment.payload as any)?.mintTxHash as string | undefined;
+    if (!mintTxHash) {
+      throw new McpError(402, 'Payment invalid: missing mintTxHash', paymentRequired);
+    }
+
+    // If SIWx verified, bind payment to the authenticated wallet.
+    let expectedPayer: string | undefined;
+    if (siwxHeader) {
+      try {
+        const siwxPayload = parseSIWxHeader(siwxHeader);
+        expectedPayer = siwxPayload.address;
+      } catch {
+        expectedPayer = undefined;
+      }
+    }
+
+    const verified = await verifyArcGatewayMintPayment({
+      mintTxHash,
+      merchantAddress: config.merchantAddress,
+      requiredAmountUsd: String(pricePerCall),
+      expectedPayerAddress: expectedPayer,
+    });
+
+    if (!verified.ok) {
+      const paymentResponse = buildSettlementResponse(
+        false,
+        'arc-testnet',
+        expectedPayer,
+        mintTxHash,
+        verified.reason,
+      );
+      throw new McpError(402, `Payment verification failed: ${verified.reason}`, {
+        ...paymentRequired,
+        'x402/payment-response': paymentResponse,
+      });
+    }
+
+    // Replay protection via storage (transferSpecHash preferred).
+    try {
+      await siwxStorage.markPaymentUsed(`${scheme}:${verified.transferSpecHash}`);
+    } catch {
+      // If storage is unavailable, fail closed (consistent with nonce protection philosophy).
+      const paymentResponse = buildSettlementResponse(
+        false,
+        'arc-testnet',
+        expectedPayer,
+        mintTxHash,
+        'storage_unavailable',
+      );
+      throw new McpError(402, 'Payment verification failed: storage_unavailable', {
+        ...paymentRequired,
+        'x402/payment-response': paymentResponse,
+      });
+    }
+
+    return buildSettlementResponse(true, 'arc-testnet', expectedPayer, mintTxHash);
+  }
+
+  throw new McpError(402, `Payment invalid: unsupported_scheme:${scheme}`, paymentRequired);
 }
 
 async function fetchSessionBalance(appSessionId: string, asset: string): Promise<number> {

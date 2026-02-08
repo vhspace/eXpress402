@@ -1,0 +1,11 @@
+[package]
+name = "express402_sui"
+edition = "2024"
+license = "MIT"
+authors = ["eXpress402 Team"]
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[addresses]
+express402 = "0x0"

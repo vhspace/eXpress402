@@ -35,15 +35,18 @@ export async function fetchTavilyRumors(query: string, maxResults = 5): Promise<
   }
 
   const rawData = await response.json();
-  
+
   // Log the raw response to see what fields are actually returned
-  console.error('[Tavily] Raw API response structure:', JSON.stringify(rawData, null, 2).substring(0, 500));
-  
+  console.error(
+    '[Tavily] Raw API response structure:',
+    JSON.stringify(rawData, null, 2).substring(0, 500),
+  );
+
   const data = rawData as {
-    results?: Array<{ 
-      title: string; 
-      url: string; 
-      content: string; 
+    results?: Array<{
+      title: string;
+      url: string;
+      content: string;
       score: number;
       published_date?: string;
     }>;
@@ -61,7 +64,7 @@ export async function fetchTavilyRumors(query: string, maxResults = 5): Promise<
   console.error('[Tavily] Fetched results (requested last 24h only):');
   results.forEach((r, i) => {
     const publishedDate = r.published_date ? new Date(r.published_date) : null;
-    const hoursAgo = publishedDate 
+    const hoursAgo = publishedDate
       ? ((Date.now() - publishedDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
       : 'NO DATE';
     console.error(`  [${i + 1}] ${hoursAgo}h ago: ${r.title.substring(0, 60)}...`);
