@@ -7,7 +7,7 @@
 - [x] All code written after Jan 30, 9am
 - [x] External reference code excluded from submission
 - [x] Git history clean and verifiable
-- [x] COMPLIANCE.md created
+- [x] Compliance statement prepared (kept private/off-repo)
 - [x] Original Sui contracts written
 
 ## 🚀 Minimum Viable Submission (Next 6 Hours)
@@ -57,7 +57,7 @@ Create minimal Sui executor that demonstrates concept:
 
 - [x] Built on Sui - `sui-contracts/` deployed to testnet
 - [x] Working prototype - eXpress402 + Sui contracts
-- [x] Clear articulation - `SUI-INTEGRATION.md`
+- [x] Clear articulation - Sui integration documentation (kept private/off-repo)
 - [x] Strength in product insight - Novel AI + parallel execution use case
 - [ ] Potential for expansion - Clear roadmap in docs
 
@@ -73,10 +73,8 @@ Create minimal Sui executor that demonstrates concept:
 ### Primary Files
 
 1. **README.md** - Updated with Sui integration
-2. **SUI-INTEGRATION.md** - Full technical explanation  
-3. **COMPLIANCE.md** - Hackathon rules adherence
-4. **sui-contracts/** - Original Move contracts
-5. **Demo video** - 2-3 minutes showing everything
+2. **sui-contracts/** - Original Move contracts
+3. **Demo video** - 2-3 minutes showing everything
 
 ### Supporting Files
 
@@ -162,7 +160,7 @@ Before hitting submit:
 - [ ] Sui contracts build successfully
 - [ ] All links in README work
 - [ ] Video plays correctly
-- [ ] COMPLIANCE.md is accurate
+- [ ] Compliance statement is accurate (kept private/off-repo)
 - [ ] Team member credited appropriately
 
 ## 🚀 Post-Submission
