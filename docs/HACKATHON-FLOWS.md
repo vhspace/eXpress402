@@ -39,7 +39,7 @@ graph TB
     end
     
     subgraph "Storage Layer"
-        R1[(Redis/Vercel KV)]
+        R1[(Redis)]
         R2[Session Map:<br/>wallet → session_id]
         R3[Nonce Tracking:<br/>replay prevention]
     end
@@ -71,7 +71,7 @@ graph TB
 sequenceDiagram
     participant Agent as AI Agent<br/>(with EOA wallet)
     participant MCP as eXpress402<br/>MCP Server
-    participant Redis as Redis/Vercel KV<br/>(Session Storage)
+    participant Redis as Redis<br/>(Session Storage)
     participant Yellow as Yellow Network<br/>(Off-Chain Ledger)
     participant Merchant as Merchant Wallet<br/>(Service Provider)
 
@@ -162,7 +162,7 @@ sequenceDiagram
 - **Signature**: ECDSA signature using agent's private key
 - **Verification**: Server recovers address from signature, validates it matches claimed address
 
-#### Session Storage (Redis/Vercel KV)
+#### Session Storage (Redis)
 - **Key Pattern**: `session:{walletAddress}` → `{yellowSessionId}`
 - **Lookup Speed**: Sub-millisecond (in-memory cache)
 - **Nonce Tracking**: `nonce:{hash}` → `"1"` with 5-minute TTL
