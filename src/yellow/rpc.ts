@@ -146,7 +146,9 @@ export class YellowRpcClient extends EventEmitter {
     const ws = new WebSocket(this.options.url);
     this.ws = ws;
 
-    ws.on('message', (data: WebSocket.Data) => this.handleMessage(Buffer.from(data as Uint8Array).toString()));
+    ws.on('message', (data: WebSocket.Data) =>
+      this.handleMessage(Buffer.from(data as Uint8Array).toString()),
+    );
     ws.on('error', error => {
       console.error('Yellow RPC socket error:', error);
     });
@@ -171,10 +173,9 @@ export class YellowRpcClient extends EventEmitter {
         clearTimeout(timeout);
         reject(new Error('Yellow RPC connection closed'));
       });
-    })
-      .finally(() => {
-        this.connectInFlight = undefined;
-      });
+    }).finally(() => {
+      this.connectInFlight = undefined;
+    });
 
     await this.connectInFlight;
   }
@@ -182,7 +183,10 @@ export class YellowRpcClient extends EventEmitter {
   async request<T>(method: string, params: Record<string, unknown>, sign = false): Promise<T> {
     await this.connect();
     const ws = this.ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
+    if (!ws) {
+      throw new Error('Yellow RPC socket not open');
+    }
+    if (ws.readyState !== WebSocket.OPEN) {
       throw new Error('Yellow RPC socket not open');
     }
 
@@ -209,7 +213,7 @@ export class YellowRpcClient extends EventEmitter {
         },
       });
 
-       // Send after pending is registered; reject safely if send fails.
+      // Send after pending is registered; reject safely if send fails.
       try {
         ws.send(message);
       } catch (error) {
@@ -538,7 +542,10 @@ export class YellowRpcClient extends EventEmitter {
   private async sendRaw(message: string) {
     await this.connect();
     const ws = this.ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
+    if (!ws) {
+      throw new Error('Yellow RPC socket not open');
+    }
+    if (ws.readyState !== WebSocket.OPEN) {
       throw new Error('Yellow RPC socket not open');
     }
 
