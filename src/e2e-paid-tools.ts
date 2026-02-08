@@ -33,6 +33,13 @@ function parseNumber(value: string, label: string) {
   return parsed;
 }
 
+function formatAmount(value: number, decimals = 6) {
+  // Keep values stable for onchain/offchain settlement messages.
+  // Yellow sandbox assets are 6-decimal (ytest.usd), and USDC is 6-decimal in production.
+  const fixed = value.toFixed(decimals);
+  return fixed.replace(/\.?0+$/, '');
+}
+
 async function requestSandboxFunds(address: string) {
   const faucetUrl = process.env.YELLOW_FAUCET_URL ?? SANDBOX_FAUCET_URL;
   console.error(`Requesting sandbox funds from ${faucetUrl} for ${address}`);
@@ -244,11 +251,38 @@ async function runAppSessionFlow(
 ) {
   logStage('Demo flow: app session');
 
-  const { participants, allocations, ttlSeconds, requiredAmount } = parseSessionConfig(
-    env,
-    agentAddress,
-    assetSymbol,
+  const sessionConfig = parseSessionConfig(env, agentAddress, assetSymbol);
+  const { participants, allocations, ttlSeconds } = sessionConfig;
+  let requiredAmount = sessionConfig.requiredAmount;
+
+  // This flow calls two paid tools. Ensure the agent allocation covers expected spend.
+  const stockPrice = getToolPrice(env, 'stock_price');
+  const rumorsPrice = getToolPrice(env, 'market_rumors');
+  const expectedSpend = stockPrice + rumorsPrice;
+  const minAgentAllocation = expectedSpend + 1; // buffer to avoid float edge-cases
+
+  const agentAllocationEntry = allocations.find(
+    entry => entry.participant.toLowerCase() === agentAddress.toLowerCase(),
   );
+  if (!agentAllocationEntry) {
+    throw new Error(`Missing allocation for agent ${agentAddress}`);
+  }
+
+  const currentAgentAllocation = parseNumber(
+    agentAllocationEntry.amount,
+    `allocation for ${agentAllocationEntry.participant}`,
+  );
+  if (currentAgentAllocation < minAgentAllocation) {
+    console.warn(
+      `WARNING: Agent allocation too low (${currentAgentAllocation}). Bumping to ${formatAmount(minAgentAllocation)} ${assetSymbol} to cover tool spend.`,
+    );
+    agentAllocationEntry.amount = formatAmount(minAgentAllocation);
+    requiredAmount = allocations.reduce(
+      (total, allocation) =>
+        total + parseNumber(allocation.amount, `allocation for ${allocation.participant}`),
+      0,
+    );
+  }
 
   // Pre-run validation: Check agent wallet has funds
   logStage('Pre-run: Validating agent wallet has funds');
@@ -325,10 +359,12 @@ async function runAppSessionFlow(
     arguments: { symbol: stockSymbol },
     _meta: { 'x402/yellow': { appSessionId, payer: agentAddress } },
   });
+  if ((stock as { isError?: boolean }).isError) {
+    throw new Error(`MCP call failed (stock_price): ${JSON.stringify(stock)}`);
+  }
   const stockText = (stock as { content?: Array<{ text?: string }> }).content?.[0]?.text;
   console.log(truncateOutput(stockText ?? JSON.stringify(stock)));
 
-  const stockPrice = getToolPrice(env, 'stock_price');
   localSessionBalance -= stockPrice;
   spentTotal += stockPrice;
 
@@ -339,10 +375,12 @@ async function runAppSessionFlow(
     arguments: { symbol: rumorsSymbol },
     _meta: { 'x402/yellow': { appSessionId, payer: agentAddress } },
   });
+  if ((rumors as { isError?: boolean }).isError) {
+    throw new Error(`MCP call failed (market_rumors): ${JSON.stringify(rumors)}`);
+  }
   const rumorsText = (rumors as { content?: Array<{ text?: string }> }).content?.[0]?.text;
   console.log(truncateOutput(rumorsText ?? JSON.stringify(rumors)));
 
-  const rumorsPrice = getToolPrice(env, 'market_rumors');
   localSessionBalance -= rumorsPrice;
   spentTotal += rumorsPrice;
 
@@ -363,21 +401,23 @@ async function runAppSessionFlow(
   }
 
   logStage('Demo: close app session');
+  const remaining = Math.max(0, localSessionBalance);
+  const spent = Math.max(0, spentTotal);
   const closeAllocations = participants.map(participant => ({
     participant: participant as `0x${string}`,
     asset: assetSymbol,
     amount:
       participant.toLowerCase() === agentAddress.toLowerCase()
-        ? localSessionBalance.toString()
+        ? formatAmount(remaining)
         : participant.toLowerCase() === (merchantParticipant as string).toLowerCase()
-          ? spentTotal.toString()
+          ? formatAmount(spent)
           : '0',
   }));
 
   console.log('Closing session with allocations:');
-  console.log(`  Agent gets back: ${localSessionBalance} ${assetSymbol}`);
-  console.log(`  Merchant receives: ${spentTotal} ${assetSymbol}`);
-  console.log(`  Total allocated: ${localSessionBalance + spentTotal} ${assetSymbol}`);
+  console.log(`  Agent gets back: ${remaining} ${assetSymbol}`);
+  console.log(`  Merchant receives: ${spent} ${assetSymbol}`);
+  console.log(`  Total allocated: ${remaining + spent} ${assetSymbol}`);
   console.log('Full close allocations:', JSON.stringify(closeAllocations, null, 2));
 
   const closeSigner = createECDSAMessageSigner(env.agentPrivateKey as `0x${string}`);
