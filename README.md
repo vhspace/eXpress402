@@ -17,7 +17,27 @@
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
-Sentifi is an autonomous AI trading agent that combines real-time market sentiment analysis with cross-chain DeFi execution. It uses Yellow Network for paid market intelligence and LI.FI SDK for optimal swap routing across chains.
+eXpress402 is a paid MCP server infrastructure for AI agents, implementing x402 v2 with wallet authentication. It provides two payment rails for accessing premium tools and data.
+
+## Payment Rails
+
+### Yellow Network Support
+Off-chain session-based payments with instant settlement:
+- **Pay once, call many times** - Create a session, make unlimited paid calls without per-transaction fees
+- **SIWx authentication** - Wallet-based identity using CAIP-122 message signing
+- **Sub-millisecond lookups** - Session mapping stored in Redis for instant authentication
+- **Zero gas fees** - All payments settled off-chain on Yellow Network
+
+### Arc + Circle Gateway Support
+On-chain payments with blockchain proof:
+- **USDC payments** - Pay with Circle USDC on Arc Testnet
+- **On-chain verification** - Every payment recorded on-chain for full transparency
+- **Circle Gateway integration** - Seamless USDC handling through Circle's infrastructure
+- **Blockchain receipts** - Verifiable payment proofs on Arc Testnet
+
+## Sentifi: Demo Trading Agent
+
+Sentifi demonstrates eXpress402 in action - an autonomous AI trading agent that combines real-time market sentiment analysis with cross-chain DeFi execution. It uses eXpress402 MCP tools for paid market intelligence and LI.FI SDK for optimal swap routing across chains.
 
 ## Wallet Setup
 
@@ -71,20 +91,22 @@ open http://localhost:3456
 ```
 
 The dashboard provides:
-- Real-time sentiment analysis
-- Trading decisions and confidence scores
-- Portfolio tracking with P&L
-- Switch between Yellow and Arc payment rails
+- **Payment rail selector** - Switch between Yellow Network (off-chain) and Arc Gateway (on-chain)
+- **Real-time sentiment analysis** - Live market data from Reddit and news sources
+- **Trading decisions** - AI-powered strategy with confidence scores
+- **Portfolio tracking** - Real-time P&L and position monitoring
 
-## How It Works
+## How Sentifi Uses eXpress402
 
 ![Sentifi Li.fi Trading Agent Flow](assets/sentifi-lifi-trading-flow.png)
 
 **Autonomous Decision Loop**:
-1. **MONITOR** - Fetch sentiment data via eXpress402 MCP (prepaid Yellow sessions)
+1. **MONITOR** - Fetch sentiment data via eXpress402 MCP tools (choose Yellow or Arc rail)
 2. **DECIDE** - Analyze signals and determine strategy (bullish/bearish/neutral)
 3. **EXECUTE** - Route trades through LI.FI SDK across 30+ DEXs for best prices
 4. **RECORD** - Track P&L and update portfolio state
+
+The dashboard lets you switch between payment rails to see both Yellow Network (off-chain) and Arc Gateway (on-chain) in action.
 
 ## Configuration
 
