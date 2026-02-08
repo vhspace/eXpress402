@@ -40,7 +40,7 @@ graph TB
     
     subgraph "Storage Layer"
         R1[(Redis)]
-        R2[Session Map:<br/>wallet → session_id]
+        R2[Session Map:<br/>wallet -> session_id]
         R3[Nonce Tracking:<br/>replay prevention]
     end
     
@@ -108,7 +108,7 @@ sequenceDiagram
     MCP->>Yellow: Verify session balance<br/>getLedgerBalances(0xabc123)
     Yellow->>MCP: Balance: 10 ytest.usd
     
-    MCP->>Redis: Store mapping:<br/>session:{walletAddr} → 0xabc123
+    MCP->>Redis: Store mapping:<br/>session:{walletAddr} -> 0xabc123
     
     MCP->>MCP: Deduct price (0.1)<br/>from session cache
     
@@ -271,7 +271,7 @@ sequenceDiagram
     Monitor->>MCP: callTool("market_rumors", {symbol: "ETH"})<br/>+ Yellow session metadata
     MCP->>Monitor: Reddit: ["ETH breaking out", "bullish trend"]<br/>Tavily: ["Ethereum adoption growing"]
     
-    Monitor->>Monitor: Analyze sentiment:<br/>- Extract keywords (bullish, bearish)<br/>- Detect negations ("not bullish" → bearish)<br/>- Weight by recency & engagement<br/>- Calculate score: -100 to +100
+    Monitor->>Monitor: Analyze sentiment:<br/>- Extract keywords (bullish, bearish)<br/>- Detect negations (not bullish -> bearish)<br/>- Weight by recency & engagement<br/>- Calculate score: -100 to +100
     
     Monitor->>Lifi: getWalletBalances(walletAddress)
     Lifi->>Monitor: Portfolio:<br/>- USDC: 500 (Arbitrum)<br/>- ETH: 0.05 (Base)
@@ -294,7 +294,7 @@ sequenceDiagram
     
     Execute->>Lifi: getRoutes({<br/>  fromChain: 42161,<br/>  toChain: 42161,<br/>  fromToken: USDC,<br/>  toToken: WETH,<br/>  amount: 100000000 (6 decimals)<br/>})
     
-    Lifi->>Lifi: Query 30+ DEXs:<br/>- Uniswap V3: 0.0421 ETH<br/>- Kyberswap: 0.0426 ETH ✓ BEST<br/>- Sushiswap: 0.0418 ETH
+    Lifi->>Lifi: Query 30+ DEXs:<br/>- Uniswap V3: 0.0421 ETH<br/>- Kyberswap: 0.0426 ETH (BEST)<br/>- Sushiswap: 0.0418 ETH
     
     Lifi->>Execute: Route {<br/>  steps: [{<br/>    tool: "Kyberswap",<br/>    fromAmount: "100",<br/>    toAmount: "0.0426",<br/>    gasCostUsd: "0.45"<br/>  }]<br/>}
     
@@ -334,7 +334,7 @@ sequenceDiagram
     Decide->>Agent: Action {<br/>  type: "SWAP_BEARISH",<br/>  params: {fromToken: "ETH", toToken: "USDC"}<br/>}
     
     Agent->>Execute: execute(action, config)
-    Execute->>Lifi: Swap 50% of ETH → USDC
+    Execute->>Lifi: Swap 50% of ETH -> USDC
     Lifi->>Chain: Execute via best DEX
     Execute->>Agent: Success (risk off)
 ```
@@ -351,21 +351,21 @@ flowchart TB
     
     Analyze --> CheckSentiment{Check Sentiment Score}
     
-    CheckSentiment -->|Score > 40| Bullish[BULLISH Signal]
-    CheckSentiment -->|Score < -40| Bearish[BEARISH Signal]
-    CheckSentiment -->|-40 ≤ Score ≤ 40| Neutral[NEUTRAL - Check Other]
+    CheckSentiment -->|Score above 40| Bullish[BULLISH Signal]
+    CheckSentiment -->|Score below -40| Bearish[BEARISH Signal]
+    CheckSentiment -->|Score between -40 and 40| Neutral[NEUTRAL - Check Other]
     
     Bullish --> HasStables{Has Stablecoins?}
-    HasStables -->|Yes| BullishTrade[Swap USDC → ETH]
+    HasStables -->|Yes| BullishTrade[Swap USDC to ETH]
     HasStables -->|No| Hold1[HOLD]
     
     Bearish --> HasRisk{Has Risk Assets?}
-    HasRisk -->|Yes| BearishTrade[Swap ETH → USDC]
+    HasRisk -->|Yes| BearishTrade[Swap ETH to USDC]
     HasRisk -->|No| Hold2[HOLD]
     
     Neutral --> CheckDrift{Portfolio Drift?}
-    CheckDrift -->|> 15%| Rebalance[Rebalance Portfolio]
-    CheckDrift -->|≤ 15%| CheckYield{Large Stable Balance?}
+    CheckDrift -->|over 15%| Rebalance[Rebalance Portfolio]
+    CheckDrift -->|15% or less| CheckYield{Large Stable Balance?}
     
     CheckYield -->|Yes| Yield[Deploy to Aave/Morpho]
     CheckYield -->|No| Hold3[HOLD]
@@ -380,8 +380,8 @@ flowchart TB
     SizeCheck -->|OK| ConfCheck{Confidence OK?}
     
     AdjustSize --> ConfCheck
-    ConfCheck -->|< 50%| Hold4[HOLD]
-    ConfCheck -->|≥ 50%| GetQuote[Get Li.fi Quote]
+    ConfCheck -->|below 50%| Hold4[HOLD]
+    ConfCheck -->|50% or more| GetQuote[Get Li.fi Quote]
     
     GetQuote --> QuoteOK{Quote Valid?}
     QuoteOK -->|No routes| Hold5[HOLD]
@@ -427,17 +427,17 @@ flowchart LR
         
         Keywords[Keyword Detection<br/>BULLISH: moon, pump, buy<br/>BEARISH: crash, dump, sell]
         
-        Negation[Negation Detection<br/>"not bullish" → bearish<br/>"no dump" → bullish]
+        Negation[Negation Detection<br/>not bullish becomes bearish<br/>no dump becomes bullish]
         
         Weight[Apply Weights<br/>- Recent: 2x<br/>- High engagement: 1.5x]
         
-        Score[Calculate Score<br/>Σ(sentiment × weight)<br/>Range: -100 to +100]
+        Score[Calculate Score<br/>sum(sentiment * weight)<br/>Range: -100 to +100]
     end
     
     subgraph Output["Decision Signals"]
-        Bull[Bullish > 40]
-        Neut[Neutral -40 to 40]
-        Bear[Bearish < -40]
+        Bull[Bullish (score above 40)]
+        Neut[Neutral (score -40 to 40)]
+        Bear[Bearish (score below -40)]
     end
     
     Reddit --> Clean
@@ -466,33 +466,33 @@ sequenceDiagram
     participant Chain1 as Arbitrum
     participant Chain2 as Optimism
 
-    Note over Agent,Chain2: SCENARIO: Cross-Chain Swap<br/>100 USDC (Arbitrum) → ETH (Optimism)
+    Note over Agent,Chain2: SCENARIO: Cross-Chain Swap<br/>100 USDC (Arbitrum) -> ETH (Optimism)
     
     Agent->>Lifi: getRoutes({<br/>  fromChain: 42161,<br/>  toChain: 10,<br/>  fromToken: USDC,<br/>  toToken: ETH,<br/>  amount: 100<br/>})
     
-    Lifi->>Lifi: Analyze possible routes:<br/>1. Direct bridge + swap: $8.50 gas<br/>2. Swap then bridge: $7.20 gas ✓<br/>3. Multi-hop: $12.00 gas
+    Lifi->>Lifi: Analyze possible routes:<br/>1. Direct bridge + swap: $8.50 gas<br/>2. Swap then bridge: $7.20 gas (best)<br/>3. Multi-hop: $12.00 gas
     
-    Lifi->>Agent: Best Route (3 steps):<br/>Step 1: Swap USDC→USDT (Kyberswap)<br/>Step 2: Bridge USDT (Stargate)<br/>Step 3: Swap USDT→ETH (Uniswap)
+    Lifi->>Agent: Best Route (3 steps):<br/>Step 1: Swap USDC->USDT (Kyberswap)<br/>Step 2: Bridge USDT (Stargate)<br/>Step 3: Swap USDT->ETH (Uniswap)
     
     Agent->>Lifi: executeRoute(route)
     
     Note over Lifi,Chain1: Step 1: Swap on Source Chain
     
-    Lifi->>DEX1: Swap 100 USDC → USDT
+    Lifi->>DEX1: Swap 100 USDC -> USDT
     DEX1->>Chain1: Execute swap transaction
     Chain1->>DEX1: Success: 99.8 USDT received
     DEX1->>Lifi: Step 1 complete
     
     Note over Lifi,Bridge: Step 2: Bridge Assets
     
-    Lifi->>Bridge: Bridge 99.8 USDT<br/>Arbitrum → Optimism
+    Lifi->>Bridge: Bridge 99.8 USDT<br/>Arbitrum -> Optimism
     Bridge->>Chain1: Lock USDT on Arbitrum
     Bridge->>Chain2: Mint USDT on Optimism
     Bridge->>Lifi: Step 2 complete<br/>~2 minutes
     
     Note over Lifi,Chain2: Step 3: Swap on Destination Chain
     
-    Lifi->>DEX2: Swap 99.8 USDT → ETH
+    Lifi->>DEX2: Swap 99.8 USDT -> ETH
     DEX2->>Chain2: Execute swap transaction
     Chain2->>DEX2: Success: 0.0425 ETH received
     DEX2->>Lifi: Step 3 complete
