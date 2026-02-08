@@ -2,14 +2,6 @@
 
 **Deadline: 22 hours from now**
 
-## ✅ Compliance (DONE)
-
-- [x] All code written after Jan 30, 9am
-- [x] External reference code excluded from submission
-- [x] Git history clean and verifiable
-- [x] Compliance statement prepared (kept private/off-repo)
-- [x] Original Sui contracts written
-
 ## 🚀 Minimum Viable Submission (Next 6 Hours)
 
 ### Hour 1-2: Contract Testing & Deployment
@@ -57,7 +49,6 @@ Create minimal Sui executor that demonstrates concept:
 
 - [x] Built on Sui - `sui-contracts/` deployed to testnet
 - [x] Working prototype - eXpress402 + Sui contracts
-- [x] Clear articulation - Sui integration documentation (kept private/off-repo)
 - [x] Strength in product insight - Novel AI + parallel execution use case
 - [ ] Potential for expansion - Clear roadmap in docs
 
@@ -160,7 +151,6 @@ Before hitting submit:
 - [ ] Sui contracts build successfully
 - [ ] All links in README work
 - [ ] Video plays correctly
-- [ ] Compliance statement is accurate (kept private/off-repo)
 - [ ] Team member credited appropriately
 
 ## 🚀 Post-Submission
