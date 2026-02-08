@@ -110,7 +110,7 @@ console.log('  Evidence: Basescan TX #1, #2\n');
 
 // PART 2: Bridge to Unified (MANUAL STEP)
 console.log('PART 2: Custody → Unified Bridge');
-console.log('  ⚠️  Manual step required (programmatic bridge not working)');
+console.log('  NOTE: Manual step required (programmatic bridge not working)');
 console.log('  Option A: Use apps.yellow.com UI');
 console.log('  Option B: Yellow Network support assistance');
 console.log('  Option C: Use faucet for demo (hybrid)\n');

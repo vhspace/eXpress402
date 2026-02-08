@@ -6,8 +6,8 @@ A clean, educational demonstration of Yellow Network app sessions that shows the
 
 This demo demonstrates the core Yellow app session workflow with two participants:
 
-1. **Agent** - Opens a session with $1 USD, initiates payment
-2. **Merchant** - Receives $0.1 USD payment
+1. **Agent** - Opens a session (example: 1 USDC), initiates payment
+2. **Merchant** - Receives a metered payment (example: 0.1 USDC)
 
 ## What This Demo Shows
 
@@ -15,12 +15,12 @@ This demo demonstrates the core Yellow app session workflow with two participant
 
 ```
 1. Create Session
-   └─ Agent locks $1 USDC
+   └─ Agent locks 1 USDC (example)
    └─ Uses quorum governance (both parties must agree)
 
 2. Payment (State Update)
    └─ Agent submits OPERATE intent
-   └─ Redistributes: Agent $0.9, Merchant $0.1
+   └─ Redistributes: Agent 0.9, Merchant 0.1 (example)
 
 3. Close Session
    └─ Finalizes state
@@ -134,8 +134,8 @@ const appDefinition = {
 };
 
 const allocations = {
-  [agent]: { [USDC]: '1000000' },    // Agent: $1
-  [merchant]: { [USDC]: '0' },       // Merchant: $0
+  [agent]: { [USDC]: '1000000' },    // Agent: 1 USDC (6 decimals)
+  [merchant]: { [USDC]: '0' },       // Merchant: 0
 };
 ```
 
@@ -145,8 +145,8 @@ const allocations = {
 const intent = {
   type: 'OPERATE',              // Redistribute funds
   allocations: {
-    [agent]: { [USDC]: '900000' },     // $0.9
-    [merchant]: { [USDC]: '100000' },  // $0.1
+    [agent]: { [USDC]: '900000' },     // 0.9 USDC
+    [merchant]: { [USDC]: '100000' },  // 0.1 USDC
   },
 };
 

@@ -287,10 +287,10 @@ npm run merchant-offramp -- base
 npm run check-production
 
 # Should show:
-# ✅ Agent wallet: 1+ USDC
-# ✅ Agent unified: 1+ USDC
-# ✅ Yellow Network: Connected
-# ✅ Status: Ready for production demo
+# Agent wallet: 1+ USDC
+# Agent unified: 1+ USDC
+# Yellow Network: Connected
+# Status: Ready for production demo
 ```
 
 ### Run Demo
@@ -373,22 +373,22 @@ npm run merchant-offramp -- base
 ## What This Enables
 
 ### For Demonstrations
-- ✅ Show real money flow
-- ✅ Generate blockchain proof
-- ✅ Validate architecture
-- ✅ Prove production readiness
+- Show real money flow
+- Generate blockchain proof
+- Validate architecture
+- Prove production readiness
 
 ### For Development
-- ✅ Test with real conditions
-- ✅ Measure actual costs
-- ✅ Identify production issues
-- ✅ Optimize for mainnet
+- Test with real conditions
+- Measure actual costs
+- Identify production issues
+- Optimize for mainnet
 
 ### For Production
-- ✅ Deploy with confidence
-- ✅ Handle real transactions
-- ✅ Scale to users
-- ✅ Monitor real costs
+- Deploy with confidence
+- Handle real transactions
+- Scale to users
+- Monitor real costs
 
 ## Next Steps
 
@@ -439,11 +439,11 @@ npm run merchant-offramp -- base
 
 You'll know it's working when:
 
-1. ✅ `npm run check-production` shows "READY"
-2. ✅ Demo runs without errors
-3. ✅ Merchant receives 0.2 USDC in wallet
-4. ✅ Basescan shows all transactions
-5. ✅ Final balances match expectations
+1. `npm run check-production` shows "READY"
+2. Demo runs without errors
+3. Merchant receives 0.2 USDC in wallet
+4. Basescan shows all transactions
+5. Final balances match expectations
 
 ## Summary
 

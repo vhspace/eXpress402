@@ -163,7 +163,7 @@ sequenceDiagram
 - **Verification**: Server recovers address from signature, validates it matches claimed address
 
 #### Session Storage (Redis)
-- **Key Pattern**: `session:{walletAddress}` → `{yellowSessionId}`
+- **Key Pattern**: `session:{walletAddress}` -> `{yellowSessionId}`
 - **Lookup Speed**: Sub-millisecond (in-memory cache)
 - **Nonce Tracking**: `nonce:{hash}` → `"1"` with 5-minute TTL
 - **Persistence**: Survives server restarts
@@ -175,13 +175,9 @@ sequenceDiagram
 - **Allocation**: Agent prefunds session, merchant receives on close
 - **Balance Tracking**: Server maintains local cache to avoid Yellow RPC calls
 
-#### Cost Comparison
+#### Why sessions matter
 
-| Method | First Call | Subsequent Calls | Total (100 calls) |
-|--------|-----------|------------------|-------------------|
-| Traditional on-chain | $2.50 gas + $0.10 | $2.50 gas + $0.10 | $260.00 |
-| eXpress402 (this project) | $0.001 gas + $0.10 | $0.00 + $0.10 | $10.10 |
-| **Savings** | - | **96% reduction** | **96% reduction** |
+- Session-based payments reduce per-call on-chain confirmation overhead by reusing an authenticated payment context.
 
 ---
 
@@ -266,7 +262,7 @@ sequenceDiagram
     Agent->>Monitor: monitor(walletAddress)
     
     Monitor->>MCP: callTool("stock_price", {symbol: "ETH"})<br/>+ Yellow session metadata
-    MCP->>Monitor: Price: $2,345.67
+    MCP->>Monitor: Price: 2345.67
     
     Monitor->>MCP: callTool("market_rumors", {symbol: "ETH"})<br/>+ Yellow session metadata
     MCP->>Monitor: Reddit: ["ETH breaking out", "bullish trend"]<br/>Tavily: ["Ethereum adoption growing"]
@@ -282,9 +278,9 @@ sequenceDiagram
     
     Agent->>Decide: decide(monitorResult, config)
     
-    Decide->>Decide: Evaluate strategies:<br/>1. Sentiment > 40? YES (52)<br/>2. Sufficient balance? YES ($500)<br/>3. Risk check? PASS
+    Decide->>Decide: Evaluate strategies:<br/>1. Sentiment threshold met<br/>2. Balance sufficient<br/>3. Risk check passed
     
-    Decide->>Decide: Select BULLISH trade:<br/>- From: USDC (Arbitrum)<br/>- To: ETH (Arbitrum)<br/>- Amount: $100 (20% of portfolio)<br/>- Reason: "Score 52 exceeds threshold"
+    Decide->>Decide: Select BULLISH trade:<br/>- From: USDC (Arbitrum)<br/>- To: ETH (Arbitrum)<br/>- Amount: 100 USDC (example)<br/>- Reason: Score exceeds threshold
     
     Decide->>Agent: Action {<br/>  type: "SWAP_BULLISH",<br/>  params: {<br/>    fromToken: "USDC",<br/>    toToken: "ETH",<br/>    amount: 100 USDC,<br/>    fromChain: 42161 (Arbitrum)<br/>  },<br/>  confidence: 0.78<br/>}
     
@@ -298,7 +294,7 @@ sequenceDiagram
     
     Lifi->>Execute: Route {<br/>  steps: [{<br/>    tool: "Kyberswap",<br/>    fromAmount: "100",<br/>    toAmount: "0.0426",<br/>    gasCostUsd: "0.45"<br/>  }]<br/>}
     
-    Execute->>Execute: Review route:<br/>- Expected output: 0.0426 ETH<br/>- Gas cost: $0.45<br/>- Slippage: 3%<br/>- Approve? YES
+    Execute->>Execute: Review route:<br/>- Expected output: 0.0426 ETH<br/>- Slippage: 3%<br/>- Approve? YES
     
     Execute->>Lifi: executeRoute(route)
     
@@ -376,7 +372,7 @@ flowchart TB
     Yield --> RiskCheck
     
     RiskCheck --> SizeCheck{Trade Size OK?}
-    SizeCheck -->|Too large| AdjustSize[Reduce to max<br/>$100 per trade]
+    SizeCheck -->|Too large| AdjustSize[Reduce to configured max]
     SizeCheck -->|OK| ConfCheck{Confidence OK?}
     
     AdjustSize --> ConfCheck
@@ -470,7 +466,7 @@ sequenceDiagram
     
     Agent->>Lifi: getRoutes({<br/>  fromChain: 42161,<br/>  toChain: 10,<br/>  fromToken: USDC,<br/>  toToken: ETH,<br/>  amount: 100<br/>})
     
-    Lifi->>Lifi: Analyze possible routes:<br/>1. Direct bridge + swap: $8.50 gas<br/>2. Swap then bridge: $7.20 gas (best)<br/>3. Multi-hop: $12.00 gas
+    Lifi->>Lifi: Analyze possible routes:<br/>1. Direct bridge + swap<br/>2. Swap then bridge (best)<br/>3. Multi-hop
     
     Lifi->>Agent: Best Route (3 steps):<br/>Step 1: Swap USDC->USDT (Kyberswap)<br/>Step 2: Bridge USDT (Stargate)<br/>Step 3: Swap USDT->ETH (Uniswap)
     
@@ -497,7 +493,7 @@ sequenceDiagram
     Chain2->>DEX2: Success: 0.0425 ETH received
     DEX2->>Lifi: Step 3 complete
     
-    Lifi->>Agent: Route executed!<br/>Total: 0.0425 ETH<br/>Gas: $7.20<br/>Time: ~2.5 minutes
+    Lifi->>Agent: Route executed!<br/>Total: 0.0425 ETH<br/>Time: ~2.5 minutes
 ```
 
 ### Key Technical Components
@@ -517,7 +513,7 @@ sequenceDiagram
   2. **Portfolio Rebalancing**: Maintain target allocations (e.g., 40% ETH, 60% USDC)
   3. **Yield Optimization**: Deploy idle stablecoins to Aave/Morpho when neutral
 - **Risk Management**:
-  - Max trade size: $100 per transaction
+  - Max trade size cap per transaction
   - Min confidence: 50%
   - Position size scaling by confidence level
 
@@ -534,37 +530,30 @@ sequenceDiagram
 - Useful for testing strategy logic and showing to judges
 - Shows all decision logic without spending gas
 
-### Cost & Performance Metrics
+### Notes for reviewers
 
-| Metric | Traditional Bot | Sentifi (eXpress402 + Li.fi) |
-|--------|----------------|------------------------------|
-| Market Data per Call | $2.50 gas + $0.10 API | $0.00 (Yellow session) |
-| Swap Execution | Fixed DEX | Best route from 30+ DEXs |
-| Cross-Chain Cost | ~$20 bridge fees | Optimized: $5-10 |
-| Sentiment Data | Manual scraping | Automated via MCP |
-| Total Cost (100 iterations) | $250+ gas + swaps | $10 data + swaps |
+- The Yellow rail is designed for session-based spending (many tool calls under one session).
+- The LI.FI integration is used for route discovery and (optionally) execution in the demo.
 
 ---
 
 ## Summary for Judges
 
 ### Innovation #1: x402 + SIWx + Yellow Network
-- **Problem**: On-chain payments create bottlenecks for AI agents (high fees, slow confirmation)
+- **Problem**: Per-call on-chain payments add latency and friction to agent loops
 - **Solution**: Wallet authentication + off-chain payment sessions
-- **Result**: Pay once, query 100+ times without additional transactions
-- **Impact**: 96% cost reduction for data-intensive AI workflows
+- **Result**: Repeated paid calls under one authenticated session, finalized on session close
 
 ### Innovation #2: Sentifi Trading Agent
-- **Problem**: AI agents need real-time data + cross-chain execution
-- **Solution**: MCP for market intelligence + Li.fi SDK for optimal swaps
-- **Result**: Autonomous trading with sentiment analysis + multi-chain routing
-- **Impact**: 50-60% better swap rates vs single DEX, 40% lower cross-chain costs
+- **Problem**: Cross-chain strategies need reliable routing plus a clear decision loop
+- **Solution**: Signal processing + risk controls + LI.FI routing
+- **Result**: Monitor/decide/execute loop with a web dashboard
 
 ### Key Differentiators
 1. **Standards Compliant**: x402 v2, CAIP-122 SIWx, MCP protocol
 2. **Production Ready**: Real Yellow Network testnet, real Li.fi SDK
 3. **Developer Friendly**: One-command setup, comprehensive docs
-4. **Measurable Impact**: Documented cost savings and performance gains
+4. **Demo Friendly**: UI + CLI demos with diagrams
 
 ### Live Demos
 ```bash
@@ -590,21 +579,21 @@ npm run demo
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  Request 1: API call                                         │
-│    → Create payment transaction: $2.50 gas + 30s confirm    │
-│    → Wait for confirmation                                   │
-│    → Receive data                                            │
+│    -> Create payment transaction                             │
+│    -> Wait for confirmation                                  │
+│    -> Receive data                                           │
 │                                                              │
 │  Request 2: API call                                         │
-│    → Create payment transaction: $2.50 gas + 30s confirm    │
-│    → Wait for confirmation                                   │
-│    → Receive data                                            │
+│    -> Create payment transaction                             │
+│    -> Wait for confirmation                                  │
+│    -> Receive data                                           │
 │                                                              │
 │  Request 3: API call                                         │
-│    → Create payment transaction: $2.50 gas + 30s confirm    │
-│    → Wait for confirmation                                   │
-│    → Receive data                                            │
+│    -> Create payment transaction                             │
+│    -> Wait for confirmation                                  │
+│    -> Receive data                                           │
 │                                                              │
-│  100 calls = $250 gas + 50 minutes waiting                   │
+│  Many calls = repeated confirmations and on-chain overhead    │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -617,19 +606,17 @@ npm run demo
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  Setup (once):                                               │
-│    → Sign SIWx message: 0.001s                               │
-│    → Create Yellow session: $0.001 gas + 2s confirm         │
-│    → Session stored in Redis                                 │
+│    -> Sign SIWx message                                      │
+│    -> Create Yellow session                                  │
+│    -> Session stored in Redis                                │
 │                                                              │
 │  Request 1-100: API calls                                    │
-│    → Verify signature: 0.0001s                               │
-│    → Redis lookup: 0.0001s (sub-millisecond!)               │
-│    → Receive data instantly                                  │
-│    → No blockchain transaction needed                        │
+│    -> Verify signature                                       │
+│    -> Redis lookup                                           │
+│    -> Receive data                                           │
+│    -> No per-call on-chain confirmation required             │
 │                                                              │
-│  100 calls = $10 session cost + 10 seconds total             │
-│                                                              │
-│  SAVINGS: 96% cost reduction, 300x faster                    │
+│  Finalize: close session to settle final allocations          │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -688,7 +675,7 @@ See [Arc + Circle Gateway setup](ARC-GATEWAY-SETUP.md) for required configuratio
 
 We're happy to explain:
 1. How SIWx signature verification works (ECDSA recovery)
-2. Yellow Network quorum 2 implementation (see `docs/history/QUORUM-2-SOLVED.md`)
+2. Yellow Network quorum 2 implementation (see `history/QUORUM-2-SOLVED.md`)
 3. Li.fi route optimization algorithms
 4. Sentiment analysis with negation detection
 5. Redis session storage architecture

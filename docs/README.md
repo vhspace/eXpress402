@@ -4,38 +4,32 @@ This repo has a lot of working demos plus a few deep-dive writeups. This page is
 
 ## Start here
 
-- [README](../README.md): overview + quick start
-- [Demo commands](../DEMO-COMMANDS.md): demo commands (sandbox + production)
+- [Judge guide](JUDGES.md)
+- [README](../README.md)
+- [Demo commands](../DEMO-COMMANDS.md)
 
-## Architecture diagrams (good for submissions)
+## Bounty tracks
 
-- [Hackathon flows](HACKATHON-FLOWS.md): end-to-end flow diagrams (Yellow sessions, Sentifi, Arc + Circle Gateway)
+- [Yellow Network track](bounties/YELLOW.md)
+- [Arc + Circle Gateway (Arc track)](ARC-GATEWAY-SETUP.md)
+- [LI.FI track](bounties/LIFI.md)
 
-## Payment rails
+## Architecture and payment rails
 
-- [Arc + Circle Gateway setup](ARC-GATEWAY-SETUP.md): Arc Testnet + Circle Gateway rail (USDC settlement proof via `gatewayMint`)
-- [x402 Yellow extension](x402-yellow-extension.md): x402 + SIWx payment extensions used by this server
-- [Minimal session demo](minimal-session-demo.md): minimal session demo (quorum 2 mechanics)
+- [Architecture overview](ARCHITECTURE.md)
+- [Payment rails comparison](PAYMENT-RAILS.md)
+- [Hackathon flows (diagrams)](HACKATHON-FLOWS.md)
+- [x402 Yellow extension](x402-yellow-extension.md)
+- [Minimal session demo](minimal-session-demo.md)
 
-## Operations
+## Deployment
 
-- [Agents](../AGENTS.md): agent wallet requirements and SIWx usage
-- [Merchant fund management](../MERCHANT-FUND-MANAGEMENT-GUIDE.md): unified balance vs custody ledger and the available offramps
-- [Merchant offramp](merchant-offramp.md): merchant offramp details and scripts
+- [Railway](deployment/RAILWAY.md)
 
-## Production
+## Reference and archives
 
-- [Production quick start](../PRODUCTION-QUICK-START.md)
-- [Production onboarding](../PRODUCTION-ONBOARDING.md)
-- [Mainnet production guide](../MAINNET-PRODUCTION-GUIDE.md)
-- [Mainnet change log](../CHANGES-FOR-MAINNET.md)
-
-## History / deep dives
-
-- [Mistakes](history/MISTAKES.md): debugging lessons learned
-- [Quorum 2 solved](history/QUORUM-2-SOLVED.md): quorum 2 root cause + fix
-- [Quorum 2 final summary](history/QUORUM-2-FINAL-SUMMARY.md): consolidated quorum 2 summary
-- [Complete flow documentation](../COMPLETE-FLOW-DOCUMENTATION.md)
-- [Unified balance architecture](../UNIFIED-BALANCE-ARCHITECTURE.md)
-- [Payment channel limitation](../PAYMENT-CHANNEL-LIMITATION.md)
+- [Agents](../AGENTS.md)
+- [Merchant offramp](merchant-offramp.md)
+- [Production notes](production/README.md)
+- [Archive](archive/README.md)
 

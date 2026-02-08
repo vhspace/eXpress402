@@ -333,23 +333,23 @@ Merchant receives: 0.2 USDC in wallet
 ## What This Proves
 
 ### Technical Architecture
-✅ SIWx authentication works (wallet-based auth)
-✅ Yellow Network app sessions work (off-chain payments)
-✅ Quorum 2 settlement works (multi-sig governance)
-✅ Unified balance offramp works (off-chain → on-chain)
-✅ Real blockchain integration (Base mainnet)
+- SIWx authentication works (wallet-based auth)
+- Yellow Network app sessions work (off-chain payments)
+- Quorum 2 settlement works (multi-sig governance)
+- Unified balance offramp works (off-chain -> on-chain)
+- Real blockchain integration (Base mainnet)
 
 ### Economic Flow
-✅ Agent can pay for AI services with crypto
-✅ Merchant receives real money in wallet
-✅ All transactions have blockchain proof
-✅ System handles production traffic
+- Agent can pay for AI services with crypto
+- Merchant receives real money in wallet
+- All transactions have blockchain proof
+- System handles production traffic
 
 ### Production Readiness
-✅ Works with real money
-✅ Proper error handling
-✅ Transaction receipts and proof
-✅ Suitable for actual deployment
+- Works with real money
+- Proper error handling
+- Transaction receipts and proof
+- Suitable for actual deployment
 
 ## Next Steps
 
@@ -388,7 +388,7 @@ If you encounter issues:
 
 ## Safety Reminders
 
-⚠️ **Production Safety:**
+**Production safety:**
 - Start with small amounts (1-2 USDC)
 - Test on sandbox first
 - Double-check addresses
@@ -396,7 +396,7 @@ If you encounter issues:
 - Monitor transactions on Basescan
 - Understand gas costs
 
-✅ **Good Practices:**
+**Good practices:**
 - Run sandbox demo first
 - Verify all balances before starting
 - Save all transaction hashes

@@ -1,4 +1,4 @@
-# 🎉 Quorum 2 COMPLETE SUCCESS!
+# Quorum 2 final summary
 
 ## What We Achieved
 
@@ -18,32 +18,32 @@ Merchant: 16.8 ytest.usd
 
 === Creating App Session ===
   Creating session with Quorum 2 (both parties must sign)...
-  ✓ Agent signed
-  ✓ Merchant signed
-  ✓ Quorum: 2/2 signatures collected
-✓ App session created
+  Agent signed
+  Merchant signed
+  Quorum: 2/2 signatures collected
+App session created
 
 === Step 2: After Creating Session ===
-Agent:    Expected: 9999979.8, Got: 9999979.8 ytest.usd ✓
-Session:  Expected: 1.0, Got: 1 ytest.usd ✓
-Merchant: Expected: 16.8, Got: 16.8 ytest.usd ✓
+Agent:    Expected: 9999979.8, Got: 9999979.8 ytest.usd
+Session:  Expected: 1.0, Got: 1 ytest.usd
+Merchant: Expected: 16.8, Got: 16.8 ytest.usd
 
 === Step 3: Closing Session with Redistribution ===
   Redistributing: Agent=0.9, Merchant=0.1
 
 === Closing App Session ===
   Closing session with Quorum 2 (both parties must sign)...
-  ✓ Agent signed
-  ✓ Merchant signed
-  ✓ Quorum: 2/2 signatures collected
-✓ App session closed
+  Agent signed
+  Merchant signed
+  Quorum: 2/2 signatures collected
+App session closed
 
 === Step 4: After Closing Session ===
-Agent:    Expected: 9999980.7, Got: 9999980.7 ytest.usd ✓
-Session:  Expected: 0, Got: 0 ytest.usd ✓
-Merchant: Expected: 16.9, Got: 16.9 ytest.usd ✓
+Agent:    Expected: 9999980.7, Got: 9999980.7 ytest.usd
+Session:  Expected: 0, Got: 0 ytest.usd
+Merchant: Expected: 16.9, Got: 16.9 ytest.usd
 
-🎉🎉 QUORUM 2 SUCCESS! Both create_app_session AND close_app_session used quorum 2!
+QUORUM 2 SUCCESS: Both create_app_session and close_app_session used quorum 2.
 ```
 
 ## The Critical Discovery
@@ -61,7 +61,7 @@ const sig = await signer(requestString);  // ❌ Creates invalid signature
 ### Correct Approach
 ```typescript
 const requestArray = parsed.req;  // [id, method, params, timestamp]
-const sig = await signer(requestArray);   // ✓ Creates valid signature
+const sig = await signer(requestArray);   // Creates valid signature
 ```
 
 ## Implementation Pattern
@@ -95,10 +95,10 @@ With quorum 2 working, you can build:
 - **Trustless applications** requiring multi-party agreement
 
 All with:
-- ✅ Instant state updates (< 1 second)
-- ✅ Zero gas fees
-- ✅ Off-chain operation
-- ✅ Cryptographic security
+- Instant state updates
+- Zero gas fees
+- Off-chain operation
+- Cryptographic security
 
 ## Files Created
 
@@ -113,10 +113,10 @@ set -a && source .env && npm run minimal-session
 ```
 
 Watch as:
-1. Both parties sign session creation ✓
-2. Session is funded with 1.0 ytest.usd ✓
-3. Both parties sign session close with payment distribution ✓
-4. Merchant receives exactly 0.1 ytest.usd ✓
+1. Both parties sign session creation
+2. Session is funded with 1.0 ytest.usd
+3. Both parties sign session close with payment distribution
+4. Merchant receives exactly 0.1 ytest.usd
 
 Every step shows Expected vs Got for Agent, Session, and Merchant!
 
@@ -142,4 +142,4 @@ Now that quorum 2 works, you can:
 
 ---
 
-**Special thanks to the debugging process that led us here - systematic investigation pays off!** 🚀
+Special thanks to the debugging process that led us here.

@@ -99,10 +99,10 @@ Merchant (0.2 USDC) + Agent (0.8 USDC) = 1.0 USDC total
    Basescan evidence: Channel creation + Close + Withdrawal
 
 **What this proves:**
-- ✅ Real blockchain transactions (deposit + withdrawal)
-- ✅ App session payment flow (sandbox but identical to prod)
-- ✅ Merchant can withdraw to wallet
-- ⚠️ Uses sandbox for middle step (unified balance funding gap)
+- Real blockchain transactions (deposit + withdrawal)
+- App session payment flow (sandbox but identical to prod)
+- Merchant can withdraw to wallet
+- Note: uses sandbox for one middle step (unified balance funding gap)
 
 **Honest documentation:**
 ```
@@ -155,9 +155,9 @@ If it works, you get instant unified balance funding (similar to sandbox).
    Show Basescan withdrawal proof
 
 5. **Summary:**
-   - Real money in ✅ (Basescan)
-   - Payment flow works ✅ (Yellow Network)
-   - Real money out ✅ (Basescan)
+   - Real money in (Basescan)
+   - Payment flow works (Yellow Network)
+   - Real money out (Basescan)
    - Custody→Unified: One-time setup via Yellow apps UI
 
 **Key message:**

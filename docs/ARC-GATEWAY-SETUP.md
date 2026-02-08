@@ -3,7 +3,9 @@
 This repo supports x402 v2 payments using **Arc Testnet + Circle Gateway**, verified onchain via a `GatewayMinter.AttestationUsed` event.
 Use this rail when you want **Arc-native USDC receipts** instead of Yellow offchain sessions.
 
-This document is tailored to the Arc bounty **"Best Agentic Commerce App Powered by Real-World Assets on Arc"** ($2,500).
+This document is tailored to the Arc bounty **"Best Agentic Commerce App Powered by Real-World Assets on Arc"**.
+
+For a side-by-side comparison with the Yellow rail, see `PAYMENT-RAILS.md`.
 
 ## How this maps to the ARC bounty
 
@@ -27,7 +29,7 @@ If you want to extend toward RWA collateral flows (borrow/repay/rebalance), this
 - **Architecture diagram**: [Arc + Circle Gateway x402 flow](HACKATHON-FLOWS.md#3-arc--circle-gateway-x402-flow)
 - **Video demo outline (60–120s)**:
   - show unified balance deposit (`npx tsx scripts/arc-gateway-deposit.ts 10`)
-  - dashboard: **Rail** → **Arc + Circle Gateway** → **LOGIN**
+  - dashboard: **Rail** -> **Arc + Circle Gateway** -> **LOGIN**
   - trigger **Analyze**, show `LAST MINT` and the mint tx in Arc explorer
 - **Product feedback**: note any friction points you hit (faucet, deposit UX, error messages, confirmation time, etc.)
 
