@@ -9,3 +9,8 @@ build/
 attic/
 review/
 attic/
+
+# Private / not for repository history
+COMPLIANCE.md
+SUI-INTEGRATION.md
+TEAMMATE-SITUATION-RESOLVED.md
