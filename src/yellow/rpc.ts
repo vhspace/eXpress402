@@ -114,6 +114,7 @@ export type AppDefinition = {
 
 export class YellowRpcClient extends EventEmitter {
   private ws?: WebSocket;
+  private connectInFlight?: Promise<void>;
   private requestId = 1;
   private pending = new Map<
     number,
@@ -132,38 +133,58 @@ export class YellowRpcClient extends EventEmitter {
       return;
     }
 
+    if (this.connectInFlight) {
+      await this.connectInFlight;
+      return;
+    }
+
     // Authentication state is scoped to a single websocket connection.
     // If we reconnect, force a fresh authenticate() before any signed calls.
     this.authenticated = false;
     this.sessionPrivateKey = undefined;
 
-    this.ws = new WebSocket(this.options.url);
-    this.ws.on('message', (data: WebSocket.Data) =>
-      this.handleMessage(Buffer.from(data as Uint8Array).toString()),
-    );
-    this.ws.on('error', error => {
+    const ws = new WebSocket(this.options.url);
+    this.ws = ws;
+
+    ws.on('message', (data: WebSocket.Data) => this.handleMessage(Buffer.from(data as Uint8Array).toString()));
+    ws.on('error', error => {
       console.error('Yellow RPC socket error:', error);
     });
-    this.ws.on('close', () => {
+    ws.on('close', () => {
       this.authenticated = false;
       this.sessionPrivateKey = undefined;
+
+      // Reject any in-flight requests so callers don't hang until timeout.
+      const pending = Array.from(this.pending.values());
+      this.pending.clear();
+      pending.forEach(p => p.reject(new Error('Yellow RPC connection closed')));
     });
 
-    await new Promise<void>((resolve, reject) => {
+    this.connectInFlight = new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Yellow RPC connection timeout')), 10_000);
-      this.ws?.once('open', () => {
+
+      ws.once('open', () => {
         clearTimeout(timeout);
         resolve();
       });
-      this.ws?.once('close', () => {
+      ws.once('close', () => {
         clearTimeout(timeout);
         reject(new Error('Yellow RPC connection closed'));
       });
-    });
+    })
+      .finally(() => {
+        this.connectInFlight = undefined;
+      });
+
+    await this.connectInFlight;
   }
 
   async request<T>(method: string, params: Record<string, unknown>, sign = false): Promise<T> {
     await this.connect();
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error('Yellow RPC socket not open');
+    }
 
     const id = this.requestId++;
     const req: NitroRpcRequest['req'] = [id, method, params, Date.now()];
@@ -187,12 +208,20 @@ export class YellowRpcClient extends EventEmitter {
           reject(err);
         },
       });
+
+       // Send after pending is registered; reject safely if send fails.
+      try {
+        ws.send(message);
+      } catch (error) {
+        clearTimeout(timeout);
+        this.pending.delete(id);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     });
 
     if (this.options.debug) {
       console.error('[yellow-rpc] send', message);
     }
-    this.ws?.send(message);
     return response;
   }
 
@@ -508,6 +537,11 @@ export class YellowRpcClient extends EventEmitter {
 
   private async sendRaw(message: string) {
     await this.connect();
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error('Yellow RPC socket not open');
+    }
+
     const parsed = JSON.parse(message) as NitroRpcRequest;
     const id = parsed.req?.[0];
     if (typeof id !== 'number') {
@@ -530,12 +564,20 @@ export class YellowRpcClient extends EventEmitter {
           reject(err);
         },
       });
+
+      // Send after pending is registered; reject safely if send fails.
+      try {
+        ws.send(message);
+      } catch (error) {
+        clearTimeout(timeout);
+        this.pending.delete(id);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     });
 
     if (this.options.debug) {
       console.error('[yellow-rpc] sendRaw', message);
     }
-    this.ws?.send(message);
     return response;
   }
 

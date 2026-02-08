@@ -36,8 +36,8 @@ export async function fetchRedditRumors(query: string, limit = 5): Promise<Reddi
 
   const children = data.data?.children ?? [];
   const now = Date.now();
-  const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
-  
+  const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
+
   const posts = children
     .map(child => child.data ?? {})
     .map(post => ({
@@ -59,10 +59,12 @@ export async function fetchRedditRumors(query: string, limit = 5): Promise<Reddi
   console.error('[Reddit] Fetched results (last 24h only):');
   posts.forEach((post, i) => {
     const createdDate = post.createdUtc ? new Date(post.createdUtc * 1000) : null;
-    const hoursAgo = createdDate 
+    const hoursAgo = createdDate
       ? ((Date.now() - createdDate.getTime()) / (1000 * 60 * 60)).toFixed(1)
       : 'unknown';
-    console.error(`  [${i + 1}] ${hoursAgo}h ago (r/${post.subreddit}): ${post.title.substring(0, 50)}...`);
+    console.error(
+      `  [${i + 1}] ${hoursAgo}h ago (r/${post.subreddit}): ${post.title.substring(0, 50)}...`,
+    );
   });
 
   return posts;

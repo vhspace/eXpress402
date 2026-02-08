@@ -22,5 +22,7 @@ beforeAll(() => {
 
   console.log('[Test Setup] Environment configured');
   console.log(`[Test Setup] KV_URL: ${process.env.KV_URL}`);
-  console.log(`[Test Setup] Yellow credentials: ${process.env.YELLOW_AGENT_PRIVATE_KEY ? 'loaded' : 'missing'}`);
+  console.log(
+    `[Test Setup] Yellow credentials: ${process.env.YELLOW_AGENT_PRIVATE_KEY ? 'loaded' : 'missing'}`,
+  );
 });
